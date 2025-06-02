@@ -56,25 +56,34 @@ struct EpisodeView: View {
         let preferredQuality = AppSettings.shared.preferredQuality
         let source = streamingData.sources.first { source in
             source.quality?.lowercased() == preferredQuality.lowercased()
-        } ?? streamingData.sources.first
+        } ?? streamingData.sources.sorted { (s1, s2) in
+            guard let q1 = s1.quality?.replacingOccurrences(of: "p", with: ""),
+                  let q2 = s2.quality?.replacingOccurrences(of: "p", with: ""),
+                  let quality1 = Int(q1),
+                  let quality2 = Int(q2) else { return false }
+            return abs(quality1 - Int(preferredQuality.replacingOccurrences(of: "p", with: ""))!) <
+                   abs(quality2 - Int(preferredQuality.replacingOccurrences(of: "p", with: ""))!)
+        }.first ?? streamingData.sources.first
         
         guard let source = source,
               let url = URL(string: source.url) else { return }
         
-        // Configure headers
-        let headers: [String: String] = [
+        // Configure headers with secure defaults
+        let headers: [String: String] = streamingData.headers ?? [
             "Origin": "https://megacloud.club",
             "Referer": "https://megacloud.club/",
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1"
         ]
         
-        // Create asset with headers
+        // Create asset with headers and optimize for streaming
         let asset = AVURLAsset(url: url, options: [
-            "AVURLAssetHTTPHeaderFieldsKey": headers
+            "AVURLAssetHTTPHeaderFieldsKey": headers,
+            "AVURLAssetHTTPUserAgentKey": headers["User-Agent"] ?? ""
         ])
         
         let playerItem = AVPlayerItem(asset: asset)
         playerItem.preferredForwardBufferDuration = 10
+        playerItem.canUseNetworkResourcesForLiveStreamingWhilePaused = true
         
         // Create and configure player
         if player == nil {
@@ -85,6 +94,7 @@ struct EpisodeView: View {
         
         player?.actionAtItemEnd = AppSettings.shared.autoplayEnabled ? .advance : .pause
         player?.automaticallyWaitsToMinimizeStalling = true
+        player?.volume = 1.0
         
         // Start playback
         player?.play()
@@ -92,6 +102,7 @@ struct EpisodeView: View {
     
     private func cleanup() {
         player?.pause()
+        player?.replaceCurrentItem(with: nil)
         player = nil
     }
 }

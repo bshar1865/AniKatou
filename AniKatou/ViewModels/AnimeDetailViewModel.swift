@@ -7,27 +7,43 @@ class AnimeDetailViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     
+    private var loadTask: Task<Void, Never>?
+    
     func loadAnimeDetails(id: String) async {
-        isLoading = true
-        errorMessage = nil
+        // Cancel any existing load task
+        loadTask?.cancel()
         
-        do {
-            // Load both details and episodes in parallel
-            async let detailsTask = APIService.shared.getAnimeDetails(id: id)
-            async let episodesTask = APIService.shared.getAnimeEpisodes(id: id)
+        loadTask = Task {
+            isLoading = true
+            errorMessage = nil
             
-            let (details, episodes) = try await (detailsTask, episodesTask)
-            self.animeDetails = details
-            self.episodes = episodes
-        } catch let error as APIError {
-            errorMessage = error.message
-            print("API Error: \(error.message)")
-        } catch {
-            errorMessage = "Failed to load anime details: \(error.localizedDescription)"
-            print("Load error: \(error)")
+            do {
+                // Load both details and episodes in parallel with error handling for each
+                async let detailsTask = APIService.shared.getAnimeDetails(id: id)
+                async let episodesTask = APIService.shared.getAnimeEpisodes(id: id)
+                
+                // Wait for both tasks to complete or fail
+                do {
+                    let (details, episodes) = try await (detailsTask, episodesTask)
+                    if !Task.isCancelled {
+                        self.animeDetails = details
+                        self.episodes = episodes.sorted { $0.number < $1.number }
+                    }
+                } catch let error as APIError {
+                    if !Task.isCancelled {
+                        errorMessage = error.message
+                    }
+                } catch {
+                    if !Task.isCancelled {
+                        errorMessage = "Failed to load anime details: \(error.localizedDescription)"
+                    }
+                }
+            }
+            
+            if !Task.isCancelled {
+                isLoading = false
+            }
         }
-        
-        isLoading = false
     }
     
     func animeToBookmarkItem() -> AnimeItem? {
@@ -48,5 +64,9 @@ class AnimeDetailViewModel: ObservableObject {
     func isBookmarked() -> Bool {
         guard let anime = animeToBookmarkItem() else { return false }
         return BookmarkManager.shared.isBookmarked(anime)
+    }
+    
+    deinit {
+        loadTask?.cancel()
     }
 } 

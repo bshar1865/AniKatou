@@ -5,7 +5,7 @@ enum APIError: Error {
     case invalidResponse
     case networkError(Error)
     case decodingError(Error)
-    case serverError(Int)
+    case serverError(Int, String?)
     case notConfigured
     case invalidEndpoint
     case invalidAnimeURL
@@ -13,24 +13,15 @@ enum APIError: Error {
     
     var message: String {
         switch self {
-        case .invalidURL:
-            return "Invalid URL format"
-        case .invalidResponse:
-            return "Invalid response from server"
-        case .networkError(let error):
-            return "Network error: \(error.localizedDescription)"
-        case .decodingError(let error):
-            return "Failed to decode response: \(error.localizedDescription)"
-        case .serverError(let code):
-            return "Server error with code: \(code)"
-        case .notConfigured:
-            return "API URL not configured"
-        case .invalidEndpoint:
-            return "Invalid API endpoint"
-        case .invalidAnimeURL:
-            return "Invalid anime URL format"
-        case .invalidEpisodeId:
-            return "Invalid episode ID format"
+        case .invalidURL: return "Invalid URL format"
+        case .invalidResponse: return "Invalid response from server"
+        case .networkError(let error): return "Network error: \(error.localizedDescription)"
+        case .decodingError(let error): return "Failed to decode response: \(error.localizedDescription)"
+        case .serverError(let code, let message): return message ?? "Server error with code: \(code)"
+        case .notConfigured: return "API URL not configured"
+        case .invalidEndpoint: return "Invalid API endpoint"
+        case .invalidAnimeURL: return "Invalid anime URL format"
+        case .invalidEpisodeId: return "Invalid episode ID format"
         }
     }
 }
@@ -43,6 +34,7 @@ class APIService {
     private init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
+        config.waitsForConnectivity = true
         session = URLSession(configuration: config)
         
         decoder = JSONDecoder()
@@ -98,35 +90,23 @@ class APIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
         
-        print("Making request to: \(baseURL.absoluteString)")
-        print("Headers: \(request.allHTTPHeaderFields ?? [:])")
-        
         let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
         
-        print("Response status code: \(httpResponse.statusCode)")
-        print("Response headers: \(httpResponse.allHeaderFields)")
-        
-        if let responseString = String(data: data, encoding: .utf8) {
-            print("Response data: \(responseString)")
-        }
-        
         if !(200...299).contains(httpResponse.statusCode) {
-            if let errorResponse = try? JSONDecoder().decode([String: String].self, from: data),
-               let errorMessage = errorResponse["message"] {
-                print("Error response body: \(errorMessage)")
+            var errorMessage: String?
+            if let errorResponse = try? JSONDecoder().decode([String: String].self, from: data) {
+                errorMessage = errorResponse["message"]
             }
-            throw APIError.serverError(httpResponse.statusCode)
+            throw APIError.serverError(httpResponse.statusCode, errorMessage)
         }
         
         do {
             return try decoder.decode(T.self, from: data)
         } catch {
-            print("Decoding error: \(error)")
-            print("Failed to decode response: \(String(data: data, encoding: .utf8) ?? "")")
             throw APIError.decodingError(error)
         }
     }
