@@ -17,47 +17,38 @@ class SearchViewModel: ObservableObject {
     
     func search(query: String) async {
         guard !query.isEmpty else {
-            searchResults = []
-            errorMessage = nil
-            isLoading = false
+            await clearResults()
             return
         }
         
-        // Cancel any existing search
-        searchTask?.cancel()
+        // Cancel any previous search task
+        await cleanupSearch()
         
-        searchTask = Task {
+        // Create new search task
+        let task = Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            
+            self.isLoading = true
+            self.errorMessage = nil
+            
             do {
-                isLoading = true
-                errorMessage = nil
-                
-                // Debounce search
-                try await Task.sleep(nanoseconds: debounceInterval)
-                
-                // Check if task was cancelled during sleep
-                if Task.isCancelled { return }
-                
                 let results = try await APIService.shared.searchAnime(query: query)
                 
-                // Check if task was cancelled after API call
-                if Task.isCancelled { return }
-                
-                searchResults = results
-                hasNextPage = !results.isEmpty
+                guard !Task.isCancelled else { return }
+                self.searchResults = results
             } catch let error as APIError {
-                if !Task.isCancelled {
-                    errorMessage = error.message
-                }
+                guard !Task.isCancelled else { return }
+                self.errorMessage = error.message
             } catch {
-                if !Task.isCancelled {
-                    errorMessage = "Failed to search: \(error.localizedDescription)"
-                }
+                guard !Task.isCancelled else { return }
+                self.errorMessage = "Failed to search: \(error.localizedDescription)"
             }
             
-            if !Task.isCancelled {
-                isLoading = false
-            }
+            guard !Task.isCancelled else { return }
+            self.isLoading = false
         }
+        
+        searchTask = task
     }
     
     func loadNextPage(query: String) async {
@@ -65,7 +56,28 @@ class SearchViewModel: ObservableObject {
         await search(query: query)
     }
     
-    deinit {
+    // Made public for access from SearchView
+    func cleanupSearch() async {
         searchTask?.cancel()
+        searchTask = nil
+        await MainActor.run {
+            isLoading = false
+        }
+    }
+    
+    func clearResults() async {
+        await cleanupSearch()
+        await MainActor.run {
+            searchResults = []
+            errorMessage = nil
+        }
+    }
+    
+    deinit {
+        // Since we can't use async in deinit, we'll create a task
+        // that will be automatically cancelled if needed
+        Task { @MainActor [weak self] in
+            await self?.cleanupSearch()
+        }
     }
 } 

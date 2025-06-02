@@ -105,7 +105,7 @@ struct AboutView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical)
                 
-                Link(destination: URL(string: "https://github.com/bsharEsfky/AniKatou")!) {
+                Link(destination: URL(string: "https://github.com/bshar1865/AniKatou")!) {
                     Label("View on GitHub", systemImage: "link")
                 }
                 
