@@ -2,12 +2,9 @@ import SwiftUI
 import AVKit
 
 struct EpisodeView: View {
-    let animeId: String
     let episodeId: String
-    let episodeNumber: Int
     @StateObject private var viewModel = EpisodeViewModel()
     @State private var player: AVPlayer?
-    @State private var timeObserverToken: Any?
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -35,7 +32,7 @@ struct EpisodeView: View {
                             .cornerRadius(8)
                         }
                     } else if let streamingData = viewModel.streamingData?.data {
-                        BasicVideoPlayer(player: player)
+                        VideoPlayer(player: player)
                             .edgesIgnoringSafeArea(.all)
                             .onAppear {
                                 setupPlayer(with: streamingData)
@@ -47,7 +44,8 @@ struct EpisodeView: View {
                 }
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
+        .statusBar(hidden: true)
+        .navigationBarHidden(true)
         .task {
             await viewModel.loadStreamingSources(episodeId: episodeId)
         }
@@ -76,6 +74,7 @@ struct EpisodeView: View {
         ])
         
         let playerItem = AVPlayerItem(asset: asset)
+        playerItem.preferredForwardBufferDuration = 10
         
         // Create and configure player
         if player == nil {
@@ -84,45 +83,20 @@ struct EpisodeView: View {
             player?.replaceCurrentItem(with: playerItem)
         }
         
-        // Restore previous progress
-        if let progress = WatchProgressManager.shared.getProgress(animeId: animeId, episodeId: episodeId) {
-            player?.seek(to: CMTime(seconds: progress.timestamp, preferredTimescale: 1))
-        }
-        
-        // Add time observer for progress tracking
-        let interval = CMTime(seconds: 5, preferredTimescale: 1)
-        timeObserverToken = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
-            let currentTime = time.seconds
-            if let duration = player?.currentItem?.duration.seconds, duration.isFinite {
-                WatchProgressManager.shared.saveProgress(
-                    animeId: animeId,
-                    episodeId: episodeId,
-                    episodeNumber: episodeNumber,
-                    timestamp: currentTime,
-                    duration: duration
-                )
-            }
-        }
-        
-        player?.actionAtItemEnd = .pause // Disable autoplay in preview
-        #if !DEBUG
         player?.actionAtItemEnd = AppSettings.shared.autoplayEnabled ? .advance : .pause
-        #endif
+        player?.automaticallyWaitsToMinimizeStalling = true
         
+        // Start playback
         player?.play()
     }
     
     private func cleanup() {
-        if let token = timeObserverToken {
-            player?.removeTimeObserver(token)
-            timeObserverToken = nil
-        }
         player?.pause()
         player = nil
     }
 }
 
-struct BasicVideoPlayer: UIViewControllerRepresentable {
+struct VideoPlayer: UIViewControllerRepresentable {
     let player: AVPlayer?
     
     func makeUIViewController(context: Context) -> AVPlayerViewController {
@@ -130,6 +104,16 @@ struct BasicVideoPlayer: UIViewControllerRepresentable {
         controller.player = player
         controller.showsPlaybackControls = true
         controller.videoGravity = .resizeAspect
+        controller.allowsPictureInPicturePlayback = true
+        controller.entersFullScreenWhenPlaybackBegins = true
+        controller.canStartPictureInPictureAutomaticallyFromInline = true
+        controller.updatesNowPlayingInfoCenter = true
+        
+        // Force landscape orientation
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscape))
+        }
+        
         return controller
     }
     
@@ -139,11 +123,5 @@ struct BasicVideoPlayer: UIViewControllerRepresentable {
 }
 
 #Preview {
-    NavigationView {
-        EpisodeView(
-            animeId: "example-anime-id",
-            episodeId: "example-episode-id",
-            episodeNumber: 1
-        )
-    }
+    EpisodeView(episodeId: "example-episode-id")
 } 
