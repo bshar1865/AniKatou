@@ -17,8 +17,10 @@ struct AniKatouApp: App {
                 NavigationView {
                     APIConfigView(isInitialSetup: true)
                 }
+                .preferredColorScheme(.dark)
             } else {
-            ContentView()
+                ContentView()
+                    .preferredColorScheme(.dark)
             }
         }
     }

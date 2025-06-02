@@ -6,7 +6,6 @@ class AppSettings {
     private let defaults = UserDefaults.standard
     private let serverKey = "preferred_server"
     private let languageKey = "preferred_language"
-    private let themeKey = "app_theme"
     private let autoplayKey = "autoplay_enabled"
     private let qualityKey = "video_quality"
     
@@ -36,30 +35,6 @@ class AppSettings {
             ("sub", "Subbed"),
             ("dub", "Dubbed")
         ]
-    }
-    
-    // Theme Settings
-    enum AppTheme: String {
-        case system, light, dark
-        
-        var displayName: String {
-            switch self {
-            case .system: return "System"
-            case .light: return "Light"
-            case .dark: return "Dark"
-            }
-        }
-    }
-    
-    var theme: AppTheme {
-        get {
-            if let savedTheme = defaults.string(forKey: themeKey),
-               let theme = AppTheme(rawValue: savedTheme) {
-                return theme
-            }
-            return .system
-        }
-        set { defaults.set(newValue.rawValue, forKey: themeKey) }
     }
     
     // Playback Settings

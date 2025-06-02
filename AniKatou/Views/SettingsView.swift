@@ -43,16 +43,6 @@ struct SettingsView: View {
             }
             
             Section {
-                Picker("Theme", selection: $viewModel.theme) {
-                    ForEach([AppSettings.AppTheme.system, .light, .dark], id: \.self) { theme in
-                        Text(theme.displayName).tag(theme)
-                    }
-                }
-            } header: {
-                Text("Appearance")
-            }
-            
-            Section {
                 Picker("Video Quality", selection: $viewModel.preferredQuality) {
                     ForEach(AppSettings.shared.availableQualities, id: \.id) { quality in
                         Text(quality.name).tag(quality.id)
@@ -84,6 +74,7 @@ struct SettingsView: View {
                 APIConfigView()
             }
         }
+        .preferredColorScheme(.dark)
     }
 }
 

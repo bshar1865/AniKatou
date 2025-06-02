@@ -39,35 +39,6 @@ struct HomeView: View {
     }
 }
 
-struct BookmarkCard: View {
-    let anime: AnimeItem
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            AsyncImage(url: URL(string: anime.image)) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Color.gray
-            }
-            .frame(height: 160)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            
-            Text(anime.title)
-                .font(.headline)
-                .lineLimit(2)
-                .foregroundColor(.primary)
-            
-            if let type = anime.type {
-                Text(type)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-    }
-}
-
 #Preview {
     NavigationView {
         HomeView()

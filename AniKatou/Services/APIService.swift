@@ -10,6 +10,7 @@ enum APIError: Error {
     case invalidEndpoint
     case invalidAnimeURL
     case invalidEpisodeId
+    case searchQueryTooShort
     
     var message: String {
         switch self {
@@ -22,6 +23,7 @@ enum APIError: Error {
         case .invalidEndpoint: return "Invalid API endpoint"
         case .invalidAnimeURL: return "Invalid anime URL format"
         case .invalidEpisodeId: return "Invalid episode ID format"
+        case .searchQueryTooShort: return "Search query must be at least 3 characters"
         }
     }
 }
@@ -30,11 +32,11 @@ class APIService {
     static let shared = APIService()
     private let decoder: JSONDecoder
     private let session: URLSession
+    private let userAgent = "AniKatou/1.0"
     
     private init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
-        config.waitsForConnectivity = true
         session = URLSession(configuration: config)
         
         decoder = JSONDecoder()
@@ -44,7 +46,7 @@ class APIService {
     // Search anime
     func searchAnime(query: String) async throws -> [AnimeItem] {
         guard query.count >= 3 else {
-            return []
+            throw APIError.searchQueryTooShort
         }
         
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
@@ -65,7 +67,6 @@ class APIService {
     
     // Get streaming URLs
     func getStreamingSources(episodeId: String, category: String = "sub", server: String = "hd-1") async throws -> StreamingResult {
-        // Validate episode ID format (should be like "anime-name?ep=number")
         guard episodeId.contains("?ep=") else {
             throw APIError.invalidEpisodeId
         }
@@ -88,26 +89,30 @@ class APIService {
         var request = URLRequest(url: baseURL)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
-        
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-        
-        if !(200...299).contains(httpResponse.statusCode) {
-            var errorMessage: String?
-            if let errorResponse = try? JSONDecoder().decode([String: String].self, from: data) {
-                errorMessage = errorResponse["message"]
-            }
-            throw APIError.serverError(httpResponse.statusCode, errorMessage)
-        }
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         
         do {
+            let (data, response) = try await session.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.invalidResponse
+            }
+            
+            if !(200...299).contains(httpResponse.statusCode) {
+                var errorMessage: String?
+                if let errorResponse = try? JSONDecoder().decode([String: String].self, from: data) {
+                    errorMessage = errorResponse["message"]
+                }
+                throw APIError.serverError(httpResponse.statusCode, errorMessage)
+            }
+            
             return try decoder.decode(T.self, from: data)
-        } catch {
+        } catch let error as APIError {
+            throw error
+        } catch let error as DecodingError {
             throw APIError.decodingError(error)
+        } catch {
+            throw APIError.networkError(error)
         }
     }
 } 

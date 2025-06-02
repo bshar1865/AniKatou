@@ -15,12 +15,6 @@ class SettingsViewModel: ObservableObject {
         }
     }
     
-    @Published var theme: AppSettings.AppTheme {
-        didSet {
-            AppSettings.shared.theme = theme
-        }
-    }
-    
     @Published var preferredQuality: String {
         didSet {
             AppSettings.shared.preferredQuality = preferredQuality
@@ -36,7 +30,6 @@ class SettingsViewModel: ObservableObject {
     init() {
         preferredServer = AppSettings.shared.preferredServer
         preferredLanguage = AppSettings.shared.preferredLanguage
-        theme = AppSettings.shared.theme
         preferredQuality = AppSettings.shared.preferredQuality
         autoplayEnabled = AppSettings.shared.autoplayEnabled
     }

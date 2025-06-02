@@ -6,65 +6,46 @@ struct SearchView: View {
     @State private var searchTask: Task<Void, Never>?
     
     var body: some View {
-        if #available(iOS 16.0, *) {
-            searchContent
-                .navigationTitle("Search")
-                .searchable(text: $searchText, prompt: "Search anime...")
-                .onChange(of: searchText) { _, newValue in
-                    handleSearchTextChange(newValue)
-                }
-                .onDisappear {
-                    cancelCurrentSearch()
-                }
-        } else {
-            // iOS 15 compatibility
-            searchContent
-                .navigationTitle("Search")
-                .searchable(text: $searchText, prompt: "Search anime...")
-                .onChange(of: searchText) { newValue in
-                    handleSearchTextChange(newValue)
-                }
-                .onDisappear {
-                    cancelCurrentSearch()
-                }
-        }
-    }
-    
-    private var searchContent: some View {
-        NavigationView {
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    if viewModel.isLoading {
-                        ProgressView()
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                if viewModel.isLoading {
+                    ProgressView()
+                        .padding()
+                } else if let error = viewModel.errorMessage {
+                    VStack(spacing: 12) {
+                        Text(error)
+                            .foregroundColor(.red)
                             .padding()
-                    } else if let error = viewModel.errorMessage {
-                        VStack(spacing: 12) {
-                            Text(error)
-                                .foregroundColor(.red)
-                                .padding()
-                            
-                            Button("Retry") {
-                                handleSearchTextChange(searchText)
-                            }
-                            .foregroundColor(.blue)
+                        
+                        Button("Retry") {
+                            handleSearchTextChange(searchText)
                         }
-                    } else if viewModel.searchResults.isEmpty && !searchText.isEmpty && !viewModel.isLoading {
-                        Text("No results found")
-                            .foregroundColor(.secondary)
-                            .padding()
-                    } else {
-                        ForEach(viewModel.searchResults) { anime in
-                            AnimeCard(anime: anime)
-                                .padding(.horizontal)
-                        }
+                        .foregroundColor(.blue)
+                    }
+                } else if viewModel.searchResults.isEmpty && !searchText.isEmpty && !viewModel.isLoading {
+                    Text("No results found")
+                        .foregroundColor(.secondary)
+                        .padding()
+                } else {
+                    ForEach(viewModel.searchResults) { anime in
+                        AnimeCard(anime: anime)
+                            .padding(.horizontal)
                     }
                 }
             }
-            .refreshable {
-                if !searchText.isEmpty {
-                    handleSearchTextChange(searchText)
-                }
+        }
+        .refreshable {
+            if !searchText.isEmpty {
+                handleSearchTextChange(searchText)
             }
+        }
+        .navigationTitle("Search")
+        .searchable(text: $searchText, prompt: "Search anime...")
+        .onChange(of: searchText) { newValue in
+            handleSearchTextChange(newValue)
+        }
+        .onDisappear {
+            cancelCurrentSearch()
         }
     }
     
@@ -99,7 +80,6 @@ struct SearchView: View {
                     await viewModel.search(query: newValue)
                 }
             } catch {
-                // Only print cancellation in debug builds
                 #if DEBUG
                 print("Search task cancelled")
                 #endif
@@ -114,7 +94,6 @@ struct AnimeCard: View {
     var body: some View {
         NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
             HStack(spacing: 12) {
-                // Cover art with proper aspect ratio
                 AsyncImage(url: URL(string: anime.image)) { phase in
                     switch phase {
                     case .empty:
@@ -124,7 +103,7 @@ struct AnimeCard: View {
                     case .success(let image):
                         image
                             .resizable()
-                            .aspectRatio(contentMode: .fit) // Changed to .fit for proper cover art display
+                            .aspectRatio(contentMode: .fit)
                             .frame(width: 70, height: 100)
                     case .failure:
                         Image(systemName: "photo")
