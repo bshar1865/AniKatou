@@ -35,16 +35,6 @@
 			path = AniKatou;
 			sourceTree = "<group>";
 		};
-		D66043222DECE3F2002379B9 /* AniKatouTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = AniKatouTests;
-			sourceTree = "<group>";
-		};
-		D660432C2DECE3F2002379B9 /* AniKatouUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = AniKatouUITests;
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,8 +66,6 @@
 			isa = PBXGroup;
 			children = (
 				D66043142DECE3EE002379B9 /* AniKatou */,
-				D66043222DECE3F2002379B9 /* AniKatouTests */,
-				D660432C2DECE3F2002379B9 /* AniKatouUITests */,
 				D66043132DECE3EE002379B9 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -130,9 +118,6 @@
 			dependencies = (
 				D66043212DECE3F2002379B9 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				D66043222DECE3F2002379B9 /* AniKatouTests */,
-			);
 			name = AniKatouTests;
 			packageProductDependencies = (
 			);
@@ -152,9 +137,6 @@
 			);
 			dependencies = (
 				D660432B2DECE3F2002379B9 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				D660432C2DECE3F2002379B9 /* AniKatouUITests */,
 			);
 			name = AniKatouUITests;
 			packageProductDependencies = (
