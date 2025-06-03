@@ -90,7 +90,7 @@ struct AboutView: View {
                     Text("AniKatou")
                         .font(.title.bold())
                     
-                    Text("Version 1.0.0")
+                    Text("Version 1.0")
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity)
