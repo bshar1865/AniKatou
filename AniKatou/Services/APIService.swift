@@ -83,7 +83,17 @@ class APIService {
     // Base fetch method
     private func fetch<T: Codable>(_ endpoint: String, queryItems: [URLQueryItem]? = nil) async throws -> T {
         guard let baseURL = APIConfig.buildEndpoint(endpoint, queryItems: queryItems) else {
+            print("\n[API Error] Base URL not configured")
             throw APIError.notConfigured
+        }
+        
+        print("\n[API Request] Endpoint: \(endpoint)")
+        print("[API Request] Full URL: \(baseURL.absoluteString)")
+        if let items = queryItems {
+            print("[API Request] Query parameters:")
+            items.forEach { item in
+                print("- \(item.name): \(item.value ?? "nil")")
+            }
         }
         
         var request = URLRequest(url: baseURL)
@@ -91,27 +101,61 @@ class APIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         
+        print("\n[API Request] Headers:")
+        request.allHTTPHeaderFields?.forEach { key, value in
+            print("- \(key): \(value)")
+        }
+        
         do {
+            print("\n[API] Sending request...")
+            let startTime = Date()
             let (data, response) = try await session.data(for: request)
+            let duration = Date().timeIntervalSince(startTime)
+            print("[API] Request completed in \(String(format: "%.2f", duration))s")
             
             guard let httpResponse = response as? HTTPURLResponse else {
+                print("[API Error] Invalid response type")
                 throw APIError.invalidResponse
+            }
+            
+            print("\n[API Response] Status code: \(httpResponse.statusCode)")
+            print("[API Response] Headers:")
+            httpResponse.allHeaderFields.forEach { key, value in
+                print("- \(key): \(value)")
             }
             
             if !(200...299).contains(httpResponse.statusCode) {
                 var errorMessage: String?
                 if let errorResponse = try? JSONDecoder().decode([String: String].self, from: data) {
                     errorMessage = errorResponse["message"]
+                    print("\n[API Error] Server error message: \(errorMessage ?? "none")")
                 }
                 throw APIError.serverError(httpResponse.statusCode, errorMessage)
             }
             
-            return try decoder.decode(T.self, from: data)
+            print("\n[API Response] Response size: \(data.count) bytes")
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("[API Response] Preview (first 500 chars):")
+                print(String(jsonString.prefix(500)))
+            }
+            
+            do {
+                let decodedResponse = try decoder.decode(T.self, from: data)
+                print("\n[API] Successfully decoded response of type \(T.self)")
+                return decodedResponse
+            } catch {
+                print("\n[API Error] Decoding failed:")
+                print("Error: \(error)")
+                print("Type expected: \(T.self)")
+                throw APIError.decodingError(error)
+            }
         } catch let error as APIError {
             throw error
         } catch let error as DecodingError {
+            print("\n[API Error] Decoding error: \(error)")
             throw APIError.decodingError(error)
         } catch {
+            print("\n[API Error] Network error: \(error)")
             throw APIError.networkError(error)
         }
     }

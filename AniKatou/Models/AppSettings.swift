@@ -8,6 +8,8 @@ class AppSettings {
     private let languageKey = "preferred_language"
     private let autoplayKey = "autoplay_enabled"
     private let qualityKey = "video_quality"
+    private let subtitlesKey = "subtitles_enabled"
+    private let subtitlesLanguageKey = "subtitles_language"
     
     private init() {}
     
@@ -54,6 +56,30 @@ class AppSettings {
             ("480p", "480p"),
             ("720p", "720p"),
             ("1080p", "1080p")
+        ]
+    }
+    
+    // Subtitle Settings
+    var subtitlesEnabled: Bool {
+        get { defaults.bool(forKey: subtitlesKey) }
+        set { defaults.set(newValue, forKey: subtitlesKey) }
+    }
+    
+    var preferredSubtitlesLanguage: String {
+        get { defaults.string(forKey: subtitlesLanguageKey) ?? "en" }
+        set { defaults.set(newValue, forKey: subtitlesLanguageKey) }
+    }
+    
+    var availableSubtitleLanguages: [(id: String, name: String)] {
+        [
+            ("en", "English"),
+            ("es", "Spanish"),
+            ("fr", "French"),
+            ("de", "German"),
+            ("it", "Italian"),
+            ("pt", "Portuguese"),
+            ("ru", "Russian"),
+            ("ja", "Japanese")
         ]
     }
 } 
