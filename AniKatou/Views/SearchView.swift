@@ -41,7 +41,7 @@ struct SearchView: View {
         }
         .navigationTitle("Search")
         .searchable(text: $searchText, prompt: "Search anime...")
-        .onChange(of: searchText) { newValue in
+        .onChange(of: searchText) { oldValue, newValue in
             handleSearchTextChange(newValue)
         }
         .onDisappear {
