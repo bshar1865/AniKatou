@@ -167,8 +167,7 @@ struct EpisodeView: View {
                             }
                             
                             print("\n[Subtitles] Loading subtitle asset tracks...")
-                            try await subtitleAsset.load(.tracks)
-                            let textTracks = subtitleAsset.tracks(withMediaType: .text)
+                            let textTracks = try await subtitleAsset.loadTracks(withMediaType: .text)
                             print("\n[Subtitles] Text tracks found: \(textTracks.count)")
                             
                             for (index, track) in textTracks.enumerated() {
@@ -181,14 +180,14 @@ struct EpisodeView: View {
                                 let composition = AVMutableComposition()
                                 
                                 // Add video track
-                                if let videoTrack = asset.tracks(withMediaType: .video).first,
+                                if let videoTrack = try await asset.loadTracks(withMediaType: .video).first,
                                    let compositionVideoTrack = composition.addMutableTrack(
                                     withMediaType: .video,
                                     preferredTrackID: kCMPersistentTrackID_Invalid
                                    ) {
-                                    try await videoTrack.load(.timeRange)
+                                    let timeRange = try await videoTrack.load(.timeRange)
                                     try compositionVideoTrack.insertTimeRange(
-                                        videoTrack.timeRange,
+                                        timeRange,
                                         of: videoTrack,
                                         at: .zero
                                     )
@@ -197,14 +196,14 @@ struct EpisodeView: View {
                                 }
                                 
                                 // Add audio track
-                                if let audioTrack = asset.tracks(withMediaType: .audio).first,
+                                if let audioTrack = try await asset.loadTracks(withMediaType: .audio).first,
                                    let compositionAudioTrack = composition.addMutableTrack(
                                     withMediaType: .audio,
                                     preferredTrackID: kCMPersistentTrackID_Invalid
                                    ) {
-                                    try await audioTrack.load(.timeRange)
+                                    let timeRange = try await audioTrack.load(.timeRange)
                                     try compositionAudioTrack.insertTimeRange(
-                                        audioTrack.timeRange,
+                                        timeRange,
                                         of: audioTrack,
                                         at: .zero
                                     )
@@ -217,9 +216,9 @@ struct EpisodeView: View {
                                     withMediaType: .text,
                                     preferredTrackID: kCMPersistentTrackID_Invalid
                                 ) {
-                                    try await subtitleTrack.load(.timeRange)
+                                    let timeRange = try await subtitleTrack.load(.timeRange)
                                     try compositionSubtitleTrack.insertTimeRange(
-                                        subtitleTrack.timeRange,
+                                        timeRange,
                                         of: subtitleTrack,
                                         at: .zero
                                     )
