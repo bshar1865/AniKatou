@@ -7,6 +7,23 @@ class AniListService {
     private init() {}
     
     func searchAnimeByTitle(_ title: String) async throws -> Int? {
+        // Try multiple variations of the title
+        let titleVariations = [
+            title,
+            title.replacingOccurrences(of: " ", with: ""),  // Remove spaces
+            title.components(separatedBy: " ").first ?? title,  // First word only
+            title.components(separatedBy: ":").first ?? title   // Before colon
+        ]
+        
+        for variation in titleVariations {
+            if let id = try? await searchSingleTitle(variation) {
+                return id
+            }
+        }
+        return nil
+    }
+    
+    private func searchSingleTitle(_ title: String) async throws -> Int? {
         let query = """
         query ($search: String) {
             Media(search: $search, type: ANIME, isAdult: false) {
@@ -16,6 +33,7 @@ class AniListService {
                     english
                     native
                 }
+                synonyms
             }
         }
         """
@@ -28,6 +46,27 @@ class AniListService {
     }
     
     func getEpisodeThumbnails(animeId: Int) async throws -> [EpisodeThumbnail] {
+        // Add retry logic
+        let maxRetries = 3
+        var lastError: Error?
+        
+        for attempt in 1...maxRetries {
+            do {
+                return try await fetchEpisodeThumbnails(animeId: animeId)
+            } catch {
+                lastError = error
+                if attempt < maxRetries {
+                    // Wait before retrying with exponential backoff
+                    try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 1_000_000_000))
+                    continue
+                }
+            }
+        }
+        
+        throw lastError ?? NSError(domain: "AniListService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to fetch thumbnails after multiple attempts"])
+    }
+    
+    private func fetchEpisodeThumbnails(animeId: Int) async throws -> [EpisodeThumbnail] {
         let query = """
         query ($id: Int) {
             Media(id: $id, isAdult: false) {

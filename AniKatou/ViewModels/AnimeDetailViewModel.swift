@@ -8,9 +8,18 @@ class AnimeDetailViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var selectedGroupIndex: Int = 0
+    @Published var thumbnailLoadingState: ThumbnailLoadingState = .notStarted
+    @Published var isBookmarked = false
     
     private var loadTask: Task<Void, Never>?
     private var aniListId: Int?
+    
+    enum ThumbnailLoadingState {
+        case notStarted
+        case loading
+        case loaded
+        case failed(String)
+    }
     
     func loadAnimeDetails(id: String) async {
         // Cancel any existing load task
@@ -19,6 +28,7 @@ class AnimeDetailViewModel: ObservableObject {
         loadTask = Task {
             isLoading = true
             errorMessage = nil
+            thumbnailLoadingState = .loading
             
             do {
                 // Load both details and episodes in parallel with error handling for each
@@ -54,19 +64,11 @@ class AnimeDetailViewModel: ObservableObject {
                         
                         self.animeDetails = details
                         self.episodeGroups = EpisodeGroup.createGroups(from: episodes)
+                        self.isBookmarked = BookmarkManager.shared.isBookmarked(anime)
                         
-                        // Try to fetch thumbnails from AniList
-                        // First try to get AniList ID by title
-                        if self.aniListId == nil {
-                            self.aniListId = try? await AniListService.shared.searchAnimeByTitle(animeDetails.name)
-                        }
-                        
-                        // If we have an AniList ID, fetch thumbnails
-                        if let aniListId = self.aniListId {
-                            let thumbnails = try await AniListService.shared.getEpisodeThumbnails(animeId: aniListId)
-                            if !Task.isCancelled {
-                                self.episodeThumbnails = thumbnails
-                            }
+                        // Try to fetch thumbnails from AniList in the background
+                        Task {
+                            await loadThumbnails(for: animeDetails.name)
                         }
                     }
                 } catch let error as APIError {
@@ -86,7 +88,31 @@ class AnimeDetailViewModel: ObservableObject {
         }
     }
     
+    private func loadThumbnails(for title: String) async {
+        do {
+            // Try to get AniList ID
+            if self.aniListId == nil {
+                self.aniListId = try? await AniListService.shared.searchAnimeByTitle(title)
+            }
+            
+            // If we have an AniList ID, fetch thumbnails
+            if let aniListId = self.aniListId {
+                let thumbnails = try await AniListService.shared.getEpisodeThumbnails(animeId: aniListId)
+                if !Task.isCancelled {
+                    self.episodeThumbnails = thumbnails
+                    self.thumbnailLoadingState = .loaded
+                }
+            } else {
+                self.thumbnailLoadingState = .failed("Could not find matching anime on AniList")
+            }
+        } catch {
+            self.thumbnailLoadingState = .failed(error.localizedDescription)
+        }
+    }
+    
     func getThumbnail(for episodeNumber: Int) -> String? {
+        // Only return thumbnail if we successfully loaded them
+        guard case .loaded = thumbnailLoadingState else { return nil }
         guard episodeNumber - 1 < episodeThumbnails.count else { return nil }
         return episodeThumbnails[episodeNumber - 1].thumbnail
     }
@@ -108,9 +134,15 @@ class AnimeDetailViewModel: ObservableObject {
         )
     }
     
-    func isBookmarked() -> Bool {
-        guard let anime = animeToBookmarkItem() else { return false }
-        return BookmarkManager.shared.isBookmarked(anime)
+    func toggleBookmark() {
+        guard let anime = animeToBookmarkItem() else { return }
+        BookmarkManager.shared.toggleBookmark(anime)
+        isBookmarked = BookmarkManager.shared.isBookmarked(anime)
+        NotificationCenter.default.post(
+            name: NSNotification.Name("BookmarksDidChange"),
+            object: nil,
+            userInfo: ["animeId": anime.id]
+        )
     }
     
     func selectGroup(_ index: Int) {

@@ -3,7 +3,6 @@ import SwiftUI
 struct AnimeDetailView: View {
     let animeId: String
     @StateObject private var viewModel = AnimeDetailViewModel()
-    @State private var isBookmarked = false
     
     var body: some View {
         ScrollView {
@@ -56,15 +55,9 @@ struct AnimeDetailView: View {
                             
                             // Bookmark Button
                             Button(action: {
-                                if let anime = viewModel.animeToBookmarkItem() {
-                                    withAnimation {
-                                        BookmarkManager.shared.toggleBookmark(anime)
-                                        isBookmarked = BookmarkManager.shared.isBookmarked(anime)
-                                    }
-                                    NotificationCenter.default.post(name: NSNotification.Name("BookmarksDidChange"), object: nil)
-                                }
+                                viewModel.toggleBookmark()
                             }) {
-                                Label(isBookmarked ? "Bookmarked" : "Bookmark", systemImage: isBookmarked ? "bookmark.fill" : "bookmark")
+                                Label(viewModel.isBookmarked ? "Bookmarked" : "Bookmark", systemImage: viewModel.isBookmarked ? "bookmark.fill" : "bookmark")
                                     .font(.headline)
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 16)
@@ -130,17 +123,33 @@ struct AnimeDetailView: View {
                                     NavigationLink(destination: EpisodeView(episodeId: episode.id)) {
                                         HStack(spacing: 12) {
                                             // Episode Thumbnail
-                                            if let thumbnail = viewModel.getThumbnail(for: episode.number) {
-                                                AsyncImage(url: URL(string: thumbnail)) { image in
-                                                    image
-                                                        .resizable()
-                                                        .aspectRatio(contentMode: .fill)
-                                                } placeholder: {
+                                            Group {
+                                                if case .loading = viewModel.thumbnailLoadingState {
                                                     Color.gray
+                                                        .overlay(
+                                                            ProgressView()
+                                                                .progressViewStyle(CircularProgressViewStyle())
+                                                        )
+                                                } else if let thumbnail = viewModel.getThumbnail(for: episode.number) {
+                                                    AsyncImage(url: URL(string: thumbnail)) { image in
+                                                        image
+                                                            .resizable()
+                                                            .aspectRatio(contentMode: .fill)
+                                                    } placeholder: {
+                                                        Color.gray
+                                                    }
+                                                } else {
+                                                    // Fallback when no thumbnail is available
+                                                    Color.gray
+                                                        .overlay(
+                                                            Image(systemName: "play.rectangle.fill")
+                                                                .foregroundColor(.white)
+                                                                .font(.system(size: 24))
+                                                        )
                                                 }
-                                                .frame(width: 100, height: 56) // 16:9 aspect ratio but smaller
-                                                .clipShape(RoundedRectangle(cornerRadius: 8))
                                             }
+                                            .frame(width: 100, height: 56)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
                                             
                                             VStack(alignment: .leading, spacing: 4) {
                                                 Text("Episode \(episode.number)\(episode.title.map { ": \($0)" } ?? "")")
@@ -189,19 +198,6 @@ struct AnimeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.loadAnimeDetails(id: animeId)
-            updateBookmarkState()
-        }
-        .onReceive(viewModel.$animeDetails) { _ in
-            Task {
-                updateBookmarkState()
-            }
-        }
-    }
-    
-    @MainActor
-    private func updateBookmarkState() {
-        if let anime = viewModel.animeToBookmarkItem() {
-            isBookmarked = BookmarkManager.shared.isBookmarked(anime)
         }
     }
 }
