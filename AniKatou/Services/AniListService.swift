@@ -9,7 +9,7 @@ class AniListService {
     func searchAnimeByTitle(_ title: String) async throws -> Int? {
         let query = """
         query ($search: String) {
-            Media(search: $search, type: ANIME) {
+            Media(search: $search, type: ANIME, isAdult: false) {
                 id
                 title {
                     romaji
@@ -30,7 +30,7 @@ class AniListService {
     func getEpisodeThumbnails(animeId: Int) async throws -> [EpisodeThumbnail] {
         let query = """
         query ($id: Int) {
-            Media(id: $id) {
+            Media(id: $id, isAdult: false) {
                 streamingEpisodes {
                     thumbnail
                     title

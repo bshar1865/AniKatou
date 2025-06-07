@@ -50,18 +50,22 @@ class APIService {
         }
         
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        let result: AnimeSearchResult = try await fetch("search", queryItems: [URLQueryItem(name: "q", value: encodedQuery)])
+        let queryItems = [
+            URLQueryItem(name: "q", value: encodedQuery),
+            URLQueryItem(name: "nsfw", value: "false")
+        ]
+        let result: AnimeSearchResult = try await fetch("search", queryItems: queryItems)
         return result.data.animes
     }
     
     // Get anime details
     func getAnimeDetails(id: String) async throws -> AnimeDetailsResult {
-        return try await fetch("anime/\(id)")
+        return try await fetch("anime/\(id)", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
     }
     
     // Get anime episodes
     func getAnimeEpisodes(id: String) async throws -> [EpisodeInfo] {
-        let result: EpisodesResponse = try await fetch("anime/\(id)/episodes")
+        let result: EpisodesResponse = try await fetch("anime/\(id)/episodes", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
         return result.data.episodes
     }
     
@@ -74,7 +78,8 @@ class APIService {
         let queryItems = [
             URLQueryItem(name: "animeEpisodeId", value: episodeId),
             URLQueryItem(name: "server", value: server),
-            URLQueryItem(name: "category", value: category)
+            URLQueryItem(name: "category", value: category),
+            URLQueryItem(name: "nsfw", value: "false")
         ]
         
         return try await fetch("episode/sources", queryItems: queryItems)
@@ -82,7 +87,7 @@ class APIService {
     
     // Get home page data
     func getHomePage() async throws -> HomePageData {
-        let result: HomePageResult = try await fetch("home")
+        let result: HomePageResult = try await fetch("home", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
         return result.data
     }
     

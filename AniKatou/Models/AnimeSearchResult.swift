@@ -19,10 +19,36 @@ struct AnimeItem: Codable, Identifiable {
     let type: String?
     let rating: String?
     let episodes: EpisodeCount?
+    let isNSFW: Bool?
+    let genres: [String]?
     
     // Map the API fields to our model
     var title: String { name }
     var image: String { poster }
+    
+    // Helper function to check if content is NSFW
+    var containsNSFWContent: Bool {
+        if let isNSFW = isNSFW, isNSFW {
+            return true
+        }
+        
+        // Check for NSFW genres
+        let nsfwGenres = ["Hentai", "Ecchi", "Adult", "Mature"]
+        if let genres = genres {
+            return genres.contains { genre in
+                nsfwGenres.contains { nsfwGenre in
+                    genre.lowercased().contains(nsfwGenre.lowercased())
+                }
+            }
+        }
+        
+        // Check for NSFW keywords in title
+        let nsfwKeywords = ["hentai", "ecchi", "adult", "nsfw", "xxx"]
+        let titleLowercased = name.lowercased()
+        return nsfwKeywords.contains { keyword in
+            titleLowercased.contains(keyword)
+        }
+    }
 }
 
 struct EpisodeCount: Codable {

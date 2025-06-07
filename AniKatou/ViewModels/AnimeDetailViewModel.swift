@@ -29,15 +29,36 @@ class AnimeDetailViewModel: ObservableObject {
                 do {
                     let (details, episodes) = try await (detailsTask, episodesTask)
                     if !Task.isCancelled {
+                        // Create AnimeItem to check for NSFW content
+                        let animeDetails = details.data.anime.info
+                        let anime = AnimeItem(
+                            id: animeDetails.id,
+                            name: animeDetails.name,
+                            jname: animeDetails.moreInfo?.japanese,
+                            poster: animeDetails.poster,
+                            duration: animeDetails.stats?.duration,
+                            type: animeDetails.type,
+                            rating: animeDetails.stats?.rating,
+                            episodes: animeDetails.stats?.episodes,
+                            isNSFW: animeDetails.moreInfo?.genres?.contains { $0.lowercased().contains("hentai") || $0.lowercased().contains("ecchi") } ?? false,
+                            genres: animeDetails.moreInfo?.genres
+                        )
+                        
+                        if anime.containsNSFWContent {
+                            errorMessage = "This content is not available due to content restrictions."
+                            self.animeDetails = nil
+                            self.episodeGroups = []
+                            self.episodeThumbnails = []
+                            return
+                        }
+                        
                         self.animeDetails = details
                         self.episodeGroups = EpisodeGroup.createGroups(from: episodes)
                         
                         // Try to fetch thumbnails from AniList
-                        guard let details = self.animeDetails?.data.anime.info else { return }
-                        
                         // First try to get AniList ID by title
                         if self.aniListId == nil {
-                            self.aniListId = try? await AniListService.shared.searchAnimeByTitle(details.name)
+                            self.aniListId = try? await AniListService.shared.searchAnimeByTitle(animeDetails.name)
                         }
                         
                         // If we have an AniList ID, fetch thumbnails
@@ -76,12 +97,14 @@ class AnimeDetailViewModel: ObservableObject {
         return AnimeItem(
             id: details.id,
             name: details.name,
-            jname: nil,
+            jname: details.moreInfo?.japanese,
             poster: details.poster,
             duration: details.stats?.duration,
-            type: details.stats?.type,
+            type: details.type,
             rating: details.stats?.rating,
-            episodes: details.stats?.episodes
+            episodes: details.stats?.episodes,
+            isNSFW: details.moreInfo?.genres?.contains { $0.lowercased().contains("hentai") || $0.lowercased().contains("ecchi") } ?? false,
+            genres: details.moreInfo?.genres
         )
     }
     

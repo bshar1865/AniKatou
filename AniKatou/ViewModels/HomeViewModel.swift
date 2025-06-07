@@ -14,20 +14,24 @@ class HomeViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     
+    private func filterNSFWContent(_ animes: [AnimeItem]) -> [AnimeItem] {
+        animes.filter { !$0.containsNSFWContent }
+    }
+    
     func loadHomeData() async {
         isLoading = true
         errorMessage = nil
         
         do {
             let data = try await APIService.shared.getHomePage()
-            trendingAnimes = data.trendingAnimes
-            latestEpisodeAnimes = data.latestEpisodeAnimes
-            topUpcomingAnimes = data.topUpcomingAnimes
-            topAiringAnimes = data.topAiringAnimes
-            mostPopularAnimes = data.mostPopularAnimes
-            mostFavoriteAnimes = data.mostFavoriteAnimes
-            latestCompletedAnimes = data.latestCompletedAnimes
-            top10Today = data.top10Animes.today
+            trendingAnimes = filterNSFWContent(data.trendingAnimes)
+            latestEpisodeAnimes = filterNSFWContent(data.latestEpisodeAnimes)
+            topUpcomingAnimes = filterNSFWContent(data.topUpcomingAnimes)
+            topAiringAnimes = filterNSFWContent(data.topAiringAnimes)
+            mostPopularAnimes = filterNSFWContent(data.mostPopularAnimes)
+            mostFavoriteAnimes = filterNSFWContent(data.mostFavoriteAnimes)
+            latestCompletedAnimes = filterNSFWContent(data.latestCompletedAnimes)
+            top10Today = filterNSFWContent(data.top10Animes.today)
         } catch let error as APIError {
             errorMessage = error.message
         } catch {

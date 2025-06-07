@@ -15,6 +15,10 @@ class SearchViewModel: ObservableObject {
     private var searchTask: Task<Void, Never>?
     private let debounceInterval: UInt64 = 800_000_000 // 0.8 seconds
     
+    private func filterNSFWContent(_ animes: [AnimeItem]) -> [AnimeItem] {
+        animes.filter { !$0.containsNSFWContent }
+    }
+    
     func search(query: String) async {
         guard !query.isEmpty else {
             await clearResults()
@@ -35,7 +39,7 @@ class SearchViewModel: ObservableObject {
                 let results = try await APIService.shared.searchAnime(query: query)
                 
                 guard !Task.isCancelled else { return }
-                self.searchResults = results
+                self.searchResults = filterNSFWContent(results)
             } catch let error as APIError {
                 guard !Task.isCancelled else { return }
                 self.errorMessage = error.message

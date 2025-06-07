@@ -263,7 +263,6 @@ struct EpisodeView: View {
         // Create and configure player
         print("\n[Player] Creating AVPlayer")
         let player = AVPlayer(playerItem: playerItem)
-        player.actionAtItemEnd = AppSettings.shared.autoplayEnabled ? .advance : .pause
         player.automaticallyWaitsToMinimizeStalling = true
         player.volume = 1.0
         
@@ -284,10 +283,17 @@ struct EpisodeView: View {
                 queue: .main
             ) { _ in
                 print("\n[Player] Playback ended")
-                player.seek(to: .zero)
                 if AppSettings.shared.autoplayEnabled {
-                    player.play()
-                    print("\n[Player] Auto-playing next item")
+                    // Instead of using actionAtItemEnd, we'll handle autoplay manually
+                    Task { @MainActor in
+                        // Reset to beginning
+                        player.seek(to: .zero)
+                        player.play()
+                        print("\n[Player] Auto-playing next item")
+                    }
+                } else {
+                    player.seek(to: .zero)
+                    print("\n[Player] Playback ended, not auto-playing")
                 }
             }
             

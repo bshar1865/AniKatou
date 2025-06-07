@@ -45,7 +45,9 @@ struct BookmarkCard_Previews: PreviewProvider {
             duration: nil,
             type: "TV",
             rating: nil,
-            episodes: nil
+            episodes: nil,
+            isNSFW: false,
+            genres: ["Action", "Adventure"]
         ))
         .frame(width: 200)
         .padding()
