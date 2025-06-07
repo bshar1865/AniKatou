@@ -128,34 +128,42 @@ struct AnimeDetailView: View {
                             LazyVStack(spacing: 8) {
                                 ForEach(viewModel.currentEpisodes) { episode in
                                     NavigationLink(destination: EpisodeView(episodeId: episode.id)) {
-                                        HStack {
+                                        HStack(spacing: 12) {
+                                            // Episode Thumbnail
+                                            if let thumbnail = viewModel.getThumbnail(for: episode.number) {
+                                                AsyncImage(url: URL(string: thumbnail)) { image in
+                                                    image
+                                                        .resizable()
+                                                        .aspectRatio(contentMode: .fill)
+                                                } placeholder: {
+                                                    Color.gray
+                                                }
+                                                .frame(width: 100, height: 56) // 16:9 aspect ratio but smaller
+                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                            }
+                                            
                                             VStack(alignment: .leading, spacing: 4) {
-                                                HStack(alignment: .center, spacing: 8) {
-                                                    Text("\(episode.number)")
-                                                        .font(.headline)
-                                                        .foregroundColor(.blue)
-                                                        .frame(minWidth: 40, alignment: .center)
-                                                        .padding(.vertical, 4)
+                                                Text("Episode \(episode.number)\(episode.title.map { ": \($0)" } ?? "")")
+                                                    .font(.headline)
+                                                    .foregroundColor(.primary)
+                                                    .lineLimit(1)
+                                                
+                                                if let title = episode.title {
+                                                    Text(title)
+                                                        .font(.subheadline)
+                                                        .foregroundColor(.gray)
+                                                        .lineLimit(2)
+                                                }
+                                                
+                                                if episode.isFiller == true {
+                                                    Text("Filler")
+                                                        .font(.caption)
+                                                        .fontWeight(.medium)
+                                                        .foregroundColor(.white)
                                                         .padding(.horizontal, 8)
-                                                        .background(Color.blue.opacity(0.1))
-                                                        .cornerRadius(8)
-                                                    
-                                                    if let title = episode.title {
-                                                        Text(title)
-                                                            .font(.headline)
-                                                            .foregroundColor(.primary)
-                                                    }
-                                                    
-                                                    if episode.isFiller == true {
-                                                        Text("Filler")
-                                                            .font(.caption)
-                                                            .fontWeight(.medium)
-                                                            .foregroundColor(.white)
-                                                            .padding(.horizontal, 8)
-                                                            .padding(.vertical, 2)
-                                                            .background(Color.orange)
-                                                            .cornerRadius(4)
-                                                    }
+                                                        .padding(.vertical, 2)
+                                                        .background(Color.orange)
+                                                        .cornerRadius(4)
                                                 }
                                             }
                                             

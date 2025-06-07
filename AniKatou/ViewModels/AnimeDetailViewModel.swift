@@ -4,11 +4,13 @@ import Foundation
 class AnimeDetailViewModel: ObservableObject {
     @Published var animeDetails: AnimeDetailsResult?
     @Published var episodeGroups: [EpisodeGroup] = []
+    @Published var episodeThumbnails: [EpisodeThumbnail] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var selectedGroupIndex: Int = 0
     
     private var loadTask: Task<Void, Never>?
+    private var aniListId: Int?
     
     func loadAnimeDetails(id: String) async {
         // Cancel any existing load task
@@ -29,6 +31,22 @@ class AnimeDetailViewModel: ObservableObject {
                     if !Task.isCancelled {
                         self.animeDetails = details
                         self.episodeGroups = EpisodeGroup.createGroups(from: episodes)
+                        
+                        // Try to fetch thumbnails from AniList
+                        guard let details = self.animeDetails?.data.anime.info else { return }
+                        
+                        // First try to get AniList ID by title
+                        if self.aniListId == nil {
+                            self.aniListId = try? await AniListService.shared.searchAnimeByTitle(details.name)
+                        }
+                        
+                        // If we have an AniList ID, fetch thumbnails
+                        if let aniListId = self.aniListId {
+                            let thumbnails = try await AniListService.shared.getEpisodeThumbnails(animeId: aniListId)
+                            if !Task.isCancelled {
+                                self.episodeThumbnails = thumbnails
+                            }
+                        }
                     }
                 } catch let error as APIError {
                     if !Task.isCancelled {
@@ -45,6 +63,11 @@ class AnimeDetailViewModel: ObservableObject {
                 isLoading = false
             }
         }
+    }
+    
+    func getThumbnail(for episodeNumber: Int) -> String? {
+        guard episodeNumber - 1 < episodeThumbnails.count else { return nil }
+        return episodeThumbnails[episodeNumber - 1].thumbnail
     }
     
     func animeToBookmarkItem() -> AnimeItem? {
