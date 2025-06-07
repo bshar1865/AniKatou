@@ -99,16 +99,16 @@ struct AnimeCard: View {
                     case .empty:
                         Rectangle()
                             .foregroundColor(Color.gray.opacity(0.3))
-                            .frame(width: 70, height: 100)
+                            .frame(width: 80, height: 120)
                     case .success(let image):
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .frame(width: 70, height: 100)
+                            .frame(width: 80, height: 120)
                     case .failure:
                         Image(systemName: "photo")
                             .foregroundColor(.gray)
-                            .frame(width: 70, height: 100)
+                            .frame(width: 80, height: 120)
                     @unknown default:
                         EmptyView()
                     }

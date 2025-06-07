@@ -17,7 +17,7 @@ struct BookmarkCard: View {
             } placeholder: {
                 Color.gray
             }
-            .frame(height: 160)
+            .frame(height: 240)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             
             Text(anime.title)
