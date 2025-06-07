@@ -7,31 +7,36 @@ struct SearchView: View {
     
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 16) {
-                if viewModel.isLoading {
-                    ProgressView()
+            if viewModel.isLoading {
+                ProgressView()
+                    .padding()
+            } else if let error = viewModel.errorMessage {
+                VStack(spacing: 12) {
+                    Text(error)
+                        .foregroundColor(.red)
                         .padding()
-                } else if let error = viewModel.errorMessage {
-                    VStack(spacing: 12) {
-                        Text(error)
-                            .foregroundColor(.red)
-                            .padding()
-                        
-                        Button("Retry") {
-                            handleSearchTextChange(searchText)
-                        }
-                        .foregroundColor(.blue)
+                    
+                    Button("Retry") {
+                        handleSearchTextChange(searchText)
                     }
-                } else if viewModel.searchResults.isEmpty && !searchText.isEmpty && !viewModel.isLoading {
-                    Text("No results found")
-                        .foregroundColor(.secondary)
-                        .padding()
-                } else {
+                    .foregroundColor(.blue)
+                }
+            } else if viewModel.searchResults.isEmpty && !searchText.isEmpty && !viewModel.isLoading {
+                Text("No results found")
+                    .foregroundColor(.secondary)
+                    .padding()
+            } else {
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 16),
+                    GridItem(.flexible(), spacing: 16)
+                ], spacing: 16) {
                     ForEach(viewModel.searchResults) { anime in
-                        AnimeCard(anime: anime)
-                            .padding(.horizontal)
+                        NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
+                            AnimeCard(anime: anime)
+                        }
                     }
                 }
+                .padding()
             }
         }
         .refreshable {
@@ -92,50 +97,27 @@ struct AnimeCard: View {
     let anime: AnimeItem
     
     var body: some View {
-        NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
-            HStack(spacing: 12) {
-                AsyncImage(url: URL(string: anime.image)) { phase in
-                    switch phase {
-                    case .empty:
-                        Rectangle()
-                            .foregroundColor(Color.gray.opacity(0.3))
-                            .frame(width: 80, height: 120)
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 80, height: 120)
-                    case .failure:
-                        Image(systemName: "photo")
-                            .foregroundColor(.gray)
-                            .frame(width: 80, height: 120)
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
-                .cornerRadius(8)
-                .shadow(radius: 2)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(anime.title)
-                        .font(.headline)
-                        .lineLimit(2)
-                        .foregroundColor(.primary)
-                        .multilineTextAlignment(.leading)
-                }
-                .padding(.vertical, 4)
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .foregroundColor(.gray)
-                    .padding(.trailing, 4)
+        VStack(alignment: .leading, spacing: 8) {
+            AsyncImage(url: URL(string: anime.image)) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Color.gray
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(12)
-            .shadow(radius: 2)
+            .frame(height: 240)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            Text(anime.title)
+                .font(.headline)
+                .lineLimit(2)
+                .foregroundColor(.primary)
+            
+            if let type = anime.type {
+                Text(type)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
     }
 }
