@@ -57,8 +57,10 @@ struct AnimeDetailView: View {
                             // Bookmark Button
                             Button(action: {
                                 if let anime = viewModel.animeToBookmarkItem() {
-                                    BookmarkManager.shared.toggleBookmark(anime)
-                                    isBookmarked.toggle()
+                                    withAnimation {
+                                        BookmarkManager.shared.toggleBookmark(anime)
+                                        isBookmarked = BookmarkManager.shared.isBookmarked(anime)
+                                    }
                                     NotificationCenter.default.post(name: NSNotification.Name("BookmarksDidChange"), object: nil)
                                 }
                             }) {
@@ -145,7 +147,19 @@ struct AnimeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.loadAnimeDetails(id: animeId)
-            isBookmarked = viewModel.isBookmarked()
+            updateBookmarkState()
+        }
+        .onReceive(viewModel.$animeDetails) { _ in
+            Task {
+                updateBookmarkState()
+            }
+        }
+    }
+    
+    @MainActor
+    private func updateBookmarkState() {
+        if let anime = viewModel.animeToBookmarkItem() {
+            isBookmarked = BookmarkManager.shared.isBookmarked(anime)
         }
     }
 }

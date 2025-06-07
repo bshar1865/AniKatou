@@ -4,24 +4,34 @@ import SwiftUI
 @MainActor
 class HomeViewModel: ObservableObject {
     @Published var bookmarkedAnimes: [AnimeItem] = []
+    private var notificationObserver: NSObjectProtocol?
     
     init() {
-        bookmarkedAnimes = BookmarkManager.shared.bookmarkedAnimes
-        
-        // Observe bookmark changes
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(bookmarksDidChange),
-            name: NSNotification.Name("BookmarksDidChange"),
-            object: nil
-        )
+        loadBookmarks()
+        setupNotificationObserver()
     }
     
     deinit {
-        NotificationCenter.default.removeObserver(self)
+        if let observer = notificationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
     
-    @objc private func bookmarksDidChange() {
-        bookmarkedAnimes = BookmarkManager.shared.bookmarkedAnimes
+    private func setupNotificationObserver() {
+        notificationObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("BookmarksDidChange"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.loadBookmarks()
+            }
+        }
+    }
+    
+    private func loadBookmarks() {
+        withAnimation {
+            bookmarkedAnimes = BookmarkManager.shared.bookmarkedAnimes
+        }
     }
 } 

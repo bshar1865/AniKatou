@@ -3,35 +3,48 @@ import Foundation
 class BookmarkManager {
     static let shared = BookmarkManager()
     private let bookmarksKey = "bookmarked_animes"
+    private var cachedBookmarks: [AnimeItem] = []
     
-    private init() {}
+    private init() {
+        loadBookmarks()
+    }
+    
+    private func loadBookmarks() {
+        guard let data = UserDefaults.standard.data(forKey: bookmarksKey),
+              let bookmarks = try? JSONDecoder().decode([AnimeItem].self, from: data) else {
+            cachedBookmarks = []
+            return
+        }
+        cachedBookmarks = bookmarks
+    }
+    
+    private func saveBookmarks() {
+        if let data = try? JSONEncoder().encode(cachedBookmarks) {
+            UserDefaults.standard.set(data, forKey: bookmarksKey)
+            UserDefaults.standard.synchronize()
+        }
+    }
     
     var bookmarkedAnimes: [AnimeItem] {
         get {
-            guard let data = UserDefaults.standard.data(forKey: bookmarksKey),
-                  let bookmarks = try? JSONDecoder().decode([AnimeItem].self, from: data) else {
-                return []
-            }
-            return bookmarks
+            cachedBookmarks
         }
         set {
-            if let data = try? JSONEncoder().encode(newValue) {
-                UserDefaults.standard.set(data, forKey: bookmarksKey)
-            }
+            cachedBookmarks = newValue
+            saveBookmarks()
         }
     }
     
     func isBookmarked(_ anime: AnimeItem) -> Bool {
-        bookmarkedAnimes.contains { $0.id == anime.id }
+        cachedBookmarks.contains { $0.id == anime.id }
     }
     
     func toggleBookmark(_ anime: AnimeItem) {
-        var bookmarks = bookmarkedAnimes
-        if let index = bookmarks.firstIndex(where: { $0.id == anime.id }) {
-            bookmarks.remove(at: index)
+        if let index = cachedBookmarks.firstIndex(where: { $0.id == anime.id }) {
+            cachedBookmarks.remove(at: index)
         } else {
-            bookmarks.append(anime)
+            cachedBookmarks.append(anime)
         }
-        bookmarkedAnimes = bookmarks
+        saveBookmarks()
     }
 } 
