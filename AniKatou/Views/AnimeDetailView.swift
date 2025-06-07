@@ -65,37 +65,18 @@ struct AnimeDetailView: View {
                                 }
                             }) {
                                 Label(isBookmarked ? "Bookmarked" : "Bookmark", systemImage: isBookmarked ? "bookmark.fill" : "bookmark")
-                                    .font(.subheadline)
-                                    .foregroundColor(isBookmarked ? Color(.systemBackground) : .primary)
+                                    .font(.headline)
+                                    .foregroundColor(.white)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
-                                    .background(isBookmarked ? Color.primary : Color(.systemGray5))
+                                    .background(Color.gray)
                                     .cornerRadius(8)
                             }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding()
-                    .background(Color(.secondarySystemBackground))
+                    .padding(.horizontal)
                     
-                    // Genres
-                    if let genres = details.genres, !genres.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack {
-                                ForEach(genres, id: \.self) { genre in
-                                    Text(genre)
-                                        .font(.subheadline)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        .background(Color.secondary.opacity(0.2))
-                                        .cornerRadius(16)
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                    }
-                    
-                    // Description
+                    // Description Section
                     if let description = details.description {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Description")
@@ -109,35 +90,88 @@ struct AnimeDetailView: View {
                     }
                     
                     // Episodes Section
-                    if !viewModel.episodes.isEmpty {
+                    if !viewModel.episodeGroups.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Episodes")
-                                .font(.headline)
-                                .padding(.horizontal)
-                            
-                            ForEach(viewModel.episodes) { episode in
-                                NavigationLink(destination: EpisodeView(episodeId: episode.id)) {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text("Episode \(episode.number)")
-                                                .font(.headline)
-                                            if let title = episode.title {
-                                                Text(title)
-                                                    .font(.subheadline)
-                                                    .foregroundColor(.secondary)
+                            HStack {
+                                Text("Episodes")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                if viewModel.episodeGroups.count > 1 {
+                                    Spacer()
+                                    
+                                    Menu {
+                                        ForEach(Array(viewModel.episodeGroups.enumerated()), id: \.element.id) { index, group in
+                                            Button(action: {
+                                                viewModel.selectedGroupIndex = index
+                                            }) {
+                                                if index == viewModel.selectedGroupIndex {
+                                                    Label(group.title, systemImage: "checkmark")
+                                                } else {
+                                                    Text(group.title)
+                                                }
                                             }
                                         }
-                                        
-                                        Spacer()
-                                        
-                                        Image(systemName: "chevron.right")
-                                            .foregroundColor(.gray)
+                                    } label: {
+                                        HStack {
+                                            Text(viewModel.episodeGroups[viewModel.selectedGroupIndex].title)
+                                                .font(.headline)
+                                            Image(systemName: "chevron.up.chevron.down")
+                                        }
+                                        .foregroundColor(.blue)
                                     }
-                                    .padding()
-                                    .background(Color(.secondarySystemBackground))
-                                    .cornerRadius(8)
                                 }
-                                .padding(.horizontal)
+                            }
+                            .padding(.horizontal)
+                            
+                            // Episodes List
+                            LazyVStack(spacing: 8) {
+                                ForEach(viewModel.currentEpisodes) { episode in
+                                    NavigationLink(destination: EpisodeView(episodeId: episode.id)) {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                HStack(alignment: .center, spacing: 8) {
+                                                    Text("\(episode.number)")
+                                                        .font(.headline)
+                                                        .foregroundColor(.blue)
+                                                        .frame(minWidth: 40, alignment: .center)
+                                                        .padding(.vertical, 4)
+                                                        .padding(.horizontal, 8)
+                                                        .background(Color.blue.opacity(0.1))
+                                                        .cornerRadius(8)
+                                                    
+                                                    if let title = episode.title {
+                                                        Text(title)
+                                                            .font(.headline)
+                                                            .foregroundColor(.primary)
+                                                    }
+                                                    
+                                                    if episode.isFiller == true {
+                                                        Text("Filler")
+                                                            .font(.caption)
+                                                            .fontWeight(.medium)
+                                                            .foregroundColor(.white)
+                                                            .padding(.horizontal, 8)
+                                                            .padding(.vertical, 2)
+                                                            .background(Color.orange)
+                                                            .cornerRadius(4)
+                                                    }
+                                                }
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            Image(systemName: "play.circle.fill")
+                                                .foregroundColor(.blue)
+                                                .font(.title2)
+                                        }
+                                        .padding()
+                                        .background(Color(.secondarySystemBackground))
+                                        .cornerRadius(12)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .padding(.horizontal)
+                                }
                             }
                         }
                     }

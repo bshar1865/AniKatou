@@ -3,9 +3,10 @@ import Foundation
 @MainActor
 class AnimeDetailViewModel: ObservableObject {
     @Published var animeDetails: AnimeDetailsResult?
-    @Published var episodes: [EpisodeInfo] = []
+    @Published var episodeGroups: [EpisodeGroup] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var selectedGroupIndex: Int = 0
     
     private var loadTask: Task<Void, Never>?
     
@@ -27,7 +28,7 @@ class AnimeDetailViewModel: ObservableObject {
                     let (details, episodes) = try await (detailsTask, episodesTask)
                     if !Task.isCancelled {
                         self.animeDetails = details
-                        self.episodes = episodes.sorted { $0.number < $1.number }
+                        self.episodeGroups = EpisodeGroup.createGroups(from: episodes)
                     }
                 } catch let error as APIError {
                     if !Task.isCancelled {
@@ -64,6 +65,15 @@ class AnimeDetailViewModel: ObservableObject {
     func isBookmarked() -> Bool {
         guard let anime = animeToBookmarkItem() else { return false }
         return BookmarkManager.shared.isBookmarked(anime)
+    }
+    
+    func selectGroup(_ index: Int) {
+        selectedGroupIndex = index
+    }
+    
+    var currentEpisodes: [EpisodeInfo] {
+        guard !episodeGroups.isEmpty else { return [] }
+        return episodeGroups[selectedGroupIndex].episodes
     }
     
     deinit {
