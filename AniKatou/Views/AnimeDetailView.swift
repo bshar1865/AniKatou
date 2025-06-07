@@ -16,8 +16,9 @@ struct AnimeDetailView: View {
                         .foregroundColor(.red)
                         .padding()
                 } else if let details = viewModel.animeDetails?.data.anime.info {
-                    // Header Image
-                    ZStack(alignment: .topTrailing) {
+                    // Header Section
+                    HStack(alignment: .top, spacing: 16) {
+                        // Cover Art
                         AsyncImage(url: URL(string: details.image)) { image in
                             image
                                 .resizable()
@@ -25,68 +26,84 @@ struct AnimeDetailView: View {
                         } placeholder: {
                             Color.gray
                         }
-                        .frame(height: 200)
-                        .clipped()
+                        .frame(width: 160, height: 240)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .shadow(radius: 8)
                         
-                        // Bookmark Button
-                        Button(action: {
-                            if let anime = viewModel.animeToBookmarkItem() {
-                                BookmarkManager.shared.toggleBookmark(anime)
-                                isBookmarked.toggle()
-                                NotificationCenter.default.post(name: NSNotification.Name("BookmarksDidChange"), object: nil)
-                            }
-                        }) {
-                            Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                        // Title and Info
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(details.title)
                                 .font(.title2)
-                                .foregroundColor(.white)
-                                .padding(8)
-                                .background(Color.black.opacity(0.6))
-                                .clipShape(Circle())
-                        }
-                        .padding()
-                    }
-                    
-                    // Title and Info
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(details.title)
-                            .font(.title)
-                            .padding(.horizontal)
-                        
-                        if let type = details.type {
-                            Label(type, systemImage: "film")
-                                .padding(.horizontal)
-                        }
-                        
-                        if let status = details.status {
-                            Label(status, systemImage: "dot.radiowaves.left.and.right")
-                                .padding(.horizontal)
-                        }
-                        
-                        if let releaseDate = details.releaseDate {
-                            Label(releaseDate, systemImage: "calendar")
-                                .padding(.horizontal)
-                        }
-                        
-                        if let genres = details.genres, !genres.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack {
-                                    ForEach(genres, id: \.self) { genre in
-                                        Text(genre)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(Color.secondary.opacity(0.2))
-                                            .cornerRadius(16)
-                                    }
-                                }
-                                .padding(.horizontal)
+                                .fontWeight(.bold)
+                                .lineLimit(3)
+                            
+                            if let type = details.type {
+                                Label(type, systemImage: "film")
+                                    .font(.subheadline)
                             }
+                            
+                            if let status = details.status {
+                                Label(status, systemImage: "dot.radiowaves.left.and.right")
+                                    .font(.subheadline)
+                            }
+                            
+                            if let releaseDate = details.releaseDate {
+                                Label(releaseDate, systemImage: "calendar")
+                                    .font(.subheadline)
+                            }
+                            
+                            Spacer()
+                            
+                            // Bookmark Button
+                            Button(action: {
+                                if let anime = viewModel.animeToBookmarkItem() {
+                                    BookmarkManager.shared.toggleBookmark(anime)
+                                    isBookmarked.toggle()
+                                    NotificationCenter.default.post(name: NSNotification.Name("BookmarksDidChange"), object: nil)
+                                }
+                            }) {
+                                Label(isBookmarked ? "Bookmarked" : "Bookmark", systemImage: isBookmarked ? "bookmark.fill" : "bookmark")
+                                    .font(.subheadline)
+                                    .foregroundColor(isBookmarked ? Color(.systemBackground) : .primary)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(isBookmarked ? Color.primary : Color(.systemGray5))
+                                    .cornerRadius(8)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding()
+                    .background(Color(.secondarySystemBackground))
+                    
+                    // Genres
+                    if let genres = details.genres, !genres.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack {
+                                ForEach(genres, id: \.self) { genre in
+                                    Text(genre)
+                                        .font(.subheadline)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(Color.secondary.opacity(0.2))
+                                        .cornerRadius(16)
+                                }
+                            }
+                            .padding(.horizontal)
                         }
                     }
                     
                     // Description
                     if let description = details.description {
-                        Text(description)
-                            .padding()
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Description")
+                                .font(.headline)
+                                .padding(.horizontal)
+                            
+                            Text(description)
+                                .font(.body)
+                                .padding(.horizontal)
+                        }
                     }
                     
                     // Episodes Section
