@@ -13,12 +13,20 @@ struct ContentView: View {
                 .tag(0)
                 
                 NavigationView {
+                    BookmarksView()
+                }
+                .tabItem {
+                    Label("Bookmarks", systemImage: "bookmark")
+                }
+                .tag(1)
+                
+                NavigationView {
                     SearchView()
                 }
                 .tabItem {
                     Label("Search", systemImage: "magnifyingglass")
                 }
-                .tag(1)
+                .tag(2)
                 
                 NavigationView {
                     SettingsView()
@@ -26,14 +34,12 @@ struct ContentView: View {
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }
-                .tag(2)
+                .tag(3)
             }
         }
     }
 }
 
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
-    }
+#Preview {
+    ContentView()
 } 

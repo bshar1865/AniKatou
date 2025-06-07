@@ -80,6 +80,12 @@ class APIService {
         return try await fetch("episode/sources", queryItems: queryItems)
     }
     
+    // Get home page data
+    func getHomePage() async throws -> HomePageData {
+        let result: HomePageResult = try await fetch("home")
+        return result.data
+    }
+    
     // Base fetch method
     private func fetch<T: Codable>(_ endpoint: String, queryItems: [URLQueryItem]? = nil) async throws -> T {
         guard let baseURL = APIConfig.buildEndpoint(endpoint, queryItems: queryItems) else {
