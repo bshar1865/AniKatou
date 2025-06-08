@@ -4,6 +4,7 @@ import AVFoundation
 
 class CustomPlayerViewController: AVPlayerViewController {
     var onDismiss: (() -> Void)?
+    private var subtitleOverlay: SubtitleOverlayView?
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
@@ -11,6 +12,39 @@ class CustomPlayerViewController: AVPlayerViewController {
             print("\n[Player] Dismissing player controller")
             onDismiss?()
         }
+    }
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        NotificationCenter.default.addObserver(self,
+                                            selector: #selector(handleMemoryWarning),
+                                            name: UIApplication.didReceiveMemoryWarningNotification,
+                                            object: nil)
+    }
+    
+    @objc private func handleMemoryWarning() {
+        print("\n[Memory] Received memory warning, cleaning up resources")
+        player?.currentItem?.asset.cancelLoading()
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    func addSubtitleOverlay(_ overlay: SubtitleOverlayView) {
+        subtitleOverlay?.removeFromSuperview()
+        subtitleOverlay = overlay
+        
+        guard let contentView = view.subviews.first else { return }
+        contentView.addSubview(overlay)
+        overlay.translatesAutoresizingMaskIntoConstraints = false
+        
+        NSLayoutConstraint.activate([
+            overlay.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            overlay.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            overlay.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            overlay.heightAnchor.constraint(equalToConstant: 100)
+        ])
     }
 }
 
@@ -20,7 +54,7 @@ struct EpisodeView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-            ZStack {
+        ZStack {
             Color.black.edgesIgnoringSafeArea(Edge.Set.all)
             
             content
@@ -34,55 +68,30 @@ struct EpisodeView: View {
     
     @ViewBuilder
     private var content: some View {
-                    if viewModel.isLoading {
-                        ProgressView("Loading...")
-                            .foregroundColor(.white)
-                    } else if let error = viewModel.errorMessage {
-                        VStack(spacing: 16) {
-                            Text(error)
-                                .foregroundColor(.red)
-                            
-                            Button("Retry") {
-                                Task {
-                                    await viewModel.loadStreamingSources(episodeId: episodeId)
-                                }
-                            }
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color.blue)
-                            .cornerRadius(8)
-                        }
-                    } else if let streamingData = viewModel.streamingData?.data {
+        if viewModel.isLoading {
+            ProgressView("Loading...")
+                .foregroundColor(.white)
+        } else if let error = viewModel.errorMessage {
+            VStack(spacing: 16) {
+                Text(error)
+                    .foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+                    .padding()
+                
+                Button("Retry") {
+                    Task {
+                        await viewModel.loadStreamingSources(episodeId: episodeId)
+                    }
+                }
+                .foregroundColor(.white)
+                .padding()
+                .background(Color.blue)
+                .cornerRadius(8)
+            }
+        } else if let streamingData = viewModel.streamingData?.data {
             Color.clear
-                            .onAppear {
-                    print("\n==================== STREAMING DATA START ====================")
+                .onAppear {
                     print("\n[Setup] Starting player setup for episode: \(episodeId)")
-                    
-                    print("\n[Data] Complete streaming data dump:")
-                    dump(streamingData)
-                    
-                    print("\n[Sources] Video sources dump:")
-                    streamingData.sources.forEach { source in
-                        print("\nSource:")
-                        dump(source)
-                    }
-                    
-                    print("\n[Subtitles] Complete subtitles dump:")
-                    if let subtitles = streamingData.subtitles {
-                        dump(subtitles)
-                    } else {
-                        print("No subtitles available")
-                    }
-                    
-                    print("\n[Headers] Complete headers dump:")
-                    if let headers = streamingData.headers {
-                        dump(headers)
-                    } else {
-                        print("Using default headers")
-                    }
-                    
-                    print("\n==================== STREAMING DATA END ====================\n")
-                    
                     setupPlayer(with: streamingData)
                 }
         }
@@ -90,7 +99,6 @@ struct EpisodeView: View {
     
     private func setupPlayer(with streamingData: StreamingData) {
         print("\n==================== PLAYER SETUP START ====================")
-        print("\n[Player] Setting up player")
         
         // Find best quality source
         let preferredQuality = AppSettings.shared.preferredQuality
@@ -110,6 +118,7 @@ struct EpisodeView: View {
         guard let source = source,
               let url = URL(string: source.url) else {
             print("\n[Error] Failed to get valid source URL")
+            viewModel.errorMessage = "Failed to get valid video source"
             return
         }
         
@@ -139,132 +148,52 @@ struct EpisodeView: View {
         playerItem.preferredForwardBufferDuration = 10
         playerItem.canUseNetworkResourcesForLiveStreamingWhilePaused = true
         
-        print("\n==================== SUBTITLE PROCESSING START ====================")
-        
-        // Handle subtitles
-        if let subtitles = streamingData.subtitles {
-            print("\n[Subtitles] Available subtitles:")
-            dump(subtitles)
-            
-            if let englishSubtitle = subtitles.first(where: { $0.lang.lowercased() == "english" || $0.lang.lowercased() == "en" }) {
-                print("\n[Subtitles] Selected English subtitle:")
-                dump(englishSubtitle)
-                
-                if let subtitleURL = URL(string: englishSubtitle.url) {
-                    print("\n[Subtitles] Loading subtitle from URL: \(subtitleURL)")
-                    
-                    // Create subtitle asset
-                    let subtitleAsset = AVURLAsset(url: subtitleURL)
-                    
-                    // Load subtitle asset
-                    Task {
-                        do {
-                            print("\n[Subtitles] Loading subtitle content...")
-                            let subtitleData = try Data(contentsOf: subtitleURL)
-                            if let content = String(data: subtitleData, encoding: .utf8) {
-                                print("\n[Subtitles] Raw subtitle content:")
-                                print(content)
-                            }
-                            
-                            print("\n[Subtitles] Loading subtitle asset tracks...")
-                            let textTracks = try await subtitleAsset.loadTracks(withMediaType: .text)
-                            print("\n[Subtitles] Text tracks found: \(textTracks.count)")
-                            
-                            for (index, track) in textTracks.enumerated() {
-                                print("\n[Subtitles] Track #\(index + 1) details:")
-                                dump(track)
-                            }
-                            
-                            if let subtitleTrack = textTracks.first {
-                                print("\n[Composition] Creating composition...")
-                                let composition = AVMutableComposition()
-                                
-                                // Add video track
-                                if let videoTrack = try await asset.loadTracks(withMediaType: .video).first,
-                                   let compositionVideoTrack = composition.addMutableTrack(
-                                    withMediaType: .video,
-                                    preferredTrackID: kCMPersistentTrackID_Invalid
-                                   ) {
-                                    let timeRange = try await videoTrack.load(.timeRange)
-                                    try compositionVideoTrack.insertTimeRange(
-                                        timeRange,
-                                        of: videoTrack,
-                                        at: .zero
-                                    )
-                                    print("\n[Composition] Video track added")
-                                    dump(compositionVideoTrack)
-                                }
-                                
-                                // Add audio track
-                                if let audioTrack = try await asset.loadTracks(withMediaType: .audio).first,
-                                   let compositionAudioTrack = composition.addMutableTrack(
-                                    withMediaType: .audio,
-                                    preferredTrackID: kCMPersistentTrackID_Invalid
-                                   ) {
-                                    let timeRange = try await audioTrack.load(.timeRange)
-                                    try compositionAudioTrack.insertTimeRange(
-                                        timeRange,
-                                        of: audioTrack,
-                                        at: .zero
-                                    )
-                                    print("\n[Composition] Audio track added")
-                                    dump(compositionAudioTrack)
-                                }
-                                
-                                // Add subtitle track
-                                if let compositionSubtitleTrack = composition.addMutableTrack(
-                                    withMediaType: .text,
-                                    preferredTrackID: kCMPersistentTrackID_Invalid
-                                ) {
-                                    let timeRange = try await subtitleTrack.load(.timeRange)
-                                    try compositionSubtitleTrack.insertTimeRange(
-                                        timeRange,
-                                        of: subtitleTrack,
-                                        at: .zero
-                                    )
-                                    print("\n[Composition] Subtitle track added")
-                                    dump(compositionSubtitleTrack)
-                                    
-                                    print("\n[Composition] Final composition details:")
-                                    dump(composition)
-                                }
-                                
-                                // Update player item
-                                await MainActor.run {
-                                    print("\n[Player] Updating player item with composition")
-                                    let newPlayerItem = AVPlayerItem(asset: composition)
-                                    if let player = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.rootViewController?.presentedViewController as? AVPlayerViewController {
-                                        player.player?.replaceCurrentItem(with: newPlayerItem)
-                                        print("\n[Player] Player item updated successfully")
-                                    } else {
-                                        print("\n[Error] Failed to get player controller")
-                                    }
-                                }
-                            } else {
-                                print("\n[Error] No text tracks found in subtitle asset")
-                            }
-                        } catch {
-                            print("\n[Error] Subtitle processing failed:")
-                            dump(error)
-                        }
-                    }
-                } else {
-                    print("\n[Error] Invalid subtitle URL")
-                }
-            } else {
-                print("\n[Subtitles] No English subtitle found")
-            }
-        } else {
-            print("\n[Subtitles] No subtitles available")
-        }
-        
-        print("\n==================== SUBTITLE PROCESSING END ====================")
-        
         // Create and configure player
         print("\n[Player] Creating AVPlayer")
         let player = AVPlayer(playerItem: playerItem)
         player.automaticallyWaitsToMinimizeStalling = true
         player.volume = 1.0
+        
+        // Handle subtitles
+        if let tracks = streamingData.tracks,
+           AppSettings.shared.subtitlesEnabled {
+            print("\n[Subtitles] Processing subtitles...")
+            
+            // Find English subtitles
+            let englishSubtitle = tracks.first { track in
+                track.kind == "captions" && 
+                track.label?.lowercased() == "english"
+            }
+            
+            if let englishSubtitle = englishSubtitle,
+               let subtitleURL = URL(string: englishSubtitle.file) {
+                print("\n[Subtitles] Found English subtitles at URL: \(subtitleURL)")
+                
+                Task {
+                    do {
+                        // Load subtitles using SubtitleManager
+                        let subtitleCues = try await SubtitleManager.shared.loadSubtitles(from: subtitleURL)
+                        
+                        // Create subtitle overlay on main actor
+                        await MainActor.run {
+                            if let playerController = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.rootViewController?.presentedViewController as? CustomPlayerViewController {
+                                let overlay = SubtitleManager.shared.createSubtitleOverlay(for: subtitleCues, player: player)
+                                playerController.addSubtitleOverlay(overlay)
+                                print("\n[Subtitles] Added subtitle overlay")
+                            }
+                        }
+                    } catch {
+                        print("\n[Error] Subtitle processing failed: \(error.localizedDescription)")
+                        // Handle error on main actor
+                        await MainActor.run {
+                            print("\n[Warning] Failed to load subtitles: \(error.localizedDescription)")
+                        }
+                    }
+                }
+            } else {
+                print("\n[Subtitles] No English subtitles found in tracks")
+            }
+        }
         
         // Present player
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
@@ -276,7 +205,18 @@ struct EpisodeView: View {
             playerViewController.modalPresentationStyle = .fullScreen
             playerViewController.showsPlaybackControls = true
             
-            // Add playback end observer
+            // Add observers
+            let timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { [weak playerViewController] _ in
+                // Monitor playback status
+                if player.currentItem?.status == .failed {
+                    print("\n[Error] Playback failed: \(player.currentItem?.error?.localizedDescription ?? "Unknown error")")
+                    Task { @MainActor in
+                        viewModel.errorMessage = "Playback failed. Please try again."
+                        playerViewController?.dismiss(animated: true)
+                    }
+                }
+            }
+            
             NotificationCenter.default.addObserver(
                 forName: .AVPlayerItemDidPlayToEndTime,
                 object: playerViewController.player?.currentItem,
@@ -284,13 +224,15 @@ struct EpisodeView: View {
             ) { _ in
                 print("\n[Player] Playback ended")
                 player.seek(to: .zero)
-                print("\n[Player] Playback ended, seeking to start")
+                print("\n[Player] Seeking to start")
             }
             
             // Set dismiss callback
             playerViewController.onDismiss = {
                 print("\n[Player] Cleaning up player")
                 player.pause()
+                player.removeTimeObserver(timeObserver)
+                NotificationCenter.default.removeObserver(playerViewController)
                 player.replaceCurrentItem(with: nil)
                 dismiss()
             }
@@ -301,6 +243,7 @@ struct EpisodeView: View {
             }
         } else {
             print("\n[Error] Failed to present player controller")
+            viewModel.errorMessage = "Failed to present video player"
         }
         
         print("\n==================== PLAYER SETUP END ====================")

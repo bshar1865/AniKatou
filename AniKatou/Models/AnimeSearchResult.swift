@@ -137,8 +137,10 @@ struct StreamingResult: Codable {
 struct StreamingData: Codable {
     let headers: [String: String]?
     let sources: [StreamSource]
-    let subtitles: [SubtitleTrack]?
+    let tracks: [SubtitleTrack]?
     let download: String?
+    let intro: IntroOutro?
+    let outro: IntroOutro?
 }
 
 struct StreamSource: Codable {
@@ -154,7 +156,13 @@ struct StreamSource: Codable {
 }
 
 struct SubtitleTrack: Codable {
-    let url: String
-    let lang: String
-    let language: String?
+    let file: String
+    let label: String?
+    let kind: String
+    let `default`: Bool?
+}
+
+struct IntroOutro: Codable {
+    let start: Int
+    let end: Int
 } 

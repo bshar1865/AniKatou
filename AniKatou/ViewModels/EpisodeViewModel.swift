@@ -34,7 +34,7 @@ class EpisodeViewModel: ObservableObject {
             
             print("\n[API] Response received successfully")
             print("\n[API] Sources count: \(streamingData?.data.sources.count ?? 0)")
-            print("[API] Has subtitles: \(streamingData?.data.subtitles != nil)")
+            print("[API] Has subtitles: \(streamingData?.data.tracks?.contains { $0.kind == "captions" } ?? false)")
             
             if let sources = streamingData?.data.sources {
                 print("\n[API] Available video sources:")
@@ -45,12 +45,15 @@ class EpisodeViewModel: ObservableObject {
                 }
             }
             
-            if let subtitles = streamingData?.data.subtitles {
-                print("\n[API] Available subtitle tracks:")
-                subtitles.forEach { subtitle in
-                    print("\nLanguage: \(subtitle.lang)")
-                    print("Language (full): \(subtitle.language ?? subtitle.lang)")
-                    print("URL: \(subtitle.url)")
+            if let tracks = streamingData?.data.tracks {
+                print("\n[API] Available tracks:")
+                tracks.forEach { track in
+                    print("\nKind: \(track.kind)")
+                    if let label = track.label {
+                        print("Label: \(label)")
+                    }
+                    print("URL: \(track.file)")
+                    print("Default: \(track.default ?? false)")
                 }
             }
             

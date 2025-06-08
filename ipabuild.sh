@@ -13,6 +13,13 @@ fi
 
 cd build
 
+# Resolve Swift Package Manager dependencies
+echo "Resolving Swift Package Manager dependencies..."
+cd "$WORKING_LOCATION"
+xcodebuild -resolvePackageDependencies
+
+# Build the project
+cd build
 xcodebuild -project "$WORKING_LOCATION/$APPLICATION_NAME.xcodeproj" \
     -scheme "$APPLICATION_NAME" \
     -configuration Release \
