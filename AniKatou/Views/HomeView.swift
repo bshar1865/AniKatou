@@ -26,17 +26,25 @@ struct HomeView: View {
                     // Trending Section
                     if !viewModel.trendingAnimes.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Trending Now")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .padding(.horizontal)
+                            HStack {
+                                Text("Trending Now")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                Spacer()
+                                
+                                NavigationLink(destination: AnimeListView(title: "Trending Now", animes: viewModel.trendingAnimes)) {
+                                    Text("See All")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .padding(.horizontal)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 LazyHStack(spacing: 16) {
                                     ForEach(viewModel.trendingAnimes) { anime in
                                         NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
-                                            BookmarkCard(anime: anime)
-                                                .frame(width: 160)
+                                            AnimeCard(anime: anime, width: 160)
                                         }
                                     }
                                 }
@@ -48,17 +56,25 @@ struct HomeView: View {
                     // Latest Episodes Section
                     if !viewModel.latestEpisodeAnimes.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Latest Episodes")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .padding(.horizontal)
+                            HStack {
+                                Text("Latest Episodes")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                Spacer()
+                                
+                                NavigationLink(destination: AnimeListView(title: "Latest Episodes", animes: viewModel.latestEpisodeAnimes)) {
+                                    Text("See All")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .padding(.horizontal)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 LazyHStack(spacing: 16) {
                                     ForEach(viewModel.latestEpisodeAnimes) { anime in
                                         NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
-                                            BookmarkCard(anime: anime)
-                                                .frame(width: 160)
+                                            AnimeCard(anime: anime, width: 160)
                                         }
                                     }
                                 }
@@ -70,18 +86,26 @@ struct HomeView: View {
                     // Top 10 Today Section
                     if !viewModel.top10Today.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Top 10 Today")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .padding(.horizontal)
+                            HStack {
+                                Text("Top 10 Today")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                Spacer()
+                                
+                                NavigationLink(destination: AnimeListView(title: "Top 10 Today", animes: viewModel.top10Today)) {
+                                    Text("See All")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .padding(.horizontal)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 LazyHStack(spacing: 16) {
                                     ForEach(Array(viewModel.top10Today.enumerated()), id: \.element.id) { index, anime in
                                         NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
                                             ZStack(alignment: .topLeading) {
-                                                BookmarkCard(anime: anime)
-                                                    .frame(width: 160)
+                                                AnimeCard(anime: anime, width: 160)
                                                 
                                                 Text("#\(index + 1)")
                                                     .font(.title2)
@@ -103,17 +127,25 @@ struct HomeView: View {
                     // Most Popular Section
                     if !viewModel.mostPopularAnimes.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Most Popular")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .padding(.horizontal)
+                            HStack {
+                                Text("Most Popular")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                Spacer()
+                                
+                                NavigationLink(destination: AnimeListView(title: "Most Popular", animes: viewModel.mostPopularAnimes)) {
+                                    Text("See All")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .padding(.horizontal)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 LazyHStack(spacing: 16) {
                                     ForEach(viewModel.mostPopularAnimes) { anime in
                                         NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
-                                            BookmarkCard(anime: anime)
-                                                .frame(width: 160)
+                                            AnimeCard(anime: anime, width: 160)
                                         }
                                     }
                                 }
@@ -125,17 +157,25 @@ struct HomeView: View {
                     // Top Upcoming Section
                     if !viewModel.topUpcomingAnimes.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Top Upcoming")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .padding(.horizontal)
+                            HStack {
+                                Text("Top Upcoming")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                Spacer()
+                                
+                                NavigationLink(destination: AnimeListView(title: "Top Upcoming", animes: viewModel.topUpcomingAnimes)) {
+                                    Text("See All")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .padding(.horizontal)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 LazyHStack(spacing: 16) {
                                     ForEach(viewModel.topUpcomingAnimes) { anime in
                                         NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
-                                            BookmarkCard(anime: anime)
-                                                .frame(width: 160)
+                                            AnimeCard(anime: anime, width: 160)
                                         }
                                     }
                                 }
@@ -147,17 +187,25 @@ struct HomeView: View {
                     // Top Airing Section
                     if !viewModel.topAiringAnimes.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Top Airing")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .padding(.horizontal)
+                            HStack {
+                                Text("Top Airing")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                Spacer()
+                                
+                                NavigationLink(destination: AnimeListView(title: "Top Airing", animes: viewModel.topAiringAnimes)) {
+                                    Text("See All")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .padding(.horizontal)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 LazyHStack(spacing: 16) {
                                     ForEach(viewModel.topAiringAnimes) { anime in
                                         NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
-                                            BookmarkCard(anime: anime)
-                                                .frame(width: 160)
+                                            AnimeCard(anime: anime, width: 160)
                                         }
                                     }
                                 }
@@ -169,17 +217,25 @@ struct HomeView: View {
                     // Most Favorite Section
                     if !viewModel.mostFavoriteAnimes.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Most Favorite")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .padding(.horizontal)
+                            HStack {
+                                Text("Most Favorite")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                Spacer()
+                                
+                                NavigationLink(destination: AnimeListView(title: "Most Favorite", animes: viewModel.mostFavoriteAnimes)) {
+                                    Text("See All")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .padding(.horizontal)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 LazyHStack(spacing: 16) {
                                     ForEach(viewModel.mostFavoriteAnimes) { anime in
                                         NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
-                                            BookmarkCard(anime: anime)
-                                                .frame(width: 160)
+                                            AnimeCard(anime: anime, width: 160)
                                         }
                                     }
                                 }
@@ -191,17 +247,25 @@ struct HomeView: View {
                     // Latest Completed Section
                     if !viewModel.latestCompletedAnimes.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Latest Completed")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .padding(.horizontal)
+                            HStack {
+                                Text("Latest Completed")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                Spacer()
+                                
+                                NavigationLink(destination: AnimeListView(title: "Latest Completed", animes: viewModel.latestCompletedAnimes)) {
+                                    Text("See All")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .padding(.horizontal)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 LazyHStack(spacing: 16) {
                                     ForEach(viewModel.latestCompletedAnimes) { anime in
-                        NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
-                            BookmarkCard(anime: anime)
-                                                .frame(width: 160)
+                                        NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
+                                            AnimeCard(anime: anime, width: 160)
                                         }
                                     }
                                 }

@@ -117,12 +117,6 @@ struct AnimeDetailView: View {
                     
                     // Additional Info Section
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Information")
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                        
                         VStack(alignment: .leading, spacing: 12) {
                             if let genres = details.moreInfo?.genres, !genres.isEmpty {
                                 InfoRow(title: "Genres", content: genres.joined(separator: ", "))

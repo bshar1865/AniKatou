@@ -9,6 +9,57 @@ struct SearchView: View {
         ScrollView {
             VStack(spacing: 16) {
                 if searchText.isEmpty {
+                    // Search History
+                    if !viewModel.searchHistory.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Recent Searches")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                Spacer()
+                                
+                                Button(action: {
+                                    viewModel.clearSearchHistory()
+                                }) {
+                                    Text("Clear")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .padding(.horizontal)
+                            
+                            VStack(spacing: 8) {
+                                ForEach(viewModel.searchHistory, id: \.self) { query in
+                                    HStack {
+                                        Button(action: {
+                                            searchText = query
+                                            handleSearchTextChange(query)
+                                        }) {
+                                            HStack {
+                                                Image(systemName: "clock")
+                                                    .foregroundColor(.secondary)
+                                                Text(query)
+                                                    .foregroundColor(.primary)
+                                                Spacer()
+                                            }
+                                        }
+                                        
+                                        Button(action: {
+                                            viewModel.removeFromSearchHistory(query)
+                                        }) {
+                                            Image(systemName: "xmark")
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    .padding(.horizontal)
+                                }
+                            }
+                        }
+                        
+                        Divider()
+                            .padding(.vertical)
+                    }
+                    
                     // Show popular anime when no search
                     if !viewModel.popularAnimes.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
@@ -157,39 +208,6 @@ struct SearchView: View {
                 #if DEBUG
                 print("Search task cancelled")
                 #endif
-            }
-        }
-    }
-}
-
-struct AnimeCard: View {
-    let anime: AnimeItem
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            AsyncImage(url: URL(string: anime.image)) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Color.gray
-                    .overlay(
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
-                    )
-            }
-            .frame(height: 240)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            
-            Text(anime.title)
-                .font(.headline)
-                .lineLimit(2)
-                .foregroundColor(.primary)
-            
-            if let type = anime.type {
-                Text(type)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
         }
     }

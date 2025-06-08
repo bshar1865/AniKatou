@@ -11,9 +11,15 @@ class SearchViewModel: ObservableObject {
     @Published var currentPage = 1
     @Published var hasNextPage = false
     @Published var totalPages = 1
+    @Published var searchHistory: [String] = []
     
     private var searchTask: Task<Void, Never>?
     private let debounceInterval: UInt64 = 800_000_000 // 0.8 seconds
+    private let maxHistoryItems = 10
+    
+    init() {
+        loadSearchHistory()
+    }
     
     func loadPopularAnime() async {
         guard popularAnimes.isEmpty else { return }
@@ -58,6 +64,11 @@ class SearchViewModel: ObservableObject {
             let results = try await APIService.shared.searchAnime(query: query)
             guard !Task.isCancelled else { return }
             searchResults = filterNSFWContent(results)
+            
+            // Add to search history if search was successful and had results
+            if !searchResults.isEmpty {
+                addToSearchHistory(query)
+            }
         } catch let error as APIError {
             guard !Task.isCancelled else { return }
             
@@ -84,6 +95,48 @@ class SearchViewModel: ObservableObject {
         
         guard !Task.isCancelled else { return }
         isLoading = false
+    }
+    
+    // Search History Management
+    private func loadSearchHistory() {
+        if let data = UserDefaults.standard.data(forKey: "searchHistory"),
+           let history = try? JSONDecoder().decode([String].self, from: data) {
+            searchHistory = history
+        }
+    }
+    
+    private func saveSearchHistory() {
+        if let data = try? JSONEncoder().encode(searchHistory) {
+            UserDefaults.standard.set(data, forKey: "searchHistory")
+        }
+    }
+    
+    private func addToSearchHistory(_ query: String) {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuery.isEmpty else { return }
+        
+        // Remove if already exists (to move it to the top)
+        searchHistory.removeAll { $0.lowercased() == trimmedQuery.lowercased() }
+        
+        // Add to the beginning
+        searchHistory.insert(trimmedQuery, at: 0)
+        
+        // Keep only the most recent searches
+        if searchHistory.count > maxHistoryItems {
+            searchHistory = Array(searchHistory.prefix(maxHistoryItems))
+        }
+        
+        saveSearchHistory()
+    }
+    
+    func removeFromSearchHistory(_ query: String) {
+        searchHistory.removeAll { $0 == query }
+        saveSearchHistory()
+    }
+    
+    func clearSearchHistory() {
+        searchHistory.removeAll()
+        saveSearchHistory()
     }
     
     func loadNextPage(query: String) async {
