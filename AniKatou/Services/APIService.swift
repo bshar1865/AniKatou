@@ -91,6 +91,13 @@ class APIService {
         return result.data
     }
     
+    // Get popular anime
+    func getPopularAnime() async throws -> [AnimeItem] {
+        let queryItems = [URLQueryItem(name: "nsfw", value: "false")]
+        let result: AnimeSearchResult = try await fetch("popular", queryItems: queryItems)
+        return result.data.animes
+    }
+    
     // Base fetch method
     private func fetch<T: Codable>(_ endpoint: String, queryItems: [URLQueryItem]? = nil) async throws -> T {
         guard let baseURL = APIConfig.buildEndpoint(endpoint, queryItems: queryItems) else {

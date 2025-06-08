@@ -15,6 +15,29 @@ class SearchViewModel: ObservableObject {
     private var searchTask: Task<Void, Never>?
     private let debounceInterval: UInt64 = 800_000_000 // 0.8 seconds
     
+    func loadPopularAnime() async {
+        guard popularAnimes.isEmpty else { return }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let results = try await APIService.shared.getPopularAnime()
+            popularAnimes = filterNSFWContent(results)
+        } catch let error as APIError {
+            // Only show error if it's not a 404
+            if case .serverError(404, _) = error {
+                popularAnimes = []
+            } else {
+                errorMessage = error.message
+            }
+        } catch {
+            errorMessage = "Failed to load popular anime: \(error.localizedDescription)"
+        }
+        
+        isLoading = false
+    }
+    
     private func filterNSFWContent(_ animes: [AnimeItem]) -> [AnimeItem] {
         animes.filter { !$0.containsNSFWContent }
     }
@@ -28,31 +51,39 @@ class SearchViewModel: ObservableObject {
         // Cancel any previous search task
         await cleanupSearch()
         
-        // Create new search task
-        let task = Task { @MainActor [weak self] in
-            guard let self = self else { return }
-            
-            self.isLoading = true
-            self.errorMessage = nil
-            
-            do {
-                let results = try await APIService.shared.searchAnime(query: query)
-                
-                guard !Task.isCancelled else { return }
-                self.searchResults = filterNSFWContent(results)
-            } catch let error as APIError {
-                guard !Task.isCancelled else { return }
-                self.errorMessage = error.message
-            } catch {
-                guard !Task.isCancelled else { return }
-                self.errorMessage = "Failed to search: \(error.localizedDescription)"
-            }
-            
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let results = try await APIService.shared.searchAnime(query: query)
             guard !Task.isCancelled else { return }
-            self.isLoading = false
+            searchResults = filterNSFWContent(results)
+        } catch let error as APIError {
+            guard !Task.isCancelled else { return }
+            
+            // Only show error for non-404 errors and when query is too short
+            switch error {
+            case .searchQueryTooShort:
+                errorMessage = error.message
+            case .serverError(404, _):
+                // For 404, just show empty results
+                searchResults = []
+            default:
+                // For other errors, only show if the query is valid length
+                if query.count >= 3 {
+                    errorMessage = error.message
+                }
+            }
+        } catch {
+            guard !Task.isCancelled else { return }
+            // Only show general errors if query is valid length
+            if query.count >= 3 {
+                errorMessage = "Failed to search: \(error.localizedDescription)"
+            }
         }
         
-        searchTask = task
+        guard !Task.isCancelled else { return }
+        isLoading = false
     }
     
     func loadNextPage(query: String) async {
