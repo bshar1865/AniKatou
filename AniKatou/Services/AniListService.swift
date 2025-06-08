@@ -52,7 +52,8 @@ class AniListService {
         
         for attempt in 1...maxRetries {
             do {
-                return try await fetchEpisodeThumbnails(animeId: animeId)
+                let thumbnails = try await fetchEpisodeThumbnails(animeId: animeId)
+                return thumbnails
             } catch {
                 lastError = error
                 if attempt < maxRetries {
@@ -100,13 +101,13 @@ class AniListService {
     
     private func sendGraphQLRequest(query: String, variables: [String: Any]) async throws -> [String: Any] {
         guard let url = URL(string: endpoint) else {
-            throw APIError.invalidURL
+            throw NSError(domain: "AniListService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid endpoint URL"])
         }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("AniKatou/1.0", forHTTPHeaderField: "User-Agent")
         
         let body: [String: Any] = [
             "query": query,
@@ -118,18 +119,18 @@ class AniListService {
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
+            throw NSError(domain: "AniListService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
         }
         
         guard httpResponse.statusCode == 200 else {
-            throw APIError.serverError(httpResponse.statusCode, nil)
+            throw NSError(domain: "AniListService", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server error"])
         }
         
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let responseData = json["data"] as? [String: Any] else {
-            throw APIError.decodingError(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON structure"]))
+              let data = json["data"] as? [String: Any] else {
+            throw NSError(domain: "AniListService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON response"])
         }
         
-        return responseData
+        return data
     }
 } 
