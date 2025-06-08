@@ -38,20 +38,14 @@ struct SettingsView: View {
                         Text(language.name).tag(language.id)
                     }
                 }
-            } header: {
-                Text("Streaming")
-            }
-            
-            Section {
+                
                 Picker("Video Quality", selection: $viewModel.preferredQuality) {
                     ForEach(AppSettings.shared.availableQualities, id: \.id) { quality in
                         Text(quality.name).tag(quality.id)
                     }
                 }
-                
-                Toggle("Autoplay Next Episode", isOn: $viewModel.autoplayEnabled)
             } header: {
-                Text("Playback")
+                Text("Streaming")
             }
             
             Section {

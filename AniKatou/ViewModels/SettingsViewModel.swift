@@ -21,16 +21,9 @@ class SettingsViewModel: ObservableObject {
         }
     }
     
-    @Published var autoplayEnabled: Bool {
-        didSet {
-            AppSettings.shared.autoplayEnabled = autoplayEnabled
-        }
-    }
-    
     init() {
         preferredServer = AppSettings.shared.preferredServer
         preferredLanguage = AppSettings.shared.preferredLanguage
         preferredQuality = AppSettings.shared.preferredQuality
-        autoplayEnabled = AppSettings.shared.autoplayEnabled
     }
 } 

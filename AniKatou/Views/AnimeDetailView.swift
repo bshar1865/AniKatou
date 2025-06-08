@@ -108,7 +108,7 @@ struct AnimeDetailView: View {
                                 .padding(.horizontal)
                                 .padding(.top, 16)
                             
-                            Text(description)
+                        Text(description)
                                 .font(.body)
                                 .padding(.horizontal)
                                 .padding(.bottom, 8)
@@ -148,7 +148,7 @@ struct AnimeDetailView: View {
                     if !viewModel.episodeGroups.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
-                                Text("Episodes")
+                            Text("Episodes")
                                     .font(.title3)
                                     .fontWeight(.bold)
                                 
@@ -168,7 +168,7 @@ struct AnimeDetailView: View {
                                             }
                                         }
                                     } label: {
-                                        HStack {
+                                    HStack {
                                             Text(viewModel.episodeGroups[viewModel.selectedGroupIndex].title)
                                                 .font(.headline)
                                             Image(systemName: "chevron.up.chevron.down")

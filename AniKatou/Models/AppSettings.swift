@@ -6,7 +6,6 @@ class AppSettings {
     private let defaults = UserDefaults.standard
     private let serverKey = "preferred_server"
     private let languageKey = "preferred_language"
-    private let autoplayKey = "autoplay_enabled"
     private let qualityKey = "video_quality"
     private let subtitlesKey = "subtitles_enabled"
     private let subtitlesLanguageKey = "subtitles_language"
@@ -39,12 +38,7 @@ class AppSettings {
         ]
     }
     
-    // Playback Settings
-    var autoplayEnabled: Bool {
-        get { defaults.bool(forKey: autoplayKey) }
-        set { defaults.set(newValue, forKey: autoplayKey) }
-    }
-    
+    // Video Quality Settings
     var preferredQuality: String {
         get { defaults.string(forKey: qualityKey) ?? "1080p" }
         set { defaults.set(newValue, forKey: qualityKey) }

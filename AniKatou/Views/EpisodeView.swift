@@ -283,18 +283,8 @@ struct EpisodeView: View {
                 queue: .main
             ) { _ in
                 print("\n[Player] Playback ended")
-                if AppSettings.shared.autoplayEnabled {
-                    // Instead of using actionAtItemEnd, we'll handle autoplay manually
-                    Task { @MainActor in
-                        // Reset to beginning
-                        player.seek(to: .zero)
-                        player.play()
-                        print("\n[Player] Auto-playing next item")
-                    }
-                } else {
-                    player.seek(to: .zero)
-                    print("\n[Player] Playback ended, not auto-playing")
-                }
+                player.seek(to: .zero)
+                print("\n[Player] Playback ended, seeking to start")
             }
             
             // Set dismiss callback
