@@ -62,9 +62,7 @@ struct AnimeDetailView: View {
                             }
                             
                             // Bookmark Button
-                            Button(action: {
-                                viewModel.toggleBookmark()
-                            }) {
+                            Button(action: { viewModel.toggleBookmark() }) {
                                 Label(viewModel.isBookmarked ? "Bookmarked" : "Bookmark", systemImage: viewModel.isBookmarked ? "bookmark.fill" : "bookmark")
                                     .font(.headline)
                                     .foregroundColor(.white)
@@ -86,17 +84,17 @@ struct AnimeDetailView: View {
                         } placeholder: {
                             Color.clear
                         }
-                            .overlay(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [
-                                        Color(colorScheme == .dark ? .black : .white),
-                                        Color(colorScheme == .dark ? .black : .white).opacity(0.8),
-                                        Color(colorScheme == .dark ? .black : .white).opacity(0.6)
-                                    ]),
-                                    startPoint: .bottom,
-                                    endPoint: .top
-                                )
+                        .overlay(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(colorScheme == .dark ? .black : .white),
+                                    Color(colorScheme == .dark ? .black : .white).opacity(0.8),
+                                    Color(colorScheme == .dark ? .black : .white).opacity(0.6)
+                                ]),
+                                startPoint: .bottom,
+                                endPoint: .top
                             )
+                        )
                     )
                     
                     // Description Section
@@ -108,7 +106,7 @@ struct AnimeDetailView: View {
                                 .padding(.horizontal)
                                 .padding(.top, 16)
                             
-                        Text(description)
+                            Text(description)
                                 .font(.body)
                                 .padding(.horizontal)
                                 .padding(.bottom, 8)
@@ -148,7 +146,7 @@ struct AnimeDetailView: View {
                     if !viewModel.episodeGroups.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
-                            Text("Episodes")
+                                Text("Episodes")
                                     .font(.title3)
                                     .fontWeight(.bold)
                                 
@@ -157,9 +155,7 @@ struct AnimeDetailView: View {
                                     
                                     Menu {
                                         ForEach(Array(viewModel.episodeGroups.enumerated()), id: \.element.id) { index, group in
-                                            Button(action: {
-                                                viewModel.selectedGroupIndex = index
-                                            }) {
+                                            Button(action: { viewModel.selectedGroupIndex = index }) {
                                                 if index == viewModel.selectedGroupIndex {
                                                     Label(group.title, systemImage: "checkmark")
                                                 } else {
@@ -168,7 +164,7 @@ struct AnimeDetailView: View {
                                             }
                                         }
                                     } label: {
-                                    HStack {
+                                        HStack {
                                             Text(viewModel.episodeGroups[viewModel.selectedGroupIndex].title)
                                                 .font(.headline)
                                             Image(systemName: "chevron.up.chevron.down")
@@ -203,7 +199,7 @@ struct AnimeDetailView: View {
 }
 
 // Helper Views
-struct InfoPill: View {
+private struct InfoPill: View {
     let text: String
     let icon: String
     
@@ -217,7 +213,7 @@ struct InfoPill: View {
     }
 }
 
-struct InfoRow: View {
+private struct InfoRow: View {
     let title: String
     let content: String
     
@@ -232,7 +228,7 @@ struct InfoRow: View {
     }
 }
 
-struct EpisodeRow: View {
+private struct EpisodeRow: View {
     let episode: EpisodeInfo
     let thumbnail: String?
     let thumbnailState: AnimeDetailViewModel.ThumbnailLoadingState
@@ -243,10 +239,7 @@ struct EpisodeRow: View {
             Group {
                 if case .loading = thumbnailState {
                     Color.gray
-                        .overlay(
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle())
-                        )
+                        .overlay(ProgressView())
                 } else if let thumbnail = thumbnail {
                     AsyncImage(url: URL(string: thumbnail)) { image in
                         image
