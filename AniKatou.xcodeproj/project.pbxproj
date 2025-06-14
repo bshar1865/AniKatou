@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D626A9F12DFDE40E006FA4C1 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = D626A9F02DFDE40E006FA4C1 /* Kingfisher */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		D66043202DECE3F2002379B9 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -42,6 +46,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D626A9F12DFDE40E006FA4C1 /* Kingfisher in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -100,6 +105,7 @@
 			);
 			name = AniKatou;
 			packageProductDependencies = (
+				D626A9F02DFDE40E006FA4C1 /* Kingfisher */,
 			);
 			productName = AniKatou;
 			productReference = D66043122DECE3EE002379B9 /* AniKatou.app */;
@@ -556,6 +562,14 @@
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D626A9F02DFDE40E006FA4C1 /* Kingfisher */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D623642E2DF51762008470D2 /* XCRemoteSwiftPackageReference "Kingfisher" */;
+			productName = Kingfisher;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D660430A2DECE3EE002379B9 /* Project object */;
 }
