@@ -162,16 +162,9 @@ struct EpisodeView: View {
             print("[Subtitles Debug] Available subtitles: \(tracks.count)")
             print("[Subtitles Debug] Available languages: \(tracks.map { $0.lang }.joined(separator: ", "))")
             
-            let preferredLanguage = AppSettings.shared.preferredSubtitlesLanguage
-            print("\n[Subtitles Debug] Looking for subtitles in preferred language: \(preferredLanguage)")
-            
-            // Try to find subtitles in preferred language, fallback to English
+            // Look for English subtitles
             let selectedSubtitle = tracks.first { track in
                 // Handle complex language strings like "English" or "English - Text (Region)"
-                let langParts = track.lang.components(separatedBy: " - ")
-                let mainLang = langParts[0].lowercased()
-                return mainLang.contains(preferredLanguage.lowercased())
-            } ?? tracks.first { track in
                 let langParts = track.lang.components(separatedBy: " - ")
                 let mainLang = langParts[0].lowercased()
                 return mainLang.contains("english")
@@ -204,7 +197,7 @@ struct EpisodeView: View {
                     }
                 }
             } else {
-                print("\n[Subtitles Debug] No suitable subtitles found for preferred language (\(preferredLanguage)) or English")
+                print("\n[Subtitles Debug] No English subtitles found")
             }
         } else {
             print("\n[Subtitles Debug] Subtitles disabled or not available")

@@ -27,17 +27,10 @@ class SettingsViewModel: ObservableObject {
         }
     }
     
-    @Published var preferredSubtitlesLanguage: String {
-        didSet {
-            AppSettings.shared.preferredSubtitlesLanguage = preferredSubtitlesLanguage
-        }
-    }
-    
     init() {
         self.preferredServer = AppSettings.shared.preferredServer
         self.preferredLanguage = AppSettings.shared.preferredLanguage
         self.preferredQuality = AppSettings.shared.preferredQuality
         self.subtitlesEnabled = AppSettings.shared.subtitlesEnabled
-        self.preferredSubtitlesLanguage = AppSettings.shared.preferredSubtitlesLanguage
     }
 } 

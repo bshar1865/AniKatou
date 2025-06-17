@@ -44,24 +44,12 @@ struct SettingsView: View {
                         Text(quality.name).tag(quality.id)
                     }
                 }
+                
+                Toggle("Enable Subtitles", isOn: $viewModel.subtitlesEnabled)
             } header: {
                 Text("Streaming")
-            }
-            
-            Section {
-                Toggle("Enable Subtitles", isOn: $viewModel.subtitlesEnabled)
-                
-                if viewModel.subtitlesEnabled {
-                    Picker("Subtitle Language", selection: $viewModel.preferredSubtitlesLanguage) {
-                        ForEach(AppSettings.shared.availableSubtitleLanguages, id: \.id) { language in
-                            Text(language.name).tag(language.id)
-                        }
-                    }
-                }
-            } header: {
-                Text("Subtitles")
             } footer: {
-                Text("Configure subtitle preferences for your video playback.")
+                Text("Configure your streaming preferences including video quality, language, and subtitles.")
             }
             
             Section {

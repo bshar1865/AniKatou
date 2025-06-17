@@ -8,7 +8,6 @@ class AppSettings {
     private let languageKey = "preferred_language"
     private let qualityKey = "video_quality"
     private let subtitlesKey = "subtitles_enabled"
-    private let subtitlesLanguageKey = "subtitles_language"
     
     private init() {}
     
@@ -57,23 +56,5 @@ class AppSettings {
     var subtitlesEnabled: Bool {
         get { defaults.bool(forKey: subtitlesKey) }
         set { defaults.set(newValue, forKey: subtitlesKey) }
-    }
-    
-    var preferredSubtitlesLanguage: String {
-        get { defaults.string(forKey: subtitlesLanguageKey) ?? "english" }
-        set { defaults.set(newValue, forKey: subtitlesLanguageKey) }
-    }
-    
-    var availableSubtitleLanguages: [(id: String, name: String)] {
-        [
-            ("english", "English"),
-            ("spanish", "Spanish"),
-            ("french", "French"),
-            ("german", "German"),
-            ("italian", "Italian"),
-            ("portuguese", "Portuguese"),
-            ("russian", "Russian"),
-            ("japanese", "Japanese")
-        ]
     }
 } 
