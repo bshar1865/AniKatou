@@ -21,9 +21,23 @@ class SettingsViewModel: ObservableObject {
         }
     }
     
+    @Published var subtitlesEnabled: Bool {
+        didSet {
+            AppSettings.shared.subtitlesEnabled = subtitlesEnabled
+        }
+    }
+    
+    @Published var preferredSubtitlesLanguage: String {
+        didSet {
+            AppSettings.shared.preferredSubtitlesLanguage = preferredSubtitlesLanguage
+        }
+    }
+    
     init() {
-        preferredServer = AppSettings.shared.preferredServer
-        preferredLanguage = AppSettings.shared.preferredLanguage
-        preferredQuality = AppSettings.shared.preferredQuality
+        self.preferredServer = AppSettings.shared.preferredServer
+        self.preferredLanguage = AppSettings.shared.preferredLanguage
+        self.preferredQuality = AppSettings.shared.preferredQuality
+        self.subtitlesEnabled = AppSettings.shared.subtitlesEnabled
+        self.preferredSubtitlesLanguage = AppSettings.shared.preferredSubtitlesLanguage
     }
 } 

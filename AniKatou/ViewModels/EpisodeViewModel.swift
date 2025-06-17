@@ -5,6 +5,7 @@ class EpisodeViewModel: ObservableObject {
     @Published var streamingData: StreamingResult?
     @Published var isLoading = false
     @Published var errorMessage: String?
+    var subtitleCues: [SubtitleManager.SubtitleCue]?
     
     func loadStreamingSources(episodeId: String) async {
         isLoading = true
@@ -34,7 +35,7 @@ class EpisodeViewModel: ObservableObject {
             
             print("\n[API] Response received successfully")
             print("\n[API] Sources count: \(streamingData?.data.sources.count ?? 0)")
-            print("[API] Has subtitles: \(streamingData?.data.subtitles?.isEmpty == false)")
+            print("[API] Has subtitles: \(streamingData?.data.tracks?.filter { !$0.lang.lowercased().contains("thumbnail") }.isEmpty == false)")
             
             if let sources = streamingData?.data.sources {
                 print("\n[API] Available video sources:")
@@ -45,11 +46,11 @@ class EpisodeViewModel: ObservableObject {
                 }
             }
             
-            if let subtitles = streamingData?.data.subtitles {
+            if let tracks = streamingData?.data.tracks?.filter({ !$0.lang.lowercased().contains("thumbnail") }) {
                 print("\n[API] Available subtitles:")
-                subtitles.forEach { subtitle in
-                    print("\nLanguage: \(subtitle.lang)")
-                    print("URL: \(subtitle.url)")
+                tracks.forEach { track in
+                    print("\nLanguage: \(track.lang)")
+                    print("URL: \(track.url)")
                 }
             }
             

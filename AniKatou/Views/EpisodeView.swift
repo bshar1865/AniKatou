@@ -156,61 +156,67 @@ struct EpisodeView: View {
         
         // Handle subtitles
         if AppSettings.shared.subtitlesEnabled,
-           let subtitles = streamingData.subtitles {
+           let tracks = streamingData.tracks?.filter({ !$0.lang.lowercased().contains("thumbnail") }) {
+            print("\n[Subtitles Debug] Subtitle handling started")
+            print("[Subtitles Debug] Subtitles enabled in settings: \(AppSettings.shared.subtitlesEnabled)")
+            print("[Subtitles Debug] Available subtitles: \(tracks.count)")
+            print("[Subtitles Debug] Available languages: \(tracks.map { $0.lang }.joined(separator: ", "))")
+            
             let preferredLanguage = AppSettings.shared.preferredSubtitlesLanguage
-            print("\n[Subtitles] Looking for subtitles in preferred language: \(preferredLanguage)")
+            print("\n[Subtitles Debug] Looking for subtitles in preferred language: \(preferredLanguage)")
             
             // Try to find subtitles in preferred language, fallback to English
-            if let preferredSub = subtitles.first(where: { $0.lang.lowercased() == preferredLanguage.lowercased() }),
-               let subtitleURL = URL(string: preferredSub.url) {
-                print("\n[Subtitles] Found subtitles in preferred language (\(preferredLanguage)), loading from URL: \(subtitleURL)")
+            let selectedSubtitle = tracks.first { track in
+                // Handle complex language strings like "English" or "English - Text (Region)"
+                let langParts = track.lang.components(separatedBy: " - ")
+                let mainLang = langParts[0].lowercased()
+                return mainLang.contains(preferredLanguage.lowercased())
+            } ?? tracks.first { track in
+                let langParts = track.lang.components(separatedBy: " - ")
+                let mainLang = langParts[0].lowercased()
+                return mainLang.contains("english")
+            }
+            
+            if let subtitle = selectedSubtitle,
+               let subtitleURL = URL(string: subtitle.url) {
+                print("\n[Subtitles Debug] Selected subtitle:")
+                print("Language: \(subtitle.lang)")
+                print("URL: \(subtitle.url)")
+                
+                // Load subtitles asynchronously
                 Task {
                     do {
+                        print("\n[Subtitles Debug] Loading subtitle content...")
                         let cues = try await SubtitleManager.shared.loadSubtitles(from: subtitleURL)
-                        print("\n[Subtitles] Successfully loaded \(cues.count) subtitle cues")
+                        print("[Subtitles Debug] Successfully loaded \(cues.count) subtitle cues")
                         
-                        // Create and add subtitle overlay
+                        // Add subtitle overlay to player if it's already presented
                         await MainActor.run {
                             if let playerController = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.rootViewController?.presentedViewController as? CustomPlayerViewController {
                                 let overlay = SubtitleManager.shared.createSubtitleOverlay(for: cues, player: player)
                                 playerController.addSubtitleOverlay(overlay)
-                                print("\n[Subtitles] Added subtitle overlay to player")
+                                print("[Subtitles Debug] Added subtitle overlay to existing player")
                             }
                         }
                     } catch {
-                        print("\n[Error] Failed to load subtitles: \(error)")
-                    }
-                }
-            } else if let englishSub = subtitles.first(where: { $0.lang.lowercased() == "english" }),
-                      let subtitleURL = URL(string: englishSub.url) {
-                print("\n[Subtitles] Preferred language not found, falling back to English subtitles from URL: \(subtitleURL)")
-                Task {
-                    do {
-                        let cues = try await SubtitleManager.shared.loadSubtitles(from: subtitleURL)
-                        print("\n[Subtitles] Successfully loaded \(cues.count) subtitle cues")
-                        
-                        // Create and add subtitle overlay
-                        await MainActor.run {
-                            if let playerController = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.rootViewController?.presentedViewController as? CustomPlayerViewController {
-                                let overlay = SubtitleManager.shared.createSubtitleOverlay(for: cues, player: player)
-                                playerController.addSubtitleOverlay(overlay)
-                                print("\n[Subtitles] Added subtitle overlay to player")
-                            }
-                        }
-                    } catch {
-                        print("\n[Error] Failed to load subtitles: \(error)")
+                        print("\n[Subtitles Debug] Failed to load subtitles: \(error)")
+                        print("Error details: \(error)")
                     }
                 }
             } else {
-                print("\n[Subtitles] No suitable subtitles found")
+                print("\n[Subtitles Debug] No suitable subtitles found for preferred language (\(preferredLanguage)) or English")
             }
+        } else {
+            print("\n[Subtitles Debug] Subtitles disabled or not available")
+            print("Subtitles enabled in settings: \(AppSettings.shared.subtitlesEnabled)")
+            print("Subtitles in streaming data: \(streamingData.tracks != nil)")
         }
         
         // Present player
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let window = windowScene.windows.first,
            let rootViewController = window.rootViewController {
-            print("\n[Player] Presenting player controller")
+            print("\n[Player Debug] Setting up player presentation")
             let playerViewController = CustomPlayerViewController()
             playerViewController.player = player
             playerViewController.modalPresentationStyle = .fullScreen

@@ -82,7 +82,26 @@ class APIService {
             URLQueryItem(name: "nsfw", value: "false")
         ]
         
-        return try await fetch("episode/sources", queryItems: queryItems)
+        print("\n[API Debug] Fetching streaming sources")
+        print("[API Debug] Episode ID: \(episodeId)")
+        print("[API Debug] Server: \(server)")
+        print("[API Debug] Category: \(category)")
+        
+        let result: StreamingResult = try await fetch("episode/sources", queryItems: queryItems)
+        
+        print("\n[API Debug] Streaming response:")
+        print("Status: \(result.status)")
+        if let tracks = result.data.tracks?.filter({ !$0.lang.lowercased().contains("thumbnail") }) {
+            print("Subtitles found: \(tracks.count)")
+            for track in tracks {
+                print("- Language: \(track.lang)")
+                print("  URL: \(track.url)")
+            }
+        } else {
+            print("No subtitles in response")
+        }
+        
+        return result
     }
     
     // Get home page data
