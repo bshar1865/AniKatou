@@ -2,7 +2,7 @@ import Foundation
 
 // Search Results
 struct AnimeSearchResult: Codable {
-    let success: Bool
+    let status: Int
     let data: AnimeSearchData
 }
 
@@ -58,7 +58,7 @@ struct EpisodeCount: Codable {
 
 // Anime Details
 struct AnimeDetailsResult: Codable {
-    let success: Bool
+    let status: Int
     let data: AnimeDetailsData
 }
 
@@ -110,7 +110,7 @@ struct AnimeMoreInfo: Codable {
 
 // Episodes Response
 struct EpisodesResponse: Codable {
-    let success: Bool
+    let status: Int
     let data: EpisodesData
 }
 
@@ -130,36 +130,27 @@ struct EpisodeInfo: Codable, Identifiable {
 
 // Streaming
 struct StreamingResult: Codable {
-    let success: Bool
+    let status: Int
     let data: StreamingData
 }
 
 struct StreamingData: Codable {
     let headers: [String: String]?
     let sources: [StreamSource]
-    let tracks: [SubtitleTrack]?
-    let download: String?
-    let intro: IntroOutro?
-    let outro: IntroOutro?
+    let subtitles: [SubtitleTrack]?
+    let anilistID: Int?
+    let malID: Int?
 }
 
 struct StreamSource: Codable {
     let url: String
     let quality: String?
     let isM3U8: Bool?
-    
-    enum CodingKeys: String, CodingKey {
-        case url
-        case quality
-        case isM3U8 = "isM3U8"
-    }
 }
 
 struct SubtitleTrack: Codable {
-    let file: String
-    let label: String?
-    let kind: String
-    let `default`: Bool?
+    let lang: String
+    let url: String
 }
 
 struct IntroOutro: Codable {

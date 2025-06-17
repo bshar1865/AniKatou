@@ -1,7 +1,7 @@
 import Foundation
 
 struct HomePageResult: Codable {
-    let success: Bool
+    let status: Int
     let data: HomePageData
 }
 

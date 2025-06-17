@@ -60,20 +60,20 @@ class AppSettings {
     }
     
     var preferredSubtitlesLanguage: String {
-        get { defaults.string(forKey: subtitlesLanguageKey) ?? "en" }
+        get { defaults.string(forKey: subtitlesLanguageKey) ?? "english" }
         set { defaults.set(newValue, forKey: subtitlesLanguageKey) }
     }
     
     var availableSubtitleLanguages: [(id: String, name: String)] {
         [
-            ("en", "English"),
-            ("es", "Spanish"),
-            ("fr", "French"),
-            ("de", "German"),
-            ("it", "Italian"),
-            ("pt", "Portuguese"),
-            ("ru", "Russian"),
-            ("ja", "Japanese")
+            ("english", "English"),
+            ("spanish", "Spanish"),
+            ("french", "French"),
+            ("german", "German"),
+            ("italian", "Italian"),
+            ("portuguese", "Portuguese"),
+            ("russian", "Russian"),
+            ("japanese", "Japanese")
         ]
     }
 } 

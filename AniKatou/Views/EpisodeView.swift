@@ -127,8 +127,8 @@ struct EpisodeView: View {
         
         // Configure headers
         let headers: [String: String] = streamingData.headers ?? [
-            "Origin": "https://megacloud.club",
-            "Referer": "https://megacloud.club/",
+            "Origin": "https://megacloud.blog",
+            "Referer": "https://megacloud.blog/",
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1"
         ]
         
@@ -155,43 +155,54 @@ struct EpisodeView: View {
         player.volume = 1.0
         
         // Handle subtitles
-        if let tracks = streamingData.tracks,
-           AppSettings.shared.subtitlesEnabled {
-            print("\n[Subtitles] Processing subtitles...")
+        if AppSettings.shared.subtitlesEnabled,
+           let subtitles = streamingData.subtitles {
+            let preferredLanguage = AppSettings.shared.preferredSubtitlesLanguage
+            print("\n[Subtitles] Looking for subtitles in preferred language: \(preferredLanguage)")
             
-            // Find English subtitles
-            let englishSubtitle = tracks.first { track in
-                track.kind == "captions" && 
-                track.label?.lowercased() == "english"
-            }
-            
-            if let englishSubtitle = englishSubtitle,
-               let subtitleURL = URL(string: englishSubtitle.file) {
-                print("\n[Subtitles] Found English subtitles at URL: \(subtitleURL)")
-                
+            // Try to find subtitles in preferred language, fallback to English
+            if let preferredSub = subtitles.first(where: { $0.lang.lowercased() == preferredLanguage.lowercased() }),
+               let subtitleURL = URL(string: preferredSub.url) {
+                print("\n[Subtitles] Found subtitles in preferred language (\(preferredLanguage)), loading from URL: \(subtitleURL)")
                 Task {
                     do {
-                        // Load subtitles using SubtitleManager
-                        let subtitleCues = try await SubtitleManager.shared.loadSubtitles(from: subtitleURL)
+                        let cues = try await SubtitleManager.shared.loadSubtitles(from: subtitleURL)
+                        print("\n[Subtitles] Successfully loaded \(cues.count) subtitle cues")
                         
-                        // Create subtitle overlay on main actor
+                        // Create and add subtitle overlay
                         await MainActor.run {
                             if let playerController = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.rootViewController?.presentedViewController as? CustomPlayerViewController {
-                                let overlay = SubtitleManager.shared.createSubtitleOverlay(for: subtitleCues, player: player)
+                                let overlay = SubtitleManager.shared.createSubtitleOverlay(for: cues, player: player)
                                 playerController.addSubtitleOverlay(overlay)
-                                print("\n[Subtitles] Added subtitle overlay")
+                                print("\n[Subtitles] Added subtitle overlay to player")
                             }
                         }
                     } catch {
-                        print("\n[Error] Subtitle processing failed: \(error.localizedDescription)")
-                        // Handle error on main actor
+                        print("\n[Error] Failed to load subtitles: \(error)")
+                    }
+                }
+            } else if let englishSub = subtitles.first(where: { $0.lang.lowercased() == "english" }),
+                      let subtitleURL = URL(string: englishSub.url) {
+                print("\n[Subtitles] Preferred language not found, falling back to English subtitles from URL: \(subtitleURL)")
+                Task {
+                    do {
+                        let cues = try await SubtitleManager.shared.loadSubtitles(from: subtitleURL)
+                        print("\n[Subtitles] Successfully loaded \(cues.count) subtitle cues")
+                        
+                        // Create and add subtitle overlay
                         await MainActor.run {
-                            print("\n[Warning] Failed to load subtitles: \(error.localizedDescription)")
+                            if let playerController = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.rootViewController?.presentedViewController as? CustomPlayerViewController {
+                                let overlay = SubtitleManager.shared.createSubtitleOverlay(for: cues, player: player)
+                                playerController.addSubtitleOverlay(overlay)
+                                print("\n[Subtitles] Added subtitle overlay to player")
+                            }
                         }
+                    } catch {
+                        print("\n[Error] Failed to load subtitles: \(error)")
                     }
                 }
             } else {
-                print("\n[Subtitles] No English subtitles found in tracks")
+                print("\n[Subtitles] No suitable subtitles found")
             }
         }
         
