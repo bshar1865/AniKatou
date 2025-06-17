@@ -154,6 +154,43 @@ struct EpisodeView: View {
         player.automaticallyWaitsToMinimizeStalling = true
         player.volume = 1.0
         
+        // Handle intro/outro skipping
+        if let intro = streamingData.intro {
+            print("\n[Player] Found intro: \(intro.start) - \(intro.end)")
+            
+            // Add observer for intro
+            let introObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { [weak player] time in
+                let currentTime = time.seconds
+                if currentTime >= Double(intro.start) && currentTime < Double(intro.end) {
+                    if AppSettings.shared.autoSkipIntro {
+                        print("\n[Player] Auto-skipping intro")
+                        player?.seek(to: CMTime(seconds: Double(intro.end), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
+                    }
+                }
+            }
+            
+            // Store observer for cleanup
+            viewModel.timeObservers.append((player: player, observer: introObserver))
+        }
+        
+        if let outro = streamingData.outro {
+            print("\n[Player] Found outro: \(outro.start) - \(outro.end)")
+            
+            // Add observer for outro
+            let outroObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { [weak player] time in
+                let currentTime = time.seconds
+                if currentTime >= Double(outro.start) && currentTime < Double(outro.end) {
+                    if AppSettings.shared.autoSkipOutro {
+                        print("\n[Player] Auto-skipping outro")
+                        player?.seek(to: CMTime(seconds: Double(outro.end), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
+                    }
+                }
+            }
+            
+            // Store observer for cleanup
+            viewModel.timeObservers.append((player: player, observer: outroObserver))
+        }
+        
         // Handle subtitles
         if AppSettings.shared.subtitlesEnabled,
            let tracks = streamingData.tracks?.filter({ !$0.lang.lowercased().contains("thumbnail") }) {
@@ -214,6 +251,52 @@ struct EpisodeView: View {
             playerViewController.player = player
             playerViewController.modalPresentationStyle = .fullScreen
             playerViewController.showsPlaybackControls = true
+            
+            // Add skip buttons if auto-skip is disabled
+            if !AppSettings.shared.autoSkipIntro || !AppSettings.shared.autoSkipOutro {
+                let skipButtonsView = UIStackView()
+                skipButtonsView.axis = .vertical
+                skipButtonsView.spacing = 8
+                skipButtonsView.translatesAutoresizingMaskIntoConstraints = false
+                
+                if let intro = streamingData.intro, !AppSettings.shared.autoSkipIntro {
+                    let skipIntroButton = UIButton(type: .system)
+                    skipIntroButton.setTitle("Skip Intro", for: .normal)
+                    skipIntroButton.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.7)
+                    skipIntroButton.layer.cornerRadius = 4
+                    skipIntroButton.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
+                    skipIntroButton.contentEdgeInsets = UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
+                    
+                    skipIntroButton.addAction(UIAction { [weak player] _ in
+                        print("\n[Player] Skipping intro")
+                        player?.seek(to: CMTime(seconds: Double(intro.end), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
+                    }, for: .touchUpInside)
+                    
+                    skipButtonsView.addArrangedSubview(skipIntroButton)
+                }
+                
+                if let outro = streamingData.outro, !AppSettings.shared.autoSkipOutro {
+                    let skipOutroButton = UIButton(type: .system)
+                    skipOutroButton.setTitle("Skip Outro", for: .normal)
+                    skipOutroButton.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.7)
+                    skipOutroButton.layer.cornerRadius = 4
+                    skipOutroButton.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
+                    skipOutroButton.contentEdgeInsets = UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
+                    
+                    skipOutroButton.addAction(UIAction { [weak player] _ in
+                        print("\n[Player] Skipping outro")
+                        player?.seek(to: CMTime(seconds: Double(outro.end), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
+                    }, for: .touchUpInside)
+                    
+                    skipButtonsView.addArrangedSubview(skipOutroButton)
+                }
+                
+                playerViewController.contentOverlayView?.addSubview(skipButtonsView)
+                NSLayoutConstraint.activate([
+                    skipButtonsView.topAnchor.constraint(equalTo: playerViewController.contentOverlayView!.topAnchor, constant: 16),
+                    skipButtonsView.trailingAnchor.constraint(equalTo: playerViewController.contentOverlayView!.trailingAnchor, constant: -16)
+                ])
+            }
             
             // Add observers
             let timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { [weak playerViewController] _ in

@@ -8,6 +8,8 @@ class AppSettings {
     private let languageKey = "preferred_language"
     private let qualityKey = "video_quality"
     private let subtitlesKey = "subtitles_enabled"
+    private let autoSkipIntroKey = "auto_skip_intro"
+    private let autoSkipOutroKey = "auto_skip_outro"
     
     private init() {}
     
@@ -56,5 +58,16 @@ class AppSettings {
     var subtitlesEnabled: Bool {
         get { defaults.bool(forKey: subtitlesKey) }
         set { defaults.set(newValue, forKey: subtitlesKey) }
+    }
+    
+    // Auto-Skip Settings
+    var autoSkipIntro: Bool {
+        get { defaults.bool(forKey: autoSkipIntroKey) }
+        set { defaults.set(newValue, forKey: autoSkipIntroKey) }
+    }
+    
+    var autoSkipOutro: Bool {
+        get { defaults.bool(forKey: autoSkipOutroKey) }
+        set { defaults.set(newValue, forKey: autoSkipOutroKey) }
     }
 } 

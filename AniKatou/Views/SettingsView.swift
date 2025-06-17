@@ -53,6 +53,15 @@ struct SettingsView: View {
             }
             
             Section {
+                Toggle("Auto-Skip Intro", isOn: $viewModel.autoSkipIntro)
+                Toggle("Auto-Skip Outro", isOn: $viewModel.autoSkipOutro)
+            } header: {
+                Text("Playback")
+            } footer: {
+                Text("When enabled, intro and outro sequences will be automatically skipped. When disabled, skip buttons will be shown instead.")
+            }
+            
+            Section {
                 Link(destination: URL(string: "https://github.com/ghoshRitesh12/aniwatch-api")!) {
                     Label("API Documentation", systemImage: "doc.text")
                 }

@@ -27,10 +27,24 @@ class SettingsViewModel: ObservableObject {
         }
     }
     
+    @Published var autoSkipIntro: Bool {
+        didSet {
+            AppSettings.shared.autoSkipIntro = autoSkipIntro
+        }
+    }
+    
+    @Published var autoSkipOutro: Bool {
+        didSet {
+            AppSettings.shared.autoSkipOutro = autoSkipOutro
+        }
+    }
+    
     init() {
         self.preferredServer = AppSettings.shared.preferredServer
         self.preferredLanguage = AppSettings.shared.preferredLanguage
         self.preferredQuality = AppSettings.shared.preferredQuality
         self.subtitlesEnabled = AppSettings.shared.subtitlesEnabled
+        self.autoSkipIntro = AppSettings.shared.autoSkipIntro
+        self.autoSkipOutro = AppSettings.shared.autoSkipOutro
     }
 } 
