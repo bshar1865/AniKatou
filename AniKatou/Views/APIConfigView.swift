@@ -22,7 +22,7 @@ struct APIConfigView: View {
                     Text("API Configuration")
                 } footer: {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Enter the base URL of your self-hosted AniWatch API instance.")
+                        Text("Enter the base URL of your self-hosted API instance.")
                         Text("The URL will be automatically prefixed with https:// if not provided.")
                             .foregroundColor(.secondary)
                         
@@ -51,15 +51,6 @@ struct APIConfigView: View {
                     }
                     .disabled(viewModel.isValidating || viewModel.apiURL.isEmpty)
                     
-                    if isInitialSetup {
-                        Button(action: {
-                            dismiss()
-                        }) {
-                            Text("Configure Later")
-                                .foregroundColor(.blue)
-                        }
-                    }
-                    
                     if !isInitialSetup && viewModel.isConfigured {
                         Button(role: .destructive, action: {
                             viewModel.clearConfig()
@@ -79,12 +70,12 @@ struct APIConfigView: View {
                         }
                     }
                 } footer: {
-                    Text("You need to host your own instance of the AniWatch API to use this app.")
+                    Text("You must provide a valid API URL to use this app.")
                 }
             }
-            .navigationTitle(isInitialSetup ? "Welcome to AniKatou" : "API Settings")
+            .navigationTitle(isInitialSetup ? "API Configuration Required" : "API Settings")
             .navigationBarTitleDisplayMode(.large)
-            .interactiveDismissDisabled(isInitialSetup && viewModel.apiURL.isEmpty)
+            .interactiveDismissDisabled(isInitialSetup)
         }
     }
 }

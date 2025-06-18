@@ -138,15 +138,8 @@ class APIService {
 
     // Base fetch method
     private func fetch<T: Codable>(_ endpoint: String, queryItems: [URLQueryItem] = []) async throws -> T {
-        guard let baseURL = URL(string: "https://bshar1865-hianime2.vercel.app/api/v2/hianime/") else {
+        guard let url = APIConfig.buildEndpoint(endpoint, queryItems: queryItems) else {
             throw APIError.notConfigured
-        }
-        
-        var components = URLComponents(url: baseURL.appendingPathComponent(endpoint), resolvingAgainstBaseURL: true)
-        components?.queryItems = queryItems
-        
-        guard let url = components?.url else {
-            throw APIError.invalidURL
         }
         
         var request = URLRequest(url: url)
