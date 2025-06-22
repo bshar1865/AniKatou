@@ -36,8 +36,4 @@ struct ContentView: View {
             .tag(3)
         }
     }
-}
-
-#Preview {
-    ContentView()
 } 

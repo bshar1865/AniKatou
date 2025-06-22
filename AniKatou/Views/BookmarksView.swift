@@ -105,10 +105,4 @@ private struct AnimeListItem: View {
         .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
     }
-}
-
-#Preview {
-    NavigationView {
-        BookmarksView()
-    }
 } 

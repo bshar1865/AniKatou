@@ -295,10 +295,4 @@ private struct EpisodeRow: View {
         .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
     }
-}
-
-#Preview {
-    NavigationView {
-        AnimeDetailView(animeId: "example-id")
-    }
 } 

@@ -20,8 +20,6 @@ class SubtitleManager {
     }
     
     func loadSubtitles(from url: URL) async throws -> [SubtitleCue] {
-        print("\n[Subtitles] Loading subtitles from URL: \(url)")
-        
         let (data, response) = try await URLSession.shared.data(from: url)
         
         guard let httpResponse = response as? HTTPURLResponse,
@@ -36,8 +34,6 @@ class SubtitleManager {
         guard !content.isEmpty else {
             throw SubtitleError.emptyContent
         }
-        
-        print("\n[Subtitles] Parsing subtitle content")
         
         // Parse VTT format
         let lines = content.components(separatedBy: .newlines)
@@ -104,7 +100,6 @@ class SubtitleManager {
             }
         }
         
-        print("\n[Subtitles] Successfully parsed \(cues.count) subtitle cues")
         return cues
     }
     

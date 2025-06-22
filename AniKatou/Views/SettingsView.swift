@@ -124,10 +124,4 @@ struct AboutView: View {
         }
         .navigationTitle("About")
     }
-}
-
-#Preview {
-    NavigationView {
-        SettingsView()
-    }
 } 

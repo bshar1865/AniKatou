@@ -39,23 +39,4 @@ struct AnimeCard: View {
         }
         .frame(width: width)
     }
-}
-
-#Preview {
-    AnimeCard(
-        anime: AnimeItem(
-            id: "preview",
-            name: "Sample Anime",
-            jname: nil,
-            poster: "https://example.com/image.jpg",
-            duration: "24 min",
-            type: "TV",
-            rating: "PG-13",
-            episodes: nil,
-            isNSFW: false,
-            genres: ["Action", "Adventure"]
-        )
-    )
-    .frame(width: 160)
-    .padding()
 } 

@@ -9,7 +9,6 @@ class CustomPlayerViewController: AVPlayerViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         if isBeingDismissed {
-            print("\n[Player] Dismissing player controller")
             onDismiss?()
         }
     }
@@ -23,7 +22,6 @@ class CustomPlayerViewController: AVPlayerViewController {
     }
     
     @objc private func handleMemoryWarning() {
-        print("\n[Memory] Received memory warning, cleaning up resources")
         player?.currentItem?.asset.cancelLoading()
     }
     
@@ -61,7 +59,6 @@ struct EpisodeView: View {
         }
         .navigationBarBackButtonHidden(true)
         .task {
-            print("\n[Init] Loading streaming sources for episode: \(episodeId)")
             await viewModel.loadStreamingSources(episodeId: episodeId)
         }
     }
@@ -91,18 +88,14 @@ struct EpisodeView: View {
         } else if let streamingData = viewModel.streamingData?.data {
             Color.clear
                 .onAppear {
-                    print("\n[Setup] Starting player setup for episode: \(episodeId)")
                     setupPlayer(with: streamingData)
                 }
         }
     }
     
     private func setupPlayer(with streamingData: StreamingData) {
-        print("\n==================== PLAYER SETUP START ====================")
-        
         // Find best quality source
         let preferredQuality = AppSettings.shared.preferredQuality
-        print("\n[Quality] Preferred quality: \(preferredQuality)")
         
         let source = streamingData.sources.first { source in
             source.quality?.lowercased() == preferredQuality.lowercased()
@@ -117,19 +110,12 @@ struct EpisodeView: View {
         
         guard let source = source,
               let url = URL(string: source.url) else {
-            print("\n[Error] Failed to get valid source URL")
             viewModel.errorMessage = "Failed to get valid video source"
             return
         }
         
-        print("\n[Source] Selected source:")
-        dump(source)
-        
         // Configure headers
         let headers: [String: String] = streamingData.headers ?? [:]
-        
-        print("\n[Headers] Using headers:")
-        dump(headers)
         
         // Create video asset
         let asset = AVURLAsset(url: url, options: [
@@ -137,29 +123,23 @@ struct EpisodeView: View {
             "AVURLAssetHTTPUserAgentKey": headers["User-Agent"] ?? ""
         ])
         
-        print("\n[Asset] Created video asset with URL: \(url)")
-        
         // Create player item
         let playerItem = AVPlayerItem(asset: asset)
         playerItem.preferredForwardBufferDuration = 10
         playerItem.canUseNetworkResourcesForLiveStreamingWhilePaused = true
         
         // Create and configure player
-        print("\n[Player] Creating AVPlayer")
         let player = AVPlayer(playerItem: playerItem)
         player.automaticallyWaitsToMinimizeStalling = true
         player.volume = 1.0
         
         // Handle intro/outro skipping
         if let intro = streamingData.intro {
-            print("\n[Player] Found intro: \(intro.start) - \(intro.end)")
-            
             // Add observer for intro
             let introObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { [weak player] time in
                 let currentTime = time.seconds
                 if currentTime >= Double(intro.start) && currentTime < Double(intro.end) {
                     if AppSettings.shared.autoSkipIntro {
-                        print("\n[Player] Auto-skipping intro")
                         player?.seek(to: CMTime(seconds: Double(intro.end), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
                     }
                 }
@@ -170,14 +150,11 @@ struct EpisodeView: View {
         }
         
         if let outro = streamingData.outro {
-            print("\n[Player] Found outro: \(outro.start) - \(outro.end)")
-            
             // Add observer for outro
             let outroObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { [weak player] time in
                 let currentTime = time.seconds
                 if currentTime >= Double(outro.start) && currentTime < Double(outro.end) {
                     if AppSettings.shared.autoSkipOutro {
-                        print("\n[Player] Auto-skipping outro")
                         player?.seek(to: CMTime(seconds: Double(outro.end), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
                     }
                 }
@@ -190,11 +167,6 @@ struct EpisodeView: View {
         // Handle subtitles
         if AppSettings.shared.subtitlesEnabled,
            let tracks = streamingData.tracks?.filter({ !$0.lang.lowercased().contains("thumbnail") }) {
-            print("\n[Subtitles Debug] Subtitle handling started")
-            print("[Subtitles Debug] Subtitles enabled in settings: \(AppSettings.shared.subtitlesEnabled)")
-            print("[Subtitles Debug] Available subtitles: \(tracks.count)")
-            print("[Subtitles Debug] Available languages: \(tracks.map { $0.lang }.joined(separator: ", "))")
-            
             // Look for English subtitles
             let selectedSubtitle = tracks.first { track in
                 // Handle complex language strings like "English" or "English - Text (Region)"
@@ -205,44 +177,29 @@ struct EpisodeView: View {
             
             if let subtitle = selectedSubtitle,
                let subtitleURL = URL(string: subtitle.url) {
-                print("\n[Subtitles Debug] Selected subtitle:")
-                print("Language: \(subtitle.lang)")
-                print("URL: \(subtitle.url)")
-                
                 // Load subtitles asynchronously
                 Task {
                     do {
-                        print("\n[Subtitles Debug] Loading subtitle content...")
                         let cues = try await SubtitleManager.shared.loadSubtitles(from: subtitleURL)
-                        print("[Subtitles Debug] Successfully loaded \(cues.count) subtitle cues")
                         
                         // Add subtitle overlay to player if it's already presented
                         await MainActor.run {
                             if let playerController = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.rootViewController?.presentedViewController as? CustomPlayerViewController {
                                 let overlay = SubtitleManager.shared.createSubtitleOverlay(for: cues, player: player)
                                 playerController.addSubtitleOverlay(overlay)
-                                print("[Subtitles Debug] Added subtitle overlay to existing player")
                             }
                         }
                     } catch {
-                        print("\n[Subtitles Debug] Failed to load subtitles: \(error)")
                         print("Error details: \(error)")
                     }
                 }
-            } else {
-                print("\n[Subtitles Debug] No English subtitles found")
             }
-        } else {
-            print("\n[Subtitles Debug] Subtitles disabled or not available")
-            print("Subtitles enabled in settings: \(AppSettings.shared.subtitlesEnabled)")
-            print("Subtitles in streaming data: \(streamingData.tracks != nil)")
         }
         
         // Present player
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let window = windowScene.windows.first,
            let rootViewController = window.rootViewController {
-            print("\n[Player Debug] Setting up player presentation")
             let playerViewController = CustomPlayerViewController()
             playerViewController.player = player
             playerViewController.modalPresentationStyle = .fullScreen
@@ -264,7 +221,6 @@ struct EpisodeView: View {
                     skipIntroButton.contentEdgeInsets = UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
                     
                     skipIntroButton.addAction(UIAction { [weak player] _ in
-                        print("\n[Player] Skipping intro")
                         player?.seek(to: CMTime(seconds: Double(intro.end), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
                     }, for: .touchUpInside)
                     
@@ -280,7 +236,6 @@ struct EpisodeView: View {
                     skipOutroButton.contentEdgeInsets = UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
                     
                     skipOutroButton.addAction(UIAction { [weak player] _ in
-                        print("\n[Player] Skipping outro")
                         player?.seek(to: CMTime(seconds: Double(outro.end), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
                     }, for: .touchUpInside)
                     
@@ -298,7 +253,6 @@ struct EpisodeView: View {
             let timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { [weak playerViewController] _ in
                 // Monitor playback status
                 if player.currentItem?.status == .failed {
-                    print("\n[Error] Playback failed: \(player.currentItem?.error?.localizedDescription ?? "Unknown error")")
                     Task { @MainActor in
                         viewModel.errorMessage = "Playback failed. Please try again."
                         playerViewController?.dismiss(animated: true)
@@ -311,14 +265,11 @@ struct EpisodeView: View {
                 object: playerViewController.player?.currentItem,
                 queue: .main
             ) { _ in
-                print("\n[Player] Playback ended")
                 player.seek(to: .zero)
-                print("\n[Player] Seeking to start")
             }
             
             // Set dismiss callback
             playerViewController.onDismiss = {
-                print("\n[Player] Cleaning up player")
                 player.pause()
                 player.removeTimeObserver(timeObserver)
                 NotificationCenter.default.removeObserver(playerViewController)
@@ -327,18 +278,10 @@ struct EpisodeView: View {
             }
             
             rootViewController.present(playerViewController, animated: true) {
-                print("\n[Player] Player presented, starting playback")
                 player.play()
             }
         } else {
-            print("\n[Error] Failed to present player controller")
             viewModel.errorMessage = "Failed to present video player"
         }
-        
-        print("\n==================== PLAYER SETUP END ====================")
     }
-}
-
-#Preview {
-    EpisodeView(episodeId: "example-episode-id")
 } 

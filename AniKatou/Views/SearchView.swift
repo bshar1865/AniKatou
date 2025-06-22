@@ -211,10 +211,4 @@ struct SearchView: View {
             }
         }
     }
-}
-
-#Preview {
-    NavigationView {
-        SearchView()
-    }
 } 

@@ -1,4 +1,4 @@
-# AniKatou (iOS)
+# AniKatou (iOS, Beta)
 
 AniKatou is a modular anime streaming app for iOS built with Swift.  
 It works exclusively with the AniWatch Unofficial API, which **you must deploy and host yourself**.  
@@ -28,6 +28,17 @@ Once sideloaded, you can configure your AniWatch API URL directly in the app.
 **WARNING:** AniKatou is a generic client app that does **NOT** host, stream, or distribute any copyrighted content.  
 This app connects **only** to user-hosted AniWatch Unofficial APIs. Users are fully responsible for deploying and operating their own API backend and for any content accessed through it.  
 Do **NOT** use this app to facilitate or promote unauthorized distribution of copyrighted material.  
+
+---
+
+## Dependencies
+
+AniKatou uses the following open-source libraries:
+
+- [Kingfisher](https://github.com/onevcat/Kingfisher) (MIT License) — for efficient image downloading and caching.
+- [SwiftSubtitles](https://github.com/mrdepth/SwiftSubtitles) (MIT License) — for parsing and displaying subtitles.
+
+Please see their repositories for more details and license information.
 
 ---
 

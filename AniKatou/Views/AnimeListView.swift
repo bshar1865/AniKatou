@@ -97,26 +97,4 @@ private struct AnimeListItem: View {
         .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
     }
-}
-
-#Preview {
-    NavigationView {
-        AnimeListView(
-            title: "Trending Now",
-            animes: [
-                AnimeItem(
-                    id: "preview1",
-                    name: "Sample Anime 1",
-                    jname: nil,
-                    poster: "https://example.com/image1.jpg",
-                    duration: "24 min",
-                    type: "TV",
-                    rating: "PG-13",
-                    episodes: EpisodeCount(sub: 12, dub: nil),
-                    isNSFW: false,
-                    genres: ["Action", "Adventure"]
-                )
-            ]
-        )
-    }
 } 
