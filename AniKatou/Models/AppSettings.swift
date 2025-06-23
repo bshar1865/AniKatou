@@ -70,4 +70,10 @@ class AppSettings {
         get { defaults.bool(forKey: autoSkipOutroKey) }
         set { defaults.set(newValue, forKey: autoSkipOutroKey) }
     }
+    
+    // Custom Player Setting
+    var useCustomPlayer: Bool {
+        get { defaults.object(forKey: "useCustomPlayer") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "useCustomPlayer") }
+    }
 } 

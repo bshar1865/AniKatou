@@ -55,6 +55,7 @@ struct SettingsView: View {
             Section {
                 Toggle("Auto-Skip Intro", isOn: $viewModel.autoSkipIntro)
                 Toggle("Auto-Skip Outro", isOn: $viewModel.autoSkipOutro)
+                Toggle("Use Custom Video Player", isOn: $viewModel.useCustomPlayer)
             } header: {
                 Text("Playback")
             } footer: {

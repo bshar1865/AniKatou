@@ -129,12 +129,12 @@ struct EpisodeInfo: Codable, Identifiable {
 }
 
 // Streaming
-struct StreamingResult: Codable {
+struct StreamingResult: Codable, Equatable {
     let status: Int
     let data: StreamingData
 }
 
-struct StreamingData: Codable {
+struct StreamingData: Codable, Equatable {
     let headers: [String: String]?
     let sources: [StreamSource]
     let tracks: [SubtitleTrack]?
@@ -144,19 +144,19 @@ struct StreamingData: Codable {
     let malID: Int?
 }
 
-struct StreamSource: Codable {
+struct StreamSource: Codable, Equatable {
     let url: String
     let quality: String?
     let isM3U8: Bool?
     let type: String?
 }
 
-struct SubtitleTrack: Codable {
+struct SubtitleTrack: Codable, Equatable {
     let url: String
     let lang: String
 }
 
-struct IntroOutro: Codable {
+struct IntroOutro: Codable, Equatable {
     let start: Int
     let end: Int
 } 

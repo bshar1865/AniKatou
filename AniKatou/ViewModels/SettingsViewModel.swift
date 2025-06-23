@@ -39,6 +39,12 @@ class SettingsViewModel: ObservableObject {
         }
     }
     
+    @Published var useCustomPlayer: Bool {
+        didSet {
+            AppSettings.shared.useCustomPlayer = useCustomPlayer
+        }
+    }
+    
     init() {
         self.preferredServer = AppSettings.shared.preferredServer
         self.preferredLanguage = AppSettings.shared.preferredLanguage
@@ -46,5 +52,6 @@ class SettingsViewModel: ObservableObject {
         self.subtitlesEnabled = AppSettings.shared.subtitlesEnabled
         self.autoSkipIntro = AppSettings.shared.autoSkipIntro
         self.autoSkipOutro = AppSettings.shared.autoSkipOutro
+        self.useCustomPlayer = AppSettings.shared.useCustomPlayer
     }
 } 
