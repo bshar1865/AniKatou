@@ -88,6 +88,10 @@ class SettingsViewModel: ObservableObject {
         }
     }
     
+    // Cache management alerts
+    @Published var showCacheClearedAlert = false
+    @Published var showContinueWatchingClearedAlert = false
+    
     init() {
         self.preferredServer = AppSettings.shared.preferredServer
         self.preferredLanguage = AppSettings.shared.preferredLanguage

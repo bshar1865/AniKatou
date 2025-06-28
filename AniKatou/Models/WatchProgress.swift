@@ -99,6 +99,10 @@ class WatchProgressManager {
         userDefaults.removeObject(forKey: watchProgressKey)
     }
     
+    func clearContinueWatching() {
+        clearWatchHistory()
+    }
+    
     func removeProgress(for animeID: String, episodeID: String) {
         var history = getWatchHistory()
         history.removeAll { $0.animeID == animeID && $0.episodeID == episodeID }

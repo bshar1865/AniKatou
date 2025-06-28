@@ -85,12 +85,42 @@ struct SettingsView: View {
             } header: {
                 Text("Info")
             }
+            
+            Section {
+                Button(action: {
+                    ImageCache.shared.clearCache()
+                    viewModel.showCacheClearedAlert = true
+                }) {
+                    Label("Clear Image Cache", systemImage: "photo.badge.plus")
+                }
+                
+                Button(action: {
+                    WatchProgressManager.shared.clearContinueWatching()
+                    viewModel.showContinueWatchingClearedAlert = true
+                }) {
+                    Label("Clear Continue Watching", systemImage: "play.rectangle.on.rectangle")
+                }
+            } header: {
+                Text("Cache")
+            } footer: {
+                Text("Clear cached data to free up storage space or resolve loading issues.")
+            }
         }
         .navigationTitle("Settings")
         .sheet(isPresented: $showingAPIConfig) {
             NavigationView {
                 APIConfigView()
             }
+        }
+        .alert("Cache Cleared", isPresented: $viewModel.showCacheClearedAlert) {
+            Button("OK") { }
+        } message: {
+            Text("Image cache has been cleared successfully.")
+        }
+        .alert("Continue Watching Cleared", isPresented: $viewModel.showContinueWatchingClearedAlert) {
+            Button("OK") { }
+        } message: {
+            Text("Continue watching data has been cleared successfully.")
         }
         .preferredColorScheme(.dark)
     }
