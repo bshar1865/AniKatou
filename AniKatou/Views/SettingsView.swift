@@ -2,8 +2,10 @@ import SwiftUI
 
 struct SettingsView: View {
     @State private var showingAPIConfig = false
+    @State private var showingAniListAuth = false
     @AppStorage(APIConfig.apiConfigKey) private var apiBaseURL: String?
     @StateObject private var viewModel = SettingsViewModel()
+    @StateObject private var aniListViewModel = AniListAuthViewModel()
     
     var body: some View {
         List {
@@ -24,6 +26,62 @@ struct SettingsView: View {
                 Text("Server")
             } footer: {
                 Text("Configure your self-hosted AniWatch API instance.")
+            }
+            
+            Section("AniList Integration") {
+                if aniListViewModel.isAuthenticated {
+                    if let profile = aniListViewModel.userProfile {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                if let avatarURL = profile.avatarURL {
+                                    AsyncImage(url: URL(string: avatarURL)) { image in
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        Image(systemName: "person.circle.fill")
+                                            .foregroundColor(.gray)
+                                    }
+                                    .frame(width: 40, height: 40)
+                                    .clipShape(Circle())
+                                } else {
+                                    Image(systemName: "person.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.gray)
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(profile.name)
+                                        .font(.headline)
+                                    Text("\(profile.animeCount) anime • \(profile.episodesWatched) episodes")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    
+                    Button(action: {
+                        aniListViewModel.logout()
+                    }) {
+                        HStack {
+                            Label("Disconnect from AniList", systemImage: "person.crop.circle.badge.minus")
+                            Spacer()
+                        }
+                    }
+                    .foregroundColor(.red)
+                } else {
+                    Button(action: {
+                        showingAniListAuth = true
+                    }) {
+                        HStack {
+                            Label("Connect to AniList", systemImage: "person.crop.circle.badge.plus")
+                            Spacer()
+                        }
+                    }
+                }
             }
             
             Section {
@@ -111,6 +169,9 @@ struct SettingsView: View {
             NavigationView {
                 APIConfigView()
             }
+        }
+        .sheet(isPresented: $showingAniListAuth) {
+            AniListAuthView()
         }
         .alert("Cache Cleared", isPresented: $viewModel.showCacheClearedAlert) {
             Button("OK") { }

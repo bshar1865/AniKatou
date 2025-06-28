@@ -113,6 +113,86 @@ struct LibraryView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
+                
+                // AniList Collections Section
+                VStack(spacing: 20) {
+                    HStack {
+                        Text("AniList")
+                            .font(.title)
+                            .fontWeight(.bold)
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                    
+                    // AniList Collections Cards
+                    VStack(spacing: 12) {
+                        // Watching Collection
+                        NavigationLink(destination: AniListCollectionView(status: .current, title: "Watching")) {
+                            AniListCollectionCard(
+                                title: "Watching",
+                                icon: "play.circle.fill",
+                                color: .green,
+                                count: 0 // TODO: Get from AniList
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // Plan to Watch Collection
+                        NavigationLink(destination: AniListCollectionView(status: .planning, title: "Plan to Watch")) {
+                            AniListCollectionCard(
+                                title: "Plan to Watch",
+                                icon: "clock.circle.fill",
+                                color: .blue,
+                                count: 0 // TODO: Get from AniList
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // Completed Collection
+                        NavigationLink(destination: AniListCollectionView(status: .completed, title: "Completed")) {
+                            AniListCollectionCard(
+                                title: "Completed",
+                                icon: "checkmark.circle.fill",
+                                color: .purple,
+                                count: 0 // TODO: Get from AniList
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // Paused Collection
+                        NavigationLink(destination: AniListCollectionView(status: .paused, title: "Paused")) {
+                            AniListCollectionCard(
+                                title: "Paused",
+                                icon: "pause.circle.fill",
+                                color: .orange,
+                                count: 0 // TODO: Get from AniList
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // Dropped Collection
+                        NavigationLink(destination: AniListCollectionView(status: .dropped, title: "Dropped")) {
+                            AniListCollectionCard(
+                                title: "Dropped",
+                                icon: "xmark.circle.fill",
+                                color: .red,
+                                count: 0 // TODO: Get from AniList
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // Rewatching Collection
+                        NavigationLink(destination: AniListCollectionView(status: .repeating, title: "Rewatching")) {
+                            AniListCollectionCard(
+                                title: "Rewatching",
+                                icon: "repeat.circle.fill",
+                                color: .indigo,
+                                count: 0 // TODO: Get from AniList
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
             }
         }
         .navigationTitle("Library")
@@ -721,5 +801,433 @@ private struct ContinueWatchingCard: View {
         let minutes = totalSeconds / 60
         let secs = totalSeconds % 60
         return String(format: "%02d:%02d", minutes, secs)
+    }
+}
+
+// MARK: - AniList Components
+
+struct AniListCollectionCard: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let count: Int
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 32))
+                .foregroundColor(color)
+                .frame(width: 60, height: 60)
+                .background(color.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Text("\(count) anime")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.secondary)
+        }
+        .padding(16)
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(16)
+        .padding(.horizontal)
+    }
+}
+
+struct AniListCollectionView: View {
+    let status: AniListStatus
+    let title: String
+    @StateObject private var viewModel = AniListAuthViewModel()
+    @State private var isGridView = true
+    
+    private let gridColumns = [
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16)
+    ]
+    
+    var body: some View {
+        Group {
+            if viewModel.isAuthenticated {
+                if viewModel.isLoading {
+                    ProgressView("Loading \(title)...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    let items = viewModel.getLibraryForStatus(status)
+                    
+                    if items.isEmpty {
+                        ContentUnavailableView(
+                            "No \(title)",
+                            systemImage: status.icon,
+                            description: Text("Your \(title.lowercased()) list is empty")
+                        )
+                    } else {
+                        ScrollView {
+                            LazyVGrid(columns: gridColumns, spacing: 16) {
+                                ForEach(items) { item in
+                                    AniListAnimeCard(item: item)
+                                }
+                            }
+                            .padding()
+                        }
+                    }
+                }
+            } else {
+                ContentUnavailableView(
+                    "Not Connected",
+                    systemImage: "person.circle",
+                    description: Text("Connect your AniList account in Settings to view your \(title.lowercased()) list")
+                )
+            }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.large)
+        .onAppear {
+            if viewModel.isAuthenticated {
+                Task {
+                    await viewModel.loadUserLibrary()
+                }
+            }
+        }
+    }
+}
+
+struct AniListAnimeCard: View {
+    let item: AniListLibraryItem
+    @State private var showingAniListDetails = false
+    
+    var body: some View {
+        Button(action: {
+            showingAniListDetails = true
+        }) {
+            VStack(alignment: .leading, spacing: 12) {
+                // Cover Image
+                if let imageURL = item.imageURL {
+                    CachedAsyncImage(url: URL(string: imageURL)) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Color.gray
+                            .overlay(ProgressView())
+                    }
+                    .frame(height: 200)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else {
+                    Color.gray
+                        .overlay(
+                            Image(systemName: "photo")
+                                .foregroundColor(.white)
+                                .font(.system(size: 32))
+                        )
+                        .frame(height: 200)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    // Title
+                    Text(item.title)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .lineLimit(2)
+                        .foregroundColor(.primary)
+                    
+                    // Progress
+                    HStack {
+                        Image(systemName: "play.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                        Text(item.progressText)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    
+                    // Score
+                    if item.score != nil && item.score! > 0 {
+                        HStack {
+                            Image(systemName: "star.fill")
+                                .font(.caption)
+                                .foregroundColor(.yellow)
+                            Text(item.scoreText)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                    }
+                    
+                    // Status Badge
+                    HStack {
+                        Image(systemName: item.status.icon)
+                            .font(.caption)
+                            .foregroundColor(item.status.statusColor)
+                        Text(item.status.displayName)
+                            .font(.caption)
+                            .foregroundColor(item.status.statusColor)
+                        Spacer()
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+            .padding(12)
+            .background(Color(.secondarySystemBackground))
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .sheet(isPresented: $showingAniListDetails) {
+            AniListAnimeDetailView(item: item)
+        }
+    }
+}
+
+struct AniListAnimeDetailView: View {
+    let item: AniListLibraryItem
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchResults: [AnimeItem] = []
+    @State private var isSearching = false
+    @State private var searchError: String?
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // AniList Info Section
+                    VStack(spacing: 16) {
+                        // Cover Image
+                        if let imageURL = item.imageURL {
+                            CachedAsyncImage(url: URL(string: imageURL)) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Color.gray
+                                    .overlay(ProgressView())
+                            }
+                            .frame(width: 200, height: 300)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        
+                        // Title and Info
+                        VStack(spacing: 8) {
+                            Text(item.title)
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .multilineTextAlignment(.center)
+                            
+                            if item.romajiTitle != item.title {
+                                Text(item.romajiTitle)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            // Status and Progress
+                            HStack(spacing: 16) {
+                                Label(item.status.displayName, systemImage: item.status.icon)
+                                    .foregroundColor(item.status.statusColor)
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(item.status.statusColor.opacity(0.1))
+                                    .cornerRadius(8)
+                                
+                                Label(item.progressText, systemImage: "play.circle.fill")
+                                    .foregroundColor(.blue)
+                                    .font(.caption)
+                            }
+                            
+                            if let score = item.score, score > 0 {
+                                Label(item.scoreText, systemImage: "star.fill")
+                                    .foregroundColor(.yellow)
+                                    .font(.caption)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(16)
+                    
+                    // Search for Streaming Section
+                    VStack(spacing: 16) {
+                        Text("Find on Streaming Service")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("Search for this anime on your streaming service to watch episodes")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                        
+                        Button(action: {
+                            Task {
+                                await searchForAnime()
+                            }
+                        }) {
+                            HStack {
+                                if isSearching {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                } else {
+                                    Image(systemName: "magnifyingglass")
+                                }
+                                Text(isSearching ? "Searching..." : "Search for Episodes")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(Color.blue)
+                            .cornerRadius(10)
+                        }
+                        .disabled(isSearching)
+                        
+                        if let error = searchError {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .multilineTextAlignment(.center)
+                        }
+                        
+                        // Search Results
+                        if !searchResults.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Search Results")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                
+                                LazyVStack(spacing: 12) {
+                                    ForEach(searchResults) { anime in
+                                        NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
+                                            HStack(spacing: 12) {
+                                                // Thumbnail
+                                                CachedAsyncImage(url: URL(string: anime.poster)) { image in
+                                                    image
+                                                        .resizable()
+                                                        .aspectRatio(contentMode: .fill)
+                                                } placeholder: {
+                                                    Color.gray
+                                                }
+                                                .frame(width: 60, height: 80)
+                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                
+                                                // Info
+                                                VStack(alignment: .leading, spacing: 4) {
+                                                    Text(anime.name)
+                                                        .font(.subheadline)
+                                                        .fontWeight(.semibold)
+                                                        .lineLimit(2)
+                                                    
+                                                    if let episodes = anime.episodes {
+                                                        Text("\(episodes) episodes")
+                                                            .font(.caption)
+                                                            .foregroundColor(.secondary)
+                                                    }
+                                                    
+                                                    if let type = anime.type {
+                                                        Text(type)
+                                                            .font(.caption)
+                                                            .foregroundColor(.secondary)
+                                                    }
+                                                }
+                                                
+                                                Spacer()
+                                                
+                                                Image(systemName: "chevron.right")
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                            .padding(12)
+                                            .background(Color(.tertiarySystemBackground))
+                                            .cornerRadius(12)
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(16)
+                }
+                .padding()
+            }
+            .navigationTitle("AniList Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func searchForAnime() async {
+        isSearching = true
+        searchError = nil
+        searchResults = []
+        
+        do {
+            // Try searching with the main title first
+            var results = try await APIService.shared.searchAnime(query: item.title)
+            
+            // If no results, try with romaji title
+            if results.isEmpty, item.romajiTitle != item.title {
+                results = try await APIService.shared.searchAnime(query: item.romajiTitle)
+            }
+            
+            // If still no results, try with a shorter version of the title
+            if results.isEmpty {
+                let shortTitle = item.title.components(separatedBy: " ").prefix(3).joined(separator: " ")
+                if shortTitle.count >= 3 {
+                    results = try await APIService.shared.searchAnime(query: shortTitle)
+                }
+            }
+            
+            await MainActor.run {
+                searchResults = results
+                isSearching = false
+                
+                if results.isEmpty {
+                    searchError = "No matching anime found on streaming service. Try searching manually in the Search tab."
+                }
+            }
+        } catch {
+            await MainActor.run {
+                searchError = "Search failed: \(error.localizedDescription)"
+                isSearching = false
+            }
+        }
+    }
+}
+
+extension AniListStatus {
+    var statusColor: Color {
+        switch self {
+        case .current:
+            return .green
+        case .planning:
+            return .blue
+        case .completed:
+            return .purple
+        case .dropped:
+            return .red
+        case .paused:
+            return .orange
+        case .repeating:
+            return .pink
+        }
     }
 } 

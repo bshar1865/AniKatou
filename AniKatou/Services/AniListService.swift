@@ -3,8 +3,202 @@ import Foundation
 class AniListService {
     static let shared = AniListService()
     private let endpoint = "https://graphql.anilist.co"
+    private let userDefaults = UserDefaults.standard
+    private let accessTokenKey = "AniListAccessToken"
+    private let refreshTokenKey = "AniListRefreshToken"
+    private let tokenExpiryKey = "AniListTokenExpiry"
     
     private init() {}
+    
+    // MARK: - Authentication Properties
+    
+    var isAuthenticated: Bool {
+        guard let accessToken = userDefaults.string(forKey: accessTokenKey),
+              let expiryDate = userDefaults.object(forKey: tokenExpiryKey) as? Date else {
+            return false
+        }
+        return !accessToken.isEmpty && expiryDate > Date()
+    }
+    
+    var accessToken: String? {
+        return userDefaults.string(forKey: accessTokenKey)
+    }
+    
+    func authenticate(code: String) async throws -> Bool {
+        let query = """
+        mutation ($code: String!) {
+            authenticate(code: $code) {
+                access_token
+                refresh_token
+                expires_in
+            }
+        }
+        """
+        
+        let variables: [String: Any] = ["code": code]
+        
+        do {
+            let data = try await sendGraphQLRequest(query: query, variables: variables)
+            guard let authDict = data["authenticate"] as? [String: Any],
+                  let accessToken = authDict["access_token"] as? String,
+                  let refreshToken = authDict["refresh_token"] as? String,
+                  let expiresIn = authDict["expires_in"] as? Int else {
+                throw AniListError.authenticationFailed
+            }
+            
+            // Save tokens
+            userDefaults.set(accessToken, forKey: accessTokenKey)
+            userDefaults.set(refreshToken, forKey: refreshTokenKey)
+            userDefaults.set(Date().addingTimeInterval(TimeInterval(expiresIn)), forKey: tokenExpiryKey)
+            
+            return true
+        } catch {
+            throw AniListError.authenticationFailed
+        }
+    }
+    
+    func logout() {
+        userDefaults.removeObject(forKey: accessTokenKey)
+        userDefaults.removeObject(forKey: refreshTokenKey)
+        userDefaults.removeObject(forKey: tokenExpiryKey)
+    }
+    
+    func refreshToken() async throws -> Bool {
+        guard let refreshToken = userDefaults.string(forKey: refreshTokenKey) else {
+            throw AniListError.noRefreshToken
+        }
+        
+        let query = """
+        mutation ($refreshToken: String!) {
+            refreshToken(refreshToken: $refreshToken) {
+                access_token
+                refresh_token
+                expires_in
+            }
+        }
+        """
+        
+        let variables: [String: Any] = ["refreshToken": refreshToken]
+        
+        do {
+            let data = try await sendGraphQLRequest(query: query, variables: variables)
+            guard let authDict = data["refreshToken"] as? [String: Any],
+                  let accessToken = authDict["access_token"] as? String,
+                  let newRefreshToken = authDict["refresh_token"] as? String,
+                  let expiresIn = authDict["expires_in"] as? Int else {
+                throw AniListError.tokenRefreshFailed
+            }
+            
+            // Save new tokens
+            userDefaults.set(accessToken, forKey: accessTokenKey)
+            userDefaults.set(newRefreshToken, forKey: refreshTokenKey)
+            userDefaults.set(Date().addingTimeInterval(TimeInterval(expiresIn)), forKey: tokenExpiryKey)
+            
+            return true
+        } catch {
+            throw AniListError.tokenRefreshFailed
+        }
+    }
+    
+    // MARK: - User Library
+    
+    func getUserLibrary(status: AniListStatus? = nil) async throws -> [AniListLibraryItem] {
+        guard isAuthenticated else {
+            throw AniListError.notAuthenticated
+        }
+        
+        let statusFilter = status?.rawValue ?? ""
+        let query = """
+        query ($status: MediaListStatus) {
+            MediaListCollection(userName: null, type: ANIME, status: $status) {
+                lists {
+                    entries {
+                        id
+                        mediaId
+                        status
+                        score
+                        progress
+                        media {
+                            id
+                            title {
+                                romaji
+                                english
+                                native
+                            }
+                            coverImage {
+                                large
+                                medium
+                            }
+                            episodes
+                            status
+                            format
+                        }
+                    }
+                }
+            }
+        }
+        """
+        
+        let variables: [String: Any] = ["status": statusFilter]
+        
+        do {
+            let data = try await sendGraphQLRequest(query: query, variables: variables, requiresAuth: true)
+            return try parseLibraryResponse(data)
+        } catch {
+            throw AniListError.failedToFetchLibrary
+        }
+    }
+    
+    private func parseLibraryResponse(_ data: [String: Any]) throws -> [AniListLibraryItem] {
+        guard let collection = data["MediaListCollection"] as? [String: Any],
+              let lists = collection["lists"] as? [[String: Any]] else {
+            throw AniListError.invalidResponse
+        }
+        
+        var items: [AniListLibraryItem] = []
+        
+        for list in lists {
+            guard let entries = list["entries"] as? [[String: Any]] else { continue }
+            
+            for entry in entries {
+                guard let media = entry["media"] as? [String: Any],
+                      let mediaId = media["id"] as? Int,
+                      let title = media["title"] as? [String: Any],
+                      let romajiTitle = title["romaji"] as? String,
+                      let status = entry["status"] as? String,
+                      let listStatus = AniListStatus(rawValue: status) else {
+                    continue
+                }
+                
+                let englishTitle = title["english"] as? String
+                let nativeTitle = title["native"] as? String
+                let coverImage = media["coverImage"] as? [String: Any]
+                let imageURL = coverImage?["large"] as? String
+                let episodes = media["episodes"] as? Int
+                let progress = entry["progress"] as? Int ?? 0
+                let score = entry["score"] as? Double
+                
+                let item = AniListLibraryItem(
+                    id: entry["id"] as? Int ?? 0,
+                    mediaId: mediaId,
+                    title: englishTitle ?? romajiTitle,
+                    romajiTitle: romajiTitle,
+                    nativeTitle: nativeTitle,
+                    imageURL: imageURL,
+                    status: listStatus,
+                    progress: progress,
+                    totalEpisodes: episodes,
+                    score: score
+                )
+                
+                items.append(item)
+            }
+        }
+        
+        return items
+    }
+    
+    // MARK: - Existing Methods
     
     func searchAnimeByTitle(_ title: String) async throws -> Int? {
         // Create multiple search variations for better matching
@@ -232,7 +426,7 @@ class AniListService {
         return thumbnails
     }
     
-    private func sendGraphQLRequest(query: String, variables: [String: Any]) async throws -> [String: Any] {
+    private func sendGraphQLRequest(query: String, variables: [String: Any], requiresAuth: Bool = false) async throws -> [String: Any] {
         guard let url = URL(string: endpoint) else {
             throw NSError(domain: "AniListService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid endpoint URL"])
         }
@@ -249,6 +443,13 @@ class AniListService {
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        if requiresAuth {
+            guard let accessToken = accessToken else {
+                throw NSError(domain: "AniListService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Access token not available"])
+            }
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
