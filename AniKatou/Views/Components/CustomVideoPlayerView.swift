@@ -45,6 +45,8 @@ struct CustomVideoPlayerView: View {
                     VideoPlayerContainer(player: player)
                         .cornerRadius(12)
                         .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .aspectRatio(16/9, contentMode: .fit)
                     
                     // Buffering Indicator
                     if isBuffering {
@@ -499,7 +501,7 @@ class PlayerView: UIView {
         get { playerLayer.player }
         set {
             playerLayer.player = newValue
-            playerLayer.videoGravity = .resizeAspectFill
+            playerLayer.videoGravity = .resizeAspect
         }
     }
     
