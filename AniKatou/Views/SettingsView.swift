@@ -44,22 +44,32 @@ struct SettingsView: View {
                         Text(quality.name).tag(quality.id)
                     }
                 }
-                
-                Toggle("Enable Subtitles", isOn: $viewModel.subtitlesEnabled)
             } header: {
                 Text("Streaming")
             } footer: {
-                Text("Configure your streaming preferences including video quality, language, and subtitles.")
+                Text("Configure your streaming preferences including video quality and language.")
             }
             
             Section {
                 Toggle("Auto-Skip Intro", isOn: $viewModel.autoSkipIntro)
                 Toggle("Auto-Skip Outro", isOn: $viewModel.autoSkipOutro)
-                Toggle("Use Custom Video Player", isOn: $viewModel.useCustomPlayer)
+                Toggle("Enable Subtitles", isOn: $viewModel.subtitlesEnabled)
+                Picker("Video Player", selection: $viewModel.playerType) {
+                    Text("iOS Player").tag("ios")
+                    Text("AniKatou Player").tag("custom")
+                }
+                
+                if viewModel.subtitlesEnabled {
+                    NavigationLink {
+                        SubtitleSettingsView()
+                    } label: {
+                        Label("Subtitle Settings", systemImage: "text.bubble")
+                    }
+                }
             } header: {
                 Text("Playback")
             } footer: {
-                Text("When enabled, intro and outro sequences will be automatically skipped. When disabled, skip buttons will be shown instead.")
+                Text("Configure playback preferences including auto-skip, subtitles, and video player selection.")
             }
             
             Section {

@@ -4,6 +4,7 @@ struct AnimeDetailView: View {
     let animeId: String
     @StateObject private var viewModel = AnimeDetailViewModel()
     @Environment(\.colorScheme) private var colorScheme
+    @State private var isDescriptionExpanded = false
     
     var body: some View {
         ScrollView {
@@ -106,10 +107,25 @@ struct AnimeDetailView: View {
                                 .padding(.horizontal)
                                 .padding(.top, 16)
                             
-                            Text(description)
-                                .font(.body)
-                                .padding(.horizontal)
-                                .padding(.bottom, 8)
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(isDescriptionExpanded ? description : getTruncatedDescription(description))
+                                    .font(.body)
+                                    .padding(.horizontal)
+                                
+                                if shouldShowMoreButton(for: description) {
+                                    Button(action: {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            isDescriptionExpanded.toggle()
+                                        }
+                                    }) {
+                                        Text(isDescriptionExpanded ? "Show Less" : "Show More")
+                                            .font(.subheadline)
+                                            .foregroundColor(.blue)
+                                            .padding(.horizontal)
+                                    }
+                                }
+                            }
+                            .padding(.bottom, 8)
                         }
                     }
                     
@@ -178,7 +194,14 @@ struct AnimeDetailView: View {
                             // Episodes List
                             LazyVStack(spacing: 12) {
                                 ForEach(viewModel.currentEpisodes) { episode in
-                                    NavigationLink(destination: EpisodeView(episodeId: episode.id)) {
+                                    NavigationLink(destination: EpisodeView(
+                                        episodeId: episode.id,
+                                        animeId: animeId,
+                                        animeTitle: details.name,
+                                        episodeNumber: "\(episode.number)",
+                                        episodeTitle: episode.title,
+                                        thumbnailURL: viewModel.getThumbnail(for: episode.number)
+                                    )) {
                                         EpisodeRow(episode: episode, thumbnail: viewModel.getThumbnail(for: episode.number), thumbnailState: viewModel.thumbnailLoadingState)
                                     }
                                     .buttonStyle(PlainButtonStyle())
@@ -195,6 +218,29 @@ struct AnimeDetailView: View {
         .task {
             await viewModel.loadAnimeDetails(id: animeId)
         }
+    }
+    
+    // Helper function to split description into sentences
+    private func getTruncatedDescription(_ description: String) -> String {
+        let sentences = description.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        
+        if sentences.count <= 3 {
+            return description
+        } else {
+            let firstThreeSentences = sentences.prefix(3).joined(separator: ". ")
+            return firstThreeSentences + "."
+        }
+    }
+    
+    // Helper function to determine if "Show More" button should be shown
+    private func shouldShowMoreButton(for description: String) -> Bool {
+        let sentences = description.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        
+        return sentences.count > 3
     }
 }
 

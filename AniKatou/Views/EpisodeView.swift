@@ -2,6 +2,12 @@ import SwiftUI
 
 struct EpisodeView: View {
     let episodeId: String
+    let animeId: String
+    let animeTitle: String
+    let episodeNumber: String
+    let episodeTitle: String?
+    let thumbnailURL: String?
+    
     @StateObject private var viewModel = EpisodeViewModel()
     @Environment(\.dismiss) private var dismiss
     @State private var showPlayer = false
@@ -25,12 +31,27 @@ struct EpisodeView: View {
                         headers: streamingData.headers,
                         subtitleTracks: streamingData.tracks,
                         intro: streamingData.intro,
-                        outro: streamingData.outro
-                    ) {
-                        dismiss()
-                    }
+                        outro: streamingData.outro,
+                        animeId: animeId,
+                        episodeId: episodeId,
+                        animeTitle: animeTitle,
+                        episodeNumber: episodeNumber,
+                        episodeTitle: episodeTitle,
+                        thumbnailURL: thumbnailURL,
+                        onDismiss: {
+                            dismiss()
+                        }
+                    )
                 } else {
-                    VideoPlayerView(streamingData: streamingData) {
+                    VideoPlayerView(
+                        streamingData: streamingData,
+                        animeId: animeId,
+                        episodeId: episodeId,
+                        animeTitle: animeTitle,
+                        episodeNumber: episodeNumber,
+                        episodeTitle: episodeTitle,
+                        thumbnailURL: thumbnailURL
+                    ) {
                         dismiss()
                     }
                 }

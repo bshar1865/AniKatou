@@ -48,6 +48,12 @@ class CustomPlayerViewController: AVPlayerViewController {
 
 struct VideoPlayerView: UIViewControllerRepresentable {
     let streamingData: StreamingData
+    let animeId: String
+    let episodeId: String
+    let animeTitle: String
+    let episodeNumber: String
+    let episodeTitle: String?
+    let thumbnailURL: String?
     let onDismiss: () -> Void
     
     func makeUIViewController(context: Context) -> CustomPlayerViewController {
@@ -228,6 +234,46 @@ struct VideoPlayerView: UIViewControllerRepresentable {
                 onDismiss()
             }
         }
+        
+        // Check for existing progress and seek to it
+        if let existingProgress = WatchProgressManager.shared.getProgress(for: animeId, episodeID: episodeId) {
+            let seekTime = CMTime(seconds: existingProgress.timestamp, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+            player.seek(to: seekTime)
+        }
+        
+        // Add watch progress observer (save every 5 seconds)
+        let progressObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 5.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { [weak player] _ in
+            guard let player = player,
+                  let currentItem = player.currentItem else { return }
+            
+            let currentTime = player.currentTime().seconds
+            
+            // Use async/await for duration
+            Task {
+                do {
+                    let duration = try await currentItem.asset.load(.duration).seconds
+                    
+                    // Only save if we have valid time and duration
+                    if currentTime > 0 && duration > 0 {
+                        WatchProgressManager.shared.saveProgress(
+                            animeID: animeId,
+                            episodeID: episodeId,
+                            timestamp: currentTime,
+                            duration: duration,
+                            title: animeTitle,
+                            episodeNumber: episodeNumber,
+                            thumbnailURL: thumbnailURL
+                        )
+                    }
+                } catch {
+                    print("Error loading duration: \(error)")
+                }
+            }
+        }
+        
+        context.coordinator.timeObservers.append((player: player, observer: timeObserver))
+        context.coordinator.timeObservers.append((player: player, observer: progressObserver))
+        
         NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: playerController.player?.currentItem,
@@ -237,8 +283,31 @@ struct VideoPlayerView: UIViewControllerRepresentable {
         }
         // Set dismiss callback
         playerController.onDismiss = {
+            // Save final progress before dismissing
+            let currentTime = player.currentTime().seconds
+            
+            Task {
+                do {
+                    let duration = try await player.currentItem?.asset.load(.duration).seconds ?? 0
+                    if currentTime > 0 && duration > 0 {
+                        WatchProgressManager.shared.saveProgress(
+                            animeID: animeId,
+                            episodeID: episodeId,
+                            timestamp: currentTime,
+                            duration: duration,
+                            title: animeTitle,
+                            episodeNumber: episodeNumber,
+                            thumbnailURL: thumbnailURL
+                        )
+                    }
+                } catch {
+                    print("Error loading duration on dismiss: \(error)")
+                }
+            }
+            
             player.pause()
             player.removeTimeObserver(timeObserver)
+            player.removeTimeObserver(progressObserver)
             NotificationCenter.default.removeObserver(playerController)
             player.replaceCurrentItem(with: nil)
             onDismiss()

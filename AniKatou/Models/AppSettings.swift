@@ -60,6 +60,47 @@ class AppSettings {
         set { defaults.set(newValue, forKey: subtitlesKey) }
     }
     
+    // Subtitle Appearance Settings
+    var subtitleTextSize: Double {
+        get { defaults.double(forKey: "subtitleTextSize") }
+        set { defaults.set(newValue, forKey: "subtitleTextSize") }
+    }
+    
+    var subtitleBackgroundOpacity: Double {
+        get { defaults.double(forKey: "subtitleBackgroundOpacity") }
+        set { defaults.set(newValue, forKey: "subtitleBackgroundOpacity") }
+    }
+    
+    var subtitleTextColor: String {
+        get { defaults.string(forKey: "subtitleTextColor") ?? "white" }
+        set { defaults.set(newValue, forKey: "subtitleTextColor") }
+    }
+    
+    var subtitleShowBackground: Bool {
+        get { defaults.bool(forKey: "subtitleShowBackground") }
+        set { defaults.set(newValue, forKey: "subtitleShowBackground") }
+    }
+    
+    var subtitlePosition: String {
+        get { defaults.string(forKey: "subtitlePosition") ?? "bottom" }
+        set { defaults.set(newValue, forKey: "subtitlePosition") }
+    }
+    
+    var subtitleFontWeight: String {
+        get { defaults.string(forKey: "subtitleFontWeight") ?? "medium" }
+        set { defaults.set(newValue, forKey: "subtitleFontWeight") }
+    }
+    
+    var subtitleMaxLines: Int {
+        get { defaults.integer(forKey: "subtitleMaxLines") }
+        set { defaults.set(newValue, forKey: "subtitleMaxLines") }
+    }
+    
+    // Default subtitle settings
+    static let defaultSubtitleTextSize: Double = 18.0
+    static let defaultSubtitleBackgroundOpacity: Double = 0.8
+    static let defaultSubtitleMaxLines: Int = 3
+    
     // Auto-Skip Settings
     var autoSkipIntro: Bool {
         get { defaults.bool(forKey: autoSkipIntroKey) }
@@ -72,8 +113,14 @@ class AppSettings {
     }
     
     // Custom Player Setting
+    var playerType: String {
+        get { defaults.string(forKey: "playerType") ?? "custom" }
+        set { defaults.set(newValue, forKey: "playerType") }
+    }
+    
+    // For backwards compatibility
     var useCustomPlayer: Bool {
-        get { defaults.object(forKey: "useCustomPlayer") as? Bool ?? true }
-        set { defaults.set(newValue, forKey: "useCustomPlayer") }
+        get { playerType == "custom" }
+        set { playerType = newValue ? "custom" : "ios" }
     }
 } 

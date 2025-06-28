@@ -39,9 +39,52 @@ class SettingsViewModel: ObservableObject {
         }
     }
     
-    @Published var useCustomPlayer: Bool {
+    @Published var playerType: String {
         didSet {
-            AppSettings.shared.useCustomPlayer = useCustomPlayer
+            AppSettings.shared.playerType = playerType
+        }
+    }
+    
+    // Subtitle Appearance Settings
+    @Published var subtitleTextSize: Double {
+        didSet {
+            AppSettings.shared.subtitleTextSize = subtitleTextSize
+        }
+    }
+    
+    @Published var subtitleBackgroundOpacity: Double {
+        didSet {
+            AppSettings.shared.subtitleBackgroundOpacity = subtitleBackgroundOpacity
+        }
+    }
+    
+    @Published var subtitleTextColor: String {
+        didSet {
+            AppSettings.shared.subtitleTextColor = subtitleTextColor
+        }
+    }
+    
+    @Published var subtitleShowBackground: Bool {
+        didSet {
+            AppSettings.shared.subtitleShowBackground = subtitleShowBackground
+        }
+    }
+    
+    @Published var subtitlePosition: String {
+        didSet {
+            AppSettings.shared.subtitlePosition = subtitlePosition
+        }
+    }
+    
+    @Published var subtitleFontWeight: String {
+        didSet {
+            AppSettings.shared.subtitleFontWeight = subtitleFontWeight
+        }
+    }
+    
+    @Published var subtitleMaxLines: Int {
+        didSet {
+            AppSettings.shared.subtitleMaxLines = subtitleMaxLines
         }
     }
     
@@ -52,6 +95,19 @@ class SettingsViewModel: ObservableObject {
         self.subtitlesEnabled = AppSettings.shared.subtitlesEnabled
         self.autoSkipIntro = AppSettings.shared.autoSkipIntro
         self.autoSkipOutro = AppSettings.shared.autoSkipOutro
-        self.useCustomPlayer = AppSettings.shared.useCustomPlayer
+        self.playerType = AppSettings.shared.playerType
+        
+        // Initialize subtitle settings with defaults if not set
+        let textSize = AppSettings.shared.subtitleTextSize > 0 ? AppSettings.shared.subtitleTextSize : AppSettings.defaultSubtitleTextSize
+        let bgOpacity = AppSettings.shared.subtitleBackgroundOpacity > 0 ? AppSettings.shared.subtitleBackgroundOpacity : AppSettings.defaultSubtitleBackgroundOpacity
+        let maxLines = AppSettings.shared.subtitleMaxLines > 0 ? AppSettings.shared.subtitleMaxLines : AppSettings.defaultSubtitleMaxLines
+        
+        self.subtitleTextSize = textSize
+        self.subtitleBackgroundOpacity = bgOpacity
+        self.subtitleTextColor = AppSettings.shared.subtitleTextColor
+        self.subtitleShowBackground = AppSettings.shared.subtitleShowBackground
+        self.subtitlePosition = AppSettings.shared.subtitlePosition
+        self.subtitleFontWeight = AppSettings.shared.subtitleFontWeight
+        self.subtitleMaxLines = maxLines
     }
 } 
