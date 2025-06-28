@@ -19,6 +19,47 @@ struct AnimeDetailView: View {
                 } else if let details = viewModel.animeDetails?.data.anime.info {
                     // Header Section
                     VStack(spacing: 16) {
+                        // AniList ID Field
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("AniList ID")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                
+                                Spacer()
+                                
+                                Button(action: { viewModel.toggleAniListIdField() }) {
+                                    Image(systemName: viewModel.showAniListIdField ? "chevron.up" : "chevron.down")
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            
+                            if viewModel.showAniListIdField {
+                                HStack {
+                                    TextField("Enter AniList ID", text: $viewModel.customAniListId)
+                                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                                        .keyboardType(.numberPad)
+                                        .onSubmit {
+                                            viewModel.updateCustomAniListId(viewModel.customAniListId)
+                                        }
+                                    
+                                    Button("Update") {
+                                        viewModel.updateCustomAniListId(viewModel.customAniListId)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .controlSize(.small)
+                                }
+                                
+                                if case .failed(let error) = viewModel.thumbnailLoadingState {
+                                    Text(error)
+                                        .font(.caption)
+                                        .foregroundColor(.red)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        
                         // Cover Art
                         AsyncImage(url: URL(string: details.image)) { image in
                             image
@@ -216,7 +257,7 @@ struct AnimeDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            await viewModel.loadAnimeDetails(id: animeId)
+            viewModel.loadAnimeDetails(animeId: animeId)
         }
     }
     
