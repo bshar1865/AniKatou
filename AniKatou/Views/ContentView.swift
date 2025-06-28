@@ -12,10 +12,10 @@ struct ContentView: View {
             .tag(0)
             
             NavigationStack {
-                BookmarksView()
+                LibraryView()
             }
             .tabItem {
-                Label("Bookmarks", systemImage: "bookmark")
+                Label("Library", systemImage: "books.vertical")
             }
             .tag(1)
             
