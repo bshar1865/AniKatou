@@ -66,8 +66,14 @@ struct CollectionsDetailView: View {
                                 NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
                                     AnimeCard(anime: anime, width: 160)
                                 }
-                                .onLongPressGesture(minimumDuration: 0.5, maximumDistance: 50) {
-                                    removeBookmark(anime)
+                                .contextMenu {
+                                    Button("Remove from Collection", role: .destructive) {
+                                        removeBookmark(anime)
+                                    }
+                                    
+                                    Button("Open Anime") {
+                                        // NavigationLink will handle this automatically
+                                    }
                                 }
                             }
                         }
@@ -78,8 +84,14 @@ struct CollectionsDetailView: View {
                                 NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
                                     AnimeListItem(anime: anime)
                                 }
-                                .onLongPressGesture(minimumDuration: 0.5, maximumDistance: 50) {
-                                    removeBookmark(anime)
+                                .contextMenu {
+                                    Button("Remove from Collection", role: .destructive) {
+                                        removeBookmark(anime)
+                                    }
+                                    
+                                    Button("Open Anime") {
+                                        // NavigationLink will handle this automatically
+                                    }
                                 }
                             }
                         }

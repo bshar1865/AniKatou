@@ -47,8 +47,14 @@ struct LibraryView: View {
                                         ContinueWatchingCard(progress: progress)
                                     }
                                     .buttonStyle(PlainButtonStyle())
-                                    .onLongPressGesture(minimumDuration: 0.5, maximumDistance: 50) {
-                                        removeFromContinueWatching(progress)
+                                    .contextMenu {
+                                        Button("Remove from Continue Watching", role: .destructive) {
+                                            removeFromContinueWatching(progress)
+                                        }
+                                        
+                                        Button("Open Episode") {
+                                            // NavigationLink will handle this automatically
+                                        }
                                     }
                                 }
                             }
@@ -133,6 +139,8 @@ struct LibraryView: View {
     }
     
     private func loadWatchHistory() {
+        // Clean up finished episodes first
+        WatchProgressManager.shared.cleanupFinishedEpisodes()
         watchHistory = WatchProgressManager.shared.getWatchHistory()
     }
     

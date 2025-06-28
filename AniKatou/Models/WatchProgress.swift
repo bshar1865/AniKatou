@@ -45,10 +45,18 @@ class WatchProgressManager {
     func saveProgress(animeID: String, episodeID: String, timestamp: Double, 
                       duration: Double, title: String, episodeNumber: String, 
                       thumbnailURL: String?) {
+        // Check if episode is finished (95% or more watched)
+        let progressPercentage = timestamp / max(1, duration)
+        if progressPercentage >= 0.95 {
+            // Episode is finished, remove it from continue watching
+            removeProgress(for: animeID, episodeID: episodeID)
+            return
+        }
+        
         var history = getWatchHistory()
         
-        // Remove old entry if exists
-        history.removeAll { $0.animeID == animeID && $0.episodeID == episodeID }
+        // Remove any previous episodes of the same anime (user moved to next episode)
+        history.removeAll { $0.animeID == animeID }
         
         // Add new entry
         let progress = WatchProgress(
@@ -97,6 +105,24 @@ class WatchProgressManager {
         
         if let encoded = try? JSONEncoder().encode(history) {
             userDefaults.set(encoded, forKey: watchProgressKey)
+        }
+    }
+    
+    func cleanupFinishedEpisodes() {
+        var history = getWatchHistory()
+        let originalCount = history.count
+        
+        // Remove episodes that are 95% or more watched
+        history.removeAll { progress in
+            let progressPercentage = progress.timestamp / max(1, progress.duration)
+            return progressPercentage >= 0.95
+        }
+        
+        // Only save if we actually removed something
+        if history.count != originalCount {
+            if let encoded = try? JSONEncoder().encode(history) {
+                userDefaults.set(encoded, forKey: watchProgressKey)
+            }
         }
     }
 }
