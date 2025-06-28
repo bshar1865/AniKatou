@@ -90,4 +90,13 @@ class WatchProgressManager {
     func clearWatchHistory() {
         userDefaults.removeObject(forKey: watchProgressKey)
     }
+    
+    func removeProgress(for animeID: String, episodeID: String) {
+        var history = getWatchHistory()
+        history.removeAll { $0.animeID == animeID && $0.episodeID == episodeID }
+        
+        if let encoded = try? JSONEncoder().encode(history) {
+            userDefaults.set(encoded, forKey: watchProgressKey)
+        }
+    }
 }

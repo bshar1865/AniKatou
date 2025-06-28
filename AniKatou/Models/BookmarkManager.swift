@@ -47,4 +47,9 @@ class BookmarkManager {
         }
         saveBookmarks()
     }
+    
+    func removeBookmark(_ anime: AnimeItem) {
+        cachedBookmarks.removeAll { $0.id == anime.id }
+        saveBookmarks()
+    }
 } 

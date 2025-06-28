@@ -32,6 +32,11 @@ struct CustomVideoPlayerView: View {
     @State private var showSubtitleMenu: Bool = false
     @State private var bufferingProgress: Double = 0
     @State private var isBuffering: Bool = false
+    @State private var hasSkippedIntro: Bool = false
+    @State private var hasSkippedOutro: Bool = false
+    @State private var showAutoSkipNotification: Bool = false
+    @State private var autoSkipMessage: String = ""
+    @State private var isAutoSkipping: Bool = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -204,6 +209,44 @@ struct CustomVideoPlayerView: View {
                         .padding(.bottom, 8)
                     }
                     
+                    // Seek Controls
+                    if showControls {
+                        HStack(spacing: 40) {
+                            // Rewind 5 seconds
+                            Button(action: {
+                                let newTime = max(0, currentTime - 5)
+                                let seekTime = CMTime(seconds: newTime, preferredTimescale: 600)
+                                player.seek(to: seekTime)
+                                autoHideControls()
+                            }) {
+                                Image(systemName: "gobackward.5")
+                                    .font(.system(size: 24, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 44, height: 44)
+                                    .background(Color.black.opacity(0.6))
+                                    .clipShape(Circle())
+                                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                            }
+                            
+                            // Forward 5 seconds
+                            Button(action: {
+                                let newTime = min(duration, currentTime + 5)
+                                let seekTime = CMTime(seconds: newTime, preferredTimescale: 600)
+                                player.seek(to: seekTime)
+                                autoHideControls()
+                            }) {
+                                Image(systemName: "goforward.5")
+                                    .font(.system(size: 24, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 44, height: 44)
+                                    .background(Color.black.opacity(0.6))
+                                    .clipShape(Circle())
+                                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                            }
+                        }
+                        .padding(.bottom, 8)
+                    }
+                    
                     // Progress Bar and Time
                     VStack(spacing: 8) {
                         // Custom Progress Bar
@@ -283,6 +326,32 @@ struct CustomVideoPlayerView: View {
                 if AppSettings.shared.subtitlesEnabled, !currentSubtitle.isEmpty {
                     subtitleOverlay(geometry: geometry)
                 }
+                
+                // Auto-skip Notification
+                if showAutoSkipNotification {
+                    VStack {
+                        Spacer()
+                        
+                        HStack {
+                            Image(systemName: "forward.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text(autoSkipMessage)
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(
+                            Capsule()
+                                .fill(Color.black.opacity(0.8))
+                                .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
+                        )
+                        .transition(.scale.combined(with: .opacity))
+                        
+                        Spacer()
+                    }
+                    .animation(.easeInOut(duration: 0.3), value: showAutoSkipNotification)
+                }
             }
         }
         .onAppear {
@@ -308,7 +377,6 @@ struct CustomVideoPlayerView: View {
         if let headers = headers {
             asset = AVURLAsset(url: videoURL, options: [
                 "AVURLAssetHTTPHeaderFieldsKey": headers,
-                "AVURLAssetHTTPUserAgentKey": headers["User-Agent"] ?? ""
             ])
         } else {
             asset = AVURLAsset(url: videoURL)
@@ -316,18 +384,24 @@ struct CustomVideoPlayerView: View {
         
         let item = AVPlayerItem(asset: asset)
         player.replaceCurrentItem(with: item)
-        player.play()
-        isPlaying = true
+        
+        // Reset skip flags for new episode
+        hasSkippedIntro = false
+        hasSkippedOutro = false
+        isAutoSkipping = false
         
         observePlayer()
-        startProgressSaving()
         loadSubtitles()
+        startProgressSaving()
         
         // Check for existing progress and seek to it
         if let existingProgress = WatchProgressManager.shared.getProgress(for: animeId, episodeID: episodeId) {
             let seekTime = CMTime(seconds: existingProgress.timestamp, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
             player.seek(to: seekTime)
         }
+        
+        player.play()
+        isPlaying = true
     }
     
     private func cleanupPlayer() {
@@ -361,8 +435,70 @@ struct CustomVideoPlayerView: View {
         
         // Observe time and buffering
         player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.2, preferredTimescale: 600), queue: .main) { time in
-            if !isSeeking {
+            if !isSeeking && !isAutoSkipping {
                 currentTime = time.seconds
+            }
+            
+            // Auto-skip intro - only skip when we enter the intro range
+            if let intro = intro, AppSettings.shared.autoSkipIntro, !hasSkippedIntro, !isAutoSkipping {
+                let introStart = Double(intro.start)
+                let introEnd = Double(intro.end)
+                
+                // Only skip if we're within the intro range and haven't skipped yet
+                if currentTime >= introStart && currentTime <= introEnd {
+                    isAutoSkipping = true
+                    let seekTime = CMTime(seconds: introEnd, preferredTimescale: 600)
+                    player.seek(to: seekTime) { finished in
+                        DispatchQueue.main.async {
+                            self.isAutoSkipping = false
+                        }
+                    }
+                    hasSkippedIntro = true
+                    
+                    // Show auto-skip notification
+                    autoSkipMessage = "Skipped Intro"
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showAutoSkipNotification = true
+                    }
+                    
+                    // Hide notification after 2 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showAutoSkipNotification = false
+                        }
+                    }
+                }
+            }
+            
+            // Auto-skip outro - only skip when we enter the outro range
+            if let outro = outro, AppSettings.shared.autoSkipOutro, !hasSkippedOutro, !isAutoSkipping {
+                let outroStart = Double(outro.start)
+                let outroEnd = Double(outro.end)
+                
+                // Only skip if we're within the outro range and haven't skipped yet
+                if currentTime >= outroStart && currentTime <= outroEnd {
+                    isAutoSkipping = true
+                    let seekTime = CMTime(seconds: outroEnd, preferredTimescale: 600)
+                    player.seek(to: seekTime) { finished in
+                        DispatchQueue.main.async {
+                            self.isAutoSkipping = false
+                        }
+                    }
+                    hasSkippedOutro = true
+                    
+                    // Show auto-skip notification
+                    autoSkipMessage = "Skipped Outro"
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showAutoSkipNotification = true
+                    }
+                    
+                    // Hide notification after 2 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showAutoSkipNotification = false
+                        }
+                    }
+                }
             }
             
             // Update buffering status
@@ -447,7 +583,7 @@ struct CustomVideoPlayerView: View {
                     subtitleTimeObserver = observer
                 }
             } catch {
-                print("[DEBUG] Failed to load subtitles: \(error)")
+                // Subtitle loading failed silently
             }
         }
     }

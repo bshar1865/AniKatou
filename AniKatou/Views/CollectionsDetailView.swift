@@ -3,6 +3,8 @@ import SwiftUI
 struct CollectionsDetailView: View {
     let viewModel: BookmarksViewModel
     @State private var isGridView = true
+    @State private var showingRemoveAlert = false
+    @State private var itemToRemove: AnimeItem?
     
     private static let gridColumns = [
         GridItem(.flexible(), spacing: 16),
@@ -64,6 +66,9 @@ struct CollectionsDetailView: View {
                                 NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
                                     AnimeCard(anime: anime, width: 160)
                                 }
+                                .onLongPressGesture(minimumDuration: 0.5, maximumDistance: 50) {
+                                    removeBookmark(anime)
+                                }
                             }
                         }
                         .padding(.horizontal)
@@ -72,6 +77,9 @@ struct CollectionsDetailView: View {
                             ForEach(viewModel.bookmarkedAnimes) { anime in
                                 NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
                                     AnimeListItem(anime: anime)
+                                }
+                                .onLongPressGesture(minimumDuration: 0.5, maximumDistance: 50) {
+                                    removeBookmark(anime)
                                 }
                             }
                         }
@@ -82,6 +90,35 @@ struct CollectionsDetailView: View {
         }
         .navigationTitle("Collections")
         .navigationBarTitleDisplayMode(.large)
+        .alert("Remove Bookmark", isPresented: $showingRemoveAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Remove", role: .destructive) {
+                confirmRemove()
+            }
+        } message: {
+            Text("Remove this anime from your collection?")
+        }
+    }
+    
+    private func removeBookmark(_ anime: AnimeItem) {
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        itemToRemove = anime
+        showingRemoveAlert = true
+    }
+    
+    private func confirmRemove() {
+        if let anime = itemToRemove {
+            BookmarkManager.shared.removeBookmark(anime)
+            // Post notification to update UI
+            NotificationCenter.default.post(
+                name: NSNotification.Name("BookmarksDidChange"),
+                object: nil,
+                userInfo: ["animeId": anime.id]
+            )
+        }
+        showingRemoveAlert = false
+        itemToRemove = nil
     }
 }
 

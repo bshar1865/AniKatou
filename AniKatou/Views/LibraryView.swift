@@ -5,6 +5,9 @@ struct LibraryView: View {
     @State private var isGridView = true
     @State private var watchHistory: [WatchProgress] = []
     @State private var selectedTab = 0
+    @State private var showingRemoveAlert = false
+    @State private var itemToRemove: Any?
+    @State private var removeType: RemoveType = .continueWatching
     
     private static let gridColumns = [
         GridItem(.flexible(), spacing: 16),
@@ -31,7 +34,7 @@ struct LibraryView: View {
                         .padding(.horizontal)
                         
                         ScrollView(.horizontal, showsIndicators: false) {
-                            LazyHStack(spacing: 20) {
+                            LazyHStack(spacing: 16) {
                                 ForEach(watchHistory.prefix(10)) { progress in
                                     NavigationLink(destination: EpisodeView(
                                         episodeId: progress.episodeID,
@@ -44,6 +47,9 @@ struct LibraryView: View {
                                         ContinueWatchingCard(progress: progress)
                                     }
                                     .buttonStyle(PlainButtonStyle())
+                                    .onLongPressGesture(minimumDuration: 0.5, maximumDistance: 50) {
+                                        removeFromContinueWatching(progress)
+                                    }
                                 }
                             }
                             .padding(.horizontal)
@@ -108,6 +114,19 @@ struct LibraryView: View {
         .onAppear {
             loadWatchHistory()
         }
+        .alert("Remove Item", isPresented: $showingRemoveAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Remove", role: .destructive) {
+                confirmRemove()
+            }
+        } message: {
+            switch removeType {
+            case .continueWatching:
+                Text("Remove this item from Continue Watching?")
+            case .bookmark:
+                Text("Remove this anime from your collection?")
+            }
+        }
         .refreshable {
             loadWatchHistory()
         }
@@ -116,6 +135,49 @@ struct LibraryView: View {
     private func loadWatchHistory() {
         watchHistory = WatchProgressManager.shared.getWatchHistory()
     }
+    
+    private func removeFromContinueWatching(_ progress: WatchProgress) {
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        itemToRemove = progress
+        removeType = .continueWatching
+        showingRemoveAlert = true
+    }
+    
+    private func removeBookmark(_ anime: AnimeItem) {
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        itemToRemove = anime
+        removeType = .bookmark
+        showingRemoveAlert = true
+    }
+    
+    private func confirmRemove() {
+        switch removeType {
+        case .continueWatching:
+            if let progress = itemToRemove as? WatchProgress {
+                WatchProgressManager.shared.removeProgress(for: progress.animeID, episodeID: progress.episodeID)
+                loadWatchHistory()
+            }
+        case .bookmark:
+            if let anime = itemToRemove as? AnimeItem {
+                BookmarkManager.shared.removeBookmark(anime)
+                // Post notification to update UI
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("BookmarksDidChange"),
+                    object: nil,
+                    userInfo: ["animeId": anime.id]
+                )
+            }
+        }
+        showingRemoveAlert = false
+        itemToRemove = nil
+    }
+}
+
+enum RemoveType {
+    case continueWatching
+    case bookmark
 }
 
 // MARK: - Collections View
@@ -289,6 +351,11 @@ private struct CollectionSection: View {
     let emptyMessage: String
     let emptyDescription: String
     
+    private static let gridColumns = [
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16)
+    ]
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Section Header
@@ -323,10 +390,7 @@ private struct CollectionSection: View {
                 .padding(.horizontal)
             } else {
                 if isGridView {
-                    LazyVGrid(columns: [
-                        GridItem(.flexible(), spacing: 16),
-                        GridItem(.flexible(), spacing: 16)
-                    ], spacing: 20) {
+                    LazyVGrid(columns: Self.gridColumns, spacing: 20) {
                         ForEach(animeList) { anime in
                             NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
                                 AnimeCard(anime: anime, width: 160)
