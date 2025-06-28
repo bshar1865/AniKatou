@@ -48,10 +48,8 @@ struct CustomVideoPlayerView: View {
                 // Video Player Container
                 ZStack {
                     VideoPlayerContainer(player: player)
-                        .cornerRadius(12)
-                        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+                        .ignoresSafeArea()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .aspectRatio(16/9, contentMode: .fit)
                     
                     // Buffering Indicator
                     if isBuffering {
@@ -70,8 +68,6 @@ struct CustomVideoPlayerView: View {
                         .transition(.opacity)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 40)
                 
                 // Top Controls Overlay
                 VStack {
@@ -114,38 +110,62 @@ struct CustomVideoPlayerView: View {
                         Spacer()
                     }
                     .padding(.horizontal, 24)
-                    .padding(.top, 16)
+                    .padding(.top, 8)
                     
                     Spacer()
                 }
                 .opacity(showControls ? 1 : 0)
                 .animation(.easeInOut(duration: 0.3), value: showControls)
                 
-                // Center Play/Pause Button
+                // Center Play/Pause Button and Seek Controls
                 if showControls {
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                            if isPlaying {
-                                player.pause()
-                            } else {
-                                player.play()
-                            }
-                            isPlaying.toggle()
+                    HStack(spacing: 25) {
+                        // Rewind 5 seconds
+                        Button(action: {
+                            let newTime = max(0, currentTime - 5)
+                            let seekTime = CMTime(seconds: newTime, preferredTimescale: 600)
+                            player.seek(to: seekTime)
+                            autoHideControls()
+                        }) {
+                            Image(systemName: "gobackward.5")
+                                .font(.system(size: 30, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 60, height: 60)
                         }
-                        autoHideControls()
-                    }) {
-                        Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 50, weight: .bold))
-                            .foregroundColor(.white)
-                            .frame(width: 80, height: 80)
-                            .background(
-                                Circle()
-                                    .fill(Color.black.opacity(0.7))
-                                    .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 6)
-                            )
+                        
+                        // Play/Pause Button
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                if isPlaying {
+                                    player.pause()
+                                } else {
+                                    player.play()
+                                }
+                                isPlaying.toggle()
+                            }
+                            autoHideControls()
+                        }) {
+                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                                .font(.system(size: 50, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(width: 80, height: 80)
+                        }
+                        .scaleEffect(isPlaying ? 1 : 1.1)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPlaying)
+                        
+                        // Forward 5 seconds
+                        Button(action: {
+                            let newTime = min(duration, currentTime + 5)
+                            let seekTime = CMTime(seconds: newTime, preferredTimescale: 600)
+                            player.seek(to: seekTime)
+                            autoHideControls()
+                        }) {
+                            Image(systemName: "goforward.5")
+                                .font(.system(size: 30, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 60, height: 60)
+                        }
                     }
-                    .scaleEffect(isPlaying ? 1 : 1.1)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPlaying)
                 }
                 
                 // Bottom Controls Overlay
@@ -206,44 +226,6 @@ struct CustomVideoPlayerView: View {
                             }
                         }
                         .padding(.horizontal, 24)
-                        .padding(.bottom, 8)
-                    }
-                    
-                    // Seek Controls
-                    if showControls {
-                        HStack(spacing: 40) {
-                            // Rewind 5 seconds
-                            Button(action: {
-                                let newTime = max(0, currentTime - 5)
-                                let seekTime = CMTime(seconds: newTime, preferredTimescale: 600)
-                                player.seek(to: seekTime)
-                                autoHideControls()
-                            }) {
-                                Image(systemName: "gobackward.5")
-                                    .font(.system(size: 24, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .frame(width: 44, height: 44)
-                                    .background(Color.black.opacity(0.6))
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
-                            }
-                            
-                            // Forward 5 seconds
-                            Button(action: {
-                                let newTime = min(duration, currentTime + 5)
-                                let seekTime = CMTime(seconds: newTime, preferredTimescale: 600)
-                                player.seek(to: seekTime)
-                                autoHideControls()
-                            }) {
-                                Image(systemName: "goforward.5")
-                                    .font(.system(size: 24, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .frame(width: 44, height: 44)
-                                    .background(Color.black.opacity(0.6))
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
-                            }
-                        }
                         .padding(.bottom, 8)
                     }
                     
@@ -316,7 +298,7 @@ struct CustomVideoPlayerView: View {
                                 .foregroundColor(.white.opacity(0.9))
                         }
                         .padding(.horizontal, 28)
-                        .padding(.bottom, 20)
+                        .padding(.bottom, 40)
                     }
                     .opacity(showControls ? 1 : 0)
                     .animation(.easeInOut(duration: 0.3), value: showControls)

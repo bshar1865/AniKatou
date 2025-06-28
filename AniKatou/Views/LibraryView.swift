@@ -21,9 +21,9 @@ struct LibraryView: View {
                 if !watchHistory.isEmpty {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
-                            Text("Continue Watching")
+                        Text("Continue Watching")
                                 .font(.title)
-                                .fontWeight(.bold)
+                            .fontWeight(.bold)
                             
                             Spacer()
                             
@@ -31,7 +31,7 @@ struct LibraryView: View {
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
-                        .padding(.horizontal)
+                            .padding(.horizontal)
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             LazyHStack(spacing: 16) {
@@ -65,10 +65,10 @@ struct LibraryView: View {
                 
                 // Collections Section
                 VStack(spacing: 20) {
-                    HStack {
+                        HStack {
                         Text("Collections")
                             .font(.title)
-                            .fontWeight(.bold)
+                                .fontWeight(.bold)
                         Spacer()
                     }
                     .padding(.horizontal)
@@ -564,9 +564,9 @@ private struct AnimeListItem: View {
                         Image(systemName: "film")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Text(type)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                    Text(type)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                     }
                 }
                 
@@ -575,7 +575,7 @@ private struct AnimeListItem: View {
                         Image(systemName: "play.rectangle")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Text("\(episodes) Episodes")
+                    Text("\(episodes) Episodes")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
@@ -629,22 +629,22 @@ private struct ContinueWatchingCard: View {
         VStack(alignment: .leading, spacing: 12) {
             // Thumbnail with overlay
             ZStack(alignment: .bottomLeading) {
-                if let thumbnailURL = progress.thumbnailURL {
-                    CachedAsyncImage(url: URL(string: thumbnailURL)) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Color.gray
-                            .overlay(ProgressView())
-                    }
+            if let thumbnailURL = progress.thumbnailURL {
+                CachedAsyncImage(url: URL(string: thumbnailURL)) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Color.gray
+                        .overlay(ProgressView())
+                }
                     .frame(width: 200, height: 120)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                } else {
-                    Color.gray
-                        .overlay(
-                            Image(systemName: "play.rectangle.fill")
-                                .foregroundColor(.white)
+            } else {
+                Color.gray
+                    .overlay(
+                        Image(systemName: "play.rectangle.fill")
+                            .foregroundColor(.white)
                                 .font(.system(size: 32))
                         )
                         .frame(width: 200, height: 120)
@@ -664,38 +664,38 @@ private struct ContinueWatchingCard: View {
             }
             
             VStack(alignment: .leading, spacing: 8) {
-                // Title
-                Text(progress.title)
+            // Title
+            Text(progress.title)
                     .font(.headline)
                     .fontWeight(.semibold)
-                    .lineLimit(2)
-                    .foregroundColor(.primary)
-                
-                // Episode info
+                .lineLimit(2)
+                .foregroundColor(.primary)
+            
+            // Episode info
                 HStack {
                     Image(systemName: "play.circle.fill")
                         .font(.caption)
                         .foregroundColor(.blue)
-                    Text("Episode \(progress.episodeNumber)")
+            Text("Episode \(progress.episodeNumber)")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                .foregroundColor(.secondary)
                     Spacer()
                 }
-                
-                // Progress bar
+            
+            // Progress bar
                 VStack(spacing: 4) {
-                    ProgressView(value: progress.progressPercentage)
-                        .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+            ProgressView(value: progress.progressPercentage)
+                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
                         .frame(height: 4)
-                    
-                    HStack {
-                        Text(progress.formattedTimestamp)
+            
+            HStack {
+                Text(progress.formattedTimestamp)
                             .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text(formatDuration(progress.duration))
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(formatDuration(progress.duration))
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                    .foregroundColor(.secondary)
                     }
                 }
             }
