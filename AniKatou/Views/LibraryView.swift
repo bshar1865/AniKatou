@@ -904,11 +904,15 @@ struct AniListCollectionView: View {
 
 struct AniListAnimeCard: View {
     let item: AniListLibraryItem
-    @State private var showingAniListDetails = false
+    @State private var searchResults: [AnimeItem] = []
+    @State private var isSearching = false
+    @State private var searchError: String?
+    @State private var showingAnimeDetail = false
+    @State private var foundAnimeId: String?
     
     var body: some View {
         Button(action: {
-            showingAniListDetails = true
+            searchAndNavigateToAnime()
         }) {
             VStack(alignment: .leading, spacing: 12) {
                 // Cover Image
@@ -934,50 +938,33 @@ struct AniListAnimeCard: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 
-                VStack(alignment: .leading, spacing: 8) {
-                    // Title
-                    Text(item.title)
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .lineLimit(2)
-                        .foregroundColor(.primary)
-                    
-                    // Progress
-                    HStack {
-                        Image(systemName: "play.circle.fill")
-                            .font(.caption)
-                            .foregroundColor(.blue)
+                // Title
+                Text(item.title)
+                    .font(.headline)
+                    .lineLimit(2)
+                    .foregroundColor(.primary)
+                
+                // Progress and Score
+                HStack {
+                    if item.progress > 0 {
                         Text(item.progressText)
-                            .font(.subheadline)
+                            .font(.caption)
                             .foregroundColor(.secondary)
-                        Spacer()
                     }
                     
-                    // Score
-                    if item.score != nil && item.score! > 0 {
-                        HStack {
+                    Spacer()
+                    
+                    if let score = item.score, score > 0 {
+                        HStack(spacing: 4) {
                             Image(systemName: "star.fill")
                                 .font(.caption)
                                 .foregroundColor(.yellow)
-                            Text(item.scoreText)
-                                .font(.subheadline)
+                            Text(String(format: "%.1f", score))
+                                .font(.caption)
                                 .foregroundColor(.secondary)
-                            Spacer()
                         }
                     }
-                    
-                    // Status Badge
-                    HStack {
-                        Image(systemName: item.status.icon)
-                            .font(.caption)
-                            .foregroundColor(item.status.statusColor)
-                        Text(item.status.displayName)
-                            .font(.caption)
-                            .foregroundColor(item.status.statusColor)
-                        Spacer()
-                    }
                 }
-                .padding(.horizontal, 4)
             }
             .padding(12)
             .background(Color(.secondarySystemBackground))
@@ -985,192 +972,19 @@ struct AniListAnimeCard: View {
             .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
         }
         .buttonStyle(PlainButtonStyle())
-        .sheet(isPresented: $showingAniListDetails) {
-            AniListAnimeDetailView(item: item)
-        }
+        .background(
+            NavigationLink(
+                destination: foundAnimeId != nil ? AnyView(AnimeDetailView(animeId: foundAnimeId!)) : AnyView(EmptyView()),
+                isActive: $showingAnimeDetail
+            ) {
+                EmptyView()
+            }
+        )
     }
-}
-
-struct AniListAnimeDetailView: View {
-    let item: AniListLibraryItem
-    @Environment(\.dismiss) private var dismiss
-    @State private var searchResults: [AnimeItem] = []
-    @State private var isSearching = false
-    @State private var searchError: String?
     
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // AniList Info Section
-                    VStack(spacing: 16) {
-                        // Cover Image
-                        if let imageURL = item.imageURL {
-                            CachedAsyncImage(url: URL(string: imageURL)) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                Color.gray
-                                    .overlay(ProgressView())
-                            }
-                            .frame(width: 200, height: 300)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        
-                        // Title and Info
-                        VStack(spacing: 8) {
-                            Text(item.title)
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .multilineTextAlignment(.center)
-                            
-                            if item.romajiTitle != item.title {
-                                Text(item.romajiTitle)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            // Status and Progress
-                            HStack(spacing: 16) {
-                                Label(item.status.displayName, systemImage: item.status.icon)
-                                    .foregroundColor(item.status.statusColor)
-                                    .font(.caption)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(item.status.statusColor.opacity(0.1))
-                                    .cornerRadius(8)
-                                
-                                Label(item.progressText, systemImage: "play.circle.fill")
-                                    .foregroundColor(.blue)
-                                    .font(.caption)
-                            }
-                            
-                            if let score = item.score, score > 0 {
-                                Label(item.scoreText, systemImage: "star.fill")
-                                    .foregroundColor(.yellow)
-                                    .font(.caption)
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(16)
-                    
-                    // Search for Streaming Section
-                    VStack(spacing: 16) {
-                        Text("Find on Streaming Service")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                        
-                        Text("Search for this anime on your streaming service to watch episodes")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                        
-                        Button(action: {
-                            Task {
-                                await searchForAnime()
-                            }
-                        }) {
-                            HStack {
-                                if isSearching {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                } else {
-                                    Image(systemName: "magnifyingglass")
-                                }
-                                Text(isSearching ? "Searching..." : "Search for Episodes")
-                            }
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(Color.blue)
-                            .cornerRadius(10)
-                        }
-                        .disabled(isSearching)
-                        
-                        if let error = searchError {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundColor(.red)
-                                .multilineTextAlignment(.center)
-                        }
-                        
-                        // Search Results
-                        if !searchResults.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Search Results")
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                                
-                                LazyVStack(spacing: 12) {
-                                    ForEach(searchResults) { anime in
-                                        NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
-                                            HStack(spacing: 12) {
-                                                // Thumbnail
-                                                CachedAsyncImage(url: URL(string: anime.poster)) { image in
-                                                    image
-                                                        .resizable()
-                                                        .aspectRatio(contentMode: .fill)
-                                                } placeholder: {
-                                                    Color.gray
-                                                }
-                                                .frame(width: 60, height: 80)
-                                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                                
-                                                // Info
-                                                VStack(alignment: .leading, spacing: 4) {
-                                                    Text(anime.name)
-                                                        .font(.subheadline)
-                                                        .fontWeight(.semibold)
-                                                        .lineLimit(2)
-                                                    
-                                                    if let episodes = anime.episodes {
-                                                        Text("\(episodes) episodes")
-                                                            .font(.caption)
-                                                            .foregroundColor(.secondary)
-                                                    }
-                                                    
-                                                    if let type = anime.type {
-                                                        Text(type)
-                                                            .font(.caption)
-                                                            .foregroundColor(.secondary)
-                                                    }
-                                                }
-                                                
-                                                Spacer()
-                                                
-                                                Image(systemName: "chevron.right")
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                            }
-                                            .padding(12)
-                                            .background(Color(.tertiarySystemBackground))
-                                            .cornerRadius(12)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(16)
-                }
-                .padding()
-            }
-            .navigationTitle("AniList Details")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
+    private func searchAndNavigateToAnime() {
+        Task {
+            await searchForAnime()
         }
     }
     
@@ -1200,8 +1014,11 @@ struct AniListAnimeDetailView: View {
                 searchResults = results
                 isSearching = false
                 
-                if results.isEmpty {
-                    searchError = "No matching anime found on streaming service. Try searching manually in the Search tab."
+                if let firstResult = results.first {
+                    foundAnimeId = firstResult.id
+                    showingAnimeDetail = true
+                } else {
+                    searchError = "No matching anime found on streaming service."
                 }
             }
         } catch {
