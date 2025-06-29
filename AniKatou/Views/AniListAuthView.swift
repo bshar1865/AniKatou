@@ -15,22 +15,100 @@ struct AniListAuthView: View {
                         .font(.system(size: 60))
                         .foregroundColor(.blue)
                     
-                    Text("AniList Integration")
+                    Text("AniList")
                         .font(.title2)
                         .fontWeight(.bold)
                     
-                    Text("Connect your AniList account to sync your anime library")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+                    if !viewModel.isAuthenticated {
+                        Text("Connect your AniList account to sync your anime library")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
                 }
                 
                 Spacer()
                 
                 if viewModel.isAuthenticated {
                     // Authenticated State
-                    VStack(spacing: 16) {
+                    VStack(spacing: 20) {
+                        // User Profile Section
+                        if let userProfile = viewModel.userProfile {
+                            VStack(spacing: 12) {
+                                // Profile Picture
+                                if let avatarURL = userProfile.avatarURL, let url = URL(string: avatarURL) {
+                                    AsyncImage(url: url) { image in
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 80, height: 80)
+                                            .clipShape(Circle())
+                                            .overlay(Circle().stroke(Color.blue, lineWidth: 2))
+                                    } placeholder: {
+                                        Circle()
+                                            .fill(Color.gray.opacity(0.3))
+                                            .frame(width: 80, height: 80)
+                                            .overlay(
+                                                Image(systemName: "person.fill")
+                                                    .font(.system(size: 30))
+                                                    .foregroundColor(.gray)
+                                            )
+                                    }
+                                } else {
+                                    Circle()
+                                        .fill(Color.gray.opacity(0.3))
+                                        .frame(width: 80, height: 80)
+                                        .overlay(
+                                            Image(systemName: "person.fill")
+                                                .font(.system(size: 30))
+                                                .foregroundColor(.gray)
+                                        )
+                                }
+                                
+                                // Username
+                                Text(userProfile.name)
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                
+                                // Stats
+                                HStack(spacing: 20) {
+                                    VStack {
+                                        Text("\(userProfile.animeCount)")
+                                            .font(.headline)
+                                            .fontWeight(.bold)
+                                        Text("Anime")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    VStack {
+                                        Text("\(userProfile.episodesWatched)")
+                                            .font(.headline)
+                                            .fontWeight(.bold)
+                                        Text("Episodes")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    if let meanScore = userProfile.meanScore {
+                                        VStack {
+                                            Text(String(format: "%.1f", meanScore))
+                                                .font(.headline)
+                                                .fontWeight(.bold)
+                                            Text("Avg Score")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding()
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(12)
+                        }
+                        
+                        // Connection Status
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
@@ -41,37 +119,31 @@ struct AniListAuthView: View {
                         if viewModel.isLoading {
                             ProgressView("Loading library...")
                         } else {
-                            VStack(spacing: 8) {
-                                Text("\(viewModel.userLibrary.count) anime in your library")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                
-                                if !viewModel.userLibrary.isEmpty {
-                                    VStack(spacing: 4) {
-                                        HStack {
-                                            Text("Watching:")
-                                            Spacer()
-                                            Text("\(viewModel.getWatchingList().count)")
-                                                .fontWeight(.semibold)
-                                        }
-                                        
-                                        HStack {
-                                            Text("Plan to Watch:")
-                                            Spacer()
-                                            Text("\(viewModel.getPlanToWatchList().count)")
-                                                .fontWeight(.semibold)
-                                        }
-                                        
-                                        HStack {
-                                            Text("Completed:")
-                                            Spacer()
-                                            Text("\(viewModel.getCompletedList().count)")
-                                                .fontWeight(.semibold)
-                                        }
+                            if !viewModel.userLibrary.isEmpty {
+                                VStack(spacing: 4) {
+                                    HStack {
+                                        Text("Watching:")
+                                        Spacer()
+                                        Text("\(viewModel.getWatchingList().count)")
+                                            .fontWeight(.semibold)
                                     }
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    
+                                    HStack {
+                                        Text("Plan to Watch:")
+                                        Spacer()
+                                        Text("\(viewModel.getPlanToWatchList().count)")
+                                            .fontWeight(.semibold)
+                                    }
+                                    
+                                    HStack {
+                                        Text("Completed:")
+                                        Spacer()
+                                        Text("\(viewModel.getCompletedList().count)")
+                                            .fontWeight(.semibold)
+                                    }
                                 }
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                             }
                         }
                         
@@ -79,6 +151,7 @@ struct AniListAuthView: View {
                             viewModel.logout()
                         }
                         .foregroundColor(.red)
+                        .buttonStyle(.bordered)
                     }
                 } else {
                     // Not Authenticated State
@@ -111,13 +184,6 @@ struct AniListAuthView: View {
             .padding()
             .navigationTitle("AniList")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
         }
         .sheet(isPresented: $showingWebView) {
             AniListWebView(viewModel: viewModel) { success in

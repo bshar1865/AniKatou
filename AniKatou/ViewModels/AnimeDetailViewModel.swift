@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 @MainActor
 class AnimeDetailViewModel: ObservableObject {
@@ -22,6 +23,8 @@ class AnimeDetailViewModel: ObservableObject {
     @Published var isBookmarked = false
     @Published var customAniListId: String = ""
     @Published var showAniListIdField = false
+    @Published var isOfflineMode = false
+    @Published var offlineAnimeDetails: OfflineAnimeDetails?
     
     private var loadTask: Task<Void, Never>?
     private var aniListId: Int?
@@ -42,44 +45,94 @@ class AnimeDetailViewModel: ObservableObject {
         thumbnailLoadingState = .notStarted
         aniListId = nil
         customAniListId = ""
+        offlineAnimeDetails = nil
         
         loadTask = Task {
             isLoading = true
             errorMessage = nil
             
-            do {
-                let result = try await APIService.shared.getAnimeDetails(id: animeId)
-                
-                if !Task.isCancelled {
-                    self.animeDetails = result
-                    
-                    // Fetch episodes separately
-                    let episodes = try await APIService.shared.getAnimeEpisodes(id: animeId)
-                    self.episodeGroups = EpisodeGroup.createGroups(from: episodes)
-                    
-                    self.isBookmarked = BookmarkManager.shared.isBookmarked(animeToBookmarkItem() ?? AnimeItem(id: "", name: "", jname: "", poster: "", duration: "", type: "", rating: "", episodes: nil, isNSFW: false, genres: []))
-                    
-                    // Try to fetch thumbnails from AniList in the background
-                    Task {
-                        await loadThumbnails(for: result.data.anime.info.name)
-                        // Update custom AniList ID field if we found an ID
-                        if let foundId = self.aniListId {
-                            await MainActor.run {
-                                self.customAniListId = String(foundId)
-                            }
-                        }
-                    }
-                }
-            } catch {
-                if !Task.isCancelled {
-                    self.errorMessage = error.localizedDescription
-                }
+            // Check if we're in offline mode
+            isOfflineMode = OfflineManager.shared.isOfflineMode
+            
+            if isOfflineMode {
+                await loadOfflineAnimeDetails(animeId: animeId)
+            } else {
+                await loadOnlineAnimeDetails(animeId: animeId)
             }
             
             if !Task.isCancelled {
-                self.isLoading = false
+                isLoading = false
             }
         }
+    }
+    
+    private func loadOfflineAnimeDetails(animeId: String) async {
+        if let offlineDetails = OfflineManager.shared.getCachedAnimeDetails(animeId) {
+            offlineAnimeDetails = offlineDetails
+            
+            // Convert offline episodes to episode groups
+            episodeGroups = EpisodeGroup.createGroups(from: offlineDetails.episodes.map { offlineEpisode in
+                EpisodeInfo(
+                    title: offlineEpisode.title,
+                    episodeId: offlineEpisode.episodeId,
+                    number: offlineEpisode.number,
+                    isFiller: offlineEpisode.isFiller
+                )
+            })
+            
+            // Load cached thumbnails
+            episodeThumbnails = offlineDetails.thumbnailURLs
+            
+            // Check bookmark status
+            let offlineBookmarks = OfflineManager.shared.getOfflineBookmarks()
+            isBookmarked = offlineBookmarks.contains { $0.id == animeId }
+            
+            print("📱 Loaded offline anime details for: \(offlineDetails.title)")
+        } else {
+            errorMessage = "Anime not available offline. Please check your internet connection and try again."
+        }
+    }
+    
+    private func loadOnlineAnimeDetails(animeId: String) async {
+        do {
+            let result = try await APIService.shared.getAnimeDetails(id: animeId)
+            
+            if !Task.isCancelled {
+                self.animeDetails = result
+                
+                // Fetch episodes separately
+                let episodes = try await APIService.shared.getAnimeEpisodes(id: animeId)
+                self.episodeGroups = EpisodeGroup.createGroups(from: episodes)
+                
+                self.isBookmarked = BookmarkManager.shared.isBookmarked(animeToBookmarkItem() ?? AnimeItem(id: "", name: "", jname: "", poster: "", duration: "", type: "", rating: "", episodes: nil, isNSFW: false, genres: []))
+                
+                // Cache anime details for offline use
+                let details = result.data.anime.info
+                Task {
+                    await cacheAnimeDetails(details: details, episodes: episodes)
+                }
+                
+                // Try to fetch thumbnails from AniList in the background
+                Task {
+                    await loadThumbnails(for: details.name)
+                    // Update custom AniList ID field if we found an ID
+                    if let foundId = self.aniListId {
+                        await MainActor.run {
+                            self.customAniListId = String(foundId)
+                        }
+                    }
+                }
+            }
+        } catch {
+            if !Task.isCancelled {
+                self.errorMessage = error.localizedDescription
+            }
+        }
+    }
+    
+    private func cacheAnimeDetails(details: AnimeDetails, episodes: [EpisodeInfo]) async {
+        // Cache the anime details for offline use
+        await OfflineManager.shared.cacheAnimeDetails(details, episodes: episodes, thumbnails: episodeThumbnails)
     }
     
     private func loadThumbnails(for title: String) async {
@@ -121,6 +174,11 @@ class AnimeDetailViewModel: ObservableObject {
                                 self.episodeThumbnails = episodeMap
                                 self.thumbnailLoadingState = .loaded
                                 print("Successfully mapped \(episodeMap.count) thumbnails for \(title) (found \(thumbnails.count) total)")
+                                
+                                // Update cached anime details with new thumbnails
+                                if let details = self.animeDetails?.data.anime.info {
+                                    await self.cacheAnimeDetails(details: details, episodes: self.currentEpisodes)
+                                }
                             }
                         } else {
                             if !Task.isCancelled {
@@ -292,7 +350,22 @@ class AnimeDetailViewModel: ObservableObject {
     }
     
     func getThumbnail(for episodeNumber: Int) -> String? {
-        return episodeThumbnails[episodeNumber]
+        if isOfflineMode {
+            // Return cached thumbnail URL for offline mode
+            return episodeThumbnails[episodeNumber]
+        } else {
+            // Return online thumbnail URL
+            return episodeThumbnails[episodeNumber]
+        }
+    }
+    
+    func getCachedThumbnailImage(for episodeNumber: Int) -> UIImage? {
+        guard isOfflineMode,
+              let animeId = animeDetails?.data.anime.info.id ?? offlineAnimeDetails?.id else {
+            return nil
+        }
+        
+        return OfflineManager.shared.getCachedThumbnail(for: episodeNumber, animeId: animeId)
     }
     
     func refreshThumbnails() {
@@ -339,26 +412,67 @@ class AnimeDetailViewModel: ObservableObject {
     }
     
     func animeToBookmarkItem() -> AnimeItem? {
-        guard let details = animeDetails?.data.anime.info else { return nil }
-        
-        return AnimeItem(
-            id: details.id,
-            name: details.name,
-            jname: details.moreInfo?.japanese,
-            poster: details.poster,
-            duration: details.stats?.duration,
-            type: details.type,
-            rating: details.stats?.rating,
-            episodes: details.stats?.episodes,
-            isNSFW: details.moreInfo?.genres?.contains { $0.lowercased().contains("hentai") || $0.lowercased().contains("ecchi") } ?? false,
-            genres: details.moreInfo?.genres
-        )
+        if isOfflineMode {
+            guard let offlineDetails = offlineAnimeDetails else { return nil }
+            
+            return AnimeItem(
+                id: offlineDetails.id,
+                name: offlineDetails.title,
+                jname: nil,
+                poster: offlineDetails.image,
+                duration: nil,
+                type: offlineDetails.type,
+                rating: offlineDetails.rating,
+                episodes: nil,
+                isNSFW: false,
+                genres: offlineDetails.genres
+            )
+        } else {
+            guard let details = animeDetails?.data.anime.info else { return nil }
+            
+            return AnimeItem(
+                id: details.id,
+                name: details.name,
+                jname: details.moreInfo?.japanese,
+                poster: details.poster,
+                duration: details.stats?.duration,
+                type: details.type,
+                rating: details.stats?.rating,
+                episodes: details.stats?.episodes,
+                isNSFW: details.moreInfo?.genres?.contains { $0.lowercased().contains("hentai") || $0.lowercased().contains("ecchi") } ?? false,
+                genres: details.moreInfo?.genres
+            )
+        }
     }
     
     func toggleBookmark() {
         guard let anime = animeToBookmarkItem() else { return }
-        BookmarkManager.shared.toggleBookmark(anime)
-        isBookmarked = BookmarkManager.shared.isBookmarked(anime)
+        
+        if isOfflineMode {
+            // Handle offline bookmarking
+            var offlineBookmarks = OfflineManager.shared.getOfflineBookmarks()
+            if let index = offlineBookmarks.firstIndex(where: { $0.id == anime.id }) {
+                offlineBookmarks.remove(at: index)
+                isBookmarked = false
+            } else {
+                offlineBookmarks.append(anime)
+                isBookmarked = true
+            }
+            
+            // Save offline bookmarks
+            do {
+                let data = try JSONEncoder().encode(offlineBookmarks)
+                let fileURL = OfflineManager.shared.cacheDirectory.appendingPathComponent("offline_bookmarks.json")
+                try data.write(to: fileURL)
+            } catch {
+                print("Failed to save offline bookmarks: \(error)")
+            }
+        } else {
+            // Handle online bookmarking
+            BookmarkManager.shared.toggleBookmark(anime)
+            isBookmarked = BookmarkManager.shared.isBookmarked(anime)
+        }
+        
         NotificationCenter.default.post(
             name: NSNotification.Name("BookmarksDidChange"),
             object: nil,

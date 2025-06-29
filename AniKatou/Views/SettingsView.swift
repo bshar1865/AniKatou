@@ -1,229 +1,233 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @State private var showingAPIConfig = false
-    @State private var showingAniListAuth = false
-    @AppStorage(APIConfig.apiConfigKey) private var apiBaseURL: String?
     @StateObject private var viewModel = SettingsViewModel()
-    @StateObject private var aniListViewModel = AniListAuthViewModel()
+    @State private var showCacheAlert = false
+    @State private var showClearCacheAlert = false
     
     var body: some View {
+        NavigationView {
         List {
-            Section {
-                Button(action: {
-                    showingAPIConfig = true
-                }) {
+                // API Configuration Section
+                Section("API Configuration") {
+                    NavigationLink(destination: APIConfigView()) {
                     HStack {
-                        Label("API Configuration", systemImage: "server.rack")
-                        Spacer()
-                        Text(apiBaseURL ?? "Not configured")
+                            Image(systemName: "server.rack")
+                                .foregroundColor(.blue)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Server Settings")
+                                    .font(.headline)
+                                Text("Configure your AniWatch API endpoint")
+                                    .font(.caption)
                             .foregroundColor(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                }
-            } header: {
-                Text("Server")
-            } footer: {
-                Text("Configure your self-hosted AniWatch API instance.")
-            }
-            
-            Section("AniList Integration") {
-                if aniListViewModel.isAuthenticated {
-                    if let profile = aniListViewModel.userProfile {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                if let avatarURL = profile.avatarURL {
-                                    AsyncImage(url: URL(string: avatarURL)) { image in
-                                        image
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                    } placeholder: {
-                                        Image(systemName: "person.circle.fill")
-                                            .foregroundColor(.gray)
-                                    }
-                                    .frame(width: 40, height: 40)
-                                    .clipShape(Circle())
-                                } else {
-                                    Image(systemName: "person.circle.fill")
-                                        .font(.title2)
-                                        .foregroundColor(.gray)
-                                }
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(profile.name)
-                                        .font(.headline)
-                                    Text("\(profile.animeCount) anime • \(profile.episodesWatched) episodes")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                Spacer()
                             }
                         }
-                        .padding(.vertical, 4)
+                    }
+                }
+                
+                // AniList Integration Section
+                Section("AniList") {
+                    NavigationLink(destination: AniListAuthView()) {
+                            HStack {
+                            Image(systemName: "person.circle")
+                                .foregroundColor(.purple)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("AniList Account")
+                                        .font(.headline)
+                                Text("Sync your anime library and progress")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+                
+                // Video Playback Section
+                Section("Video Playback") {
+                    // Server Selection
+                    Picker("Preferred Server", selection: $viewModel.preferredServer) {
+                        ForEach(viewModel.availableServers, id: \.id) { server in
+                            Text(server.name).tag(server.id)
+                        }
                     }
                     
-                    Button(action: {
-                        aniListViewModel.logout()
-                    }) {
-                        HStack {
-                            Label("Disconnect from AniList", systemImage: "person.crop.circle.badge.minus")
-                            Spacer()
+                    // Language Selection
+                    Picker("Audio Language", selection: $viewModel.preferredLanguage) {
+                        ForEach(viewModel.availableLanguages, id: \.id) { language in
+                            Text(language.name).tag(language.id)
                         }
                     }
-                    .foregroundColor(.red)
-                } else {
+                    
+                    // Quality Selection
+                    Picker("Video Quality", selection: $viewModel.preferredQuality) {
+                        ForEach(viewModel.availableQualities, id: \.id) { quality in
+                            Text(quality.name).tag(quality.id)
+                        }
+                    }
+                    
+                    // Player Type
+                    Picker("Video Player", selection: $viewModel.playerType) {
+                        Text("AniKatou Player").tag("custom")
+                        Text("Native Player").tag("ios")
+                    }
+                }
+                
+                // Subtitle Settings Section
+                Section("Subtitle Settings") {
+                    NavigationLink(destination: SubtitleSettingsView()) {
+                        HStack {
+                            Image(systemName: "text.bubble")
+                                .foregroundColor(.green)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Subtitle Preferences")
+                                    .font(.headline)
+                                Text("Customize subtitle appearance and behavior")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    
+                    Toggle("Enable Subtitles", isOn: $viewModel.subtitlesEnabled)
+                }
+                
+                // Auto-Skip Settings Section
+                Section("Auto-Skip Settings") {
+                    Toggle("Skip Intros Automatically", isOn: $viewModel.autoSkipIntro)
+                    Toggle("Skip Outros Automatically", isOn: $viewModel.autoSkipOutro)
+                }
+                
+                // Offline Cache Section
+                Section("Offline Storage") {
+                    HStack {
+                        Image(systemName: "externaldrive")
+                            .foregroundColor(.orange)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Cache Management")
+                                .font(.headline)
+                            Text("Manage offline content and storage")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Button("Manage") {
+                            showCacheAlert = true
+                        }
+                        .foregroundColor(.blue)
+                    }
+                    
+                    // Cache Statistics
+                    if let stats = viewModel.cacheStatistics {
+                        HStack {
+                            Text("Storage Used")
+                            Spacer()
+                            Text(formatFileSize(stats.totalSize))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        HStack {
+                            Text("Cached Anime")
+                            Spacer()
+                            Text("\(stats.animeCount)")
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        HStack {
+                            Text("Cached Images")
+                            Spacer()
+                            Text("\(stats.imageCount)")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                
+                // Community Section
+                Section("Community & Support") {
                     Button(action: {
-                        showingAniListAuth = true
+                        if let url = URL(string: "https://discord.gg/EE3xSCSqgC") {
+                            UIApplication.shared.open(url)
+                        }
                     }) {
                         HStack {
-                            Label("Connect to AniList", systemImage: "person.crop.circle.badge.plus")
+                            Image(systemName: "bubble.left.and.bubble.right")
+                                .foregroundColor(.blue)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Join Discord Community")
+                                    .font(.headline)
+                                Text("Join for support and talk")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                             Spacer()
+                            Image(systemName: "arrow.up.right.square")
+                                .foregroundColor(.blue)
+                                .font(.caption)
+                        }
+                    }
+                    .foregroundColor(.primary)
+                    
+                    // App Version
+                    HStack {
+                        Image(systemName: "info.circle")
+                            .foregroundColor(.gray)
+                        Text("App Version")
+                        Spacer()
+                        Text(viewModel.appVersion)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                // Data Management Section
+                Section("Data Management") {
+                Button(action: {
+                        showClearCacheAlert = true
+                    }) {
+                        HStack {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
+                            Text("Clear All Cache")
+                                .foregroundColor(.red)
                         }
                     }
                 }
             }
-            
-            Section {
-                Picker("Preferred Server", selection: $viewModel.preferredServer) {
-                    ForEach(AppSettings.shared.availableServers, id: \.id) { server in
-                        Text(server.name).tag(server.id)
-                    }
-                }
-                
-                Picker("Language", selection: $viewModel.preferredLanguage) {
-                    ForEach(AppSettings.shared.availableLanguages, id: \.id) { language in
-                        Text(language.name).tag(language.id)
-                    }
-                }
-                
-                Picker("Video Quality", selection: $viewModel.preferredQuality) {
-                    ForEach(AppSettings.shared.availableQualities, id: \.id) { quality in
-                        Text(quality.name).tag(quality.id)
-                    }
-                }
-            } header: {
-                Text("Streaming")
-            } footer: {
-                Text("Configure your streaming preferences including video quality and language.")
-            }
-            
-            Section {
-                Toggle("Auto-Skip Intro", isOn: $viewModel.autoSkipIntro)
-                Toggle("Auto-Skip Outro", isOn: $viewModel.autoSkipOutro)
-                Toggle("Enable Subtitles", isOn: $viewModel.subtitlesEnabled)
-                Picker("Video Player", selection: $viewModel.playerType) {
-                    Text("iOS Player").tag("ios")
-                    Text("AniKatou Player").tag("custom")
-                }
-                
-                if viewModel.subtitlesEnabled {
-                    NavigationLink {
-                        SubtitleSettingsView()
-                    } label: {
-                        Label("Subtitle Settings", systemImage: "text.bubble")
-                    }
-                }
-            } header: {
-                Text("Playback")
-            } footer: {
-                Text("Configure playback preferences including auto-skip, subtitles, and video player selection.")
-            }
-            
-            Section {
-                Link(destination: URL(string: "https://github.com/ghoshRitesh12/aniwatch-api")!) {
-                    Label("API Documentation", systemImage: "doc.text")
-                }
-                
-                NavigationLink {
-                    AboutView()
-                } label: {
-                    Label("About", systemImage: "info.circle")
-                }
-            } header: {
-                Text("Info")
-            }
-            
-            Section {
-                Button(action: {
-                    ImageCache.shared.clearCache()
-                    viewModel.showCacheClearedAlert = true
-                }) {
-                    Label("Clear Image Cache", systemImage: "photo.badge.plus")
-                }
-                
-                Button(action: {
-                    WatchProgressManager.shared.clearContinueWatching()
-                    viewModel.showContinueWatchingClearedAlert = true
-                }) {
-                    Label("Clear Continue Watching", systemImage: "play.rectangle.on.rectangle")
-                }
-            } header: {
-                Text("Cache")
-            } footer: {
-                Text("Clear cached data to free up storage space or resolve loading issues.")
-            }
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.large)
         }
-        .navigationTitle("Settings")
-        .sheet(isPresented: $showingAPIConfig) {
-            NavigationView {
-                APIConfigView()
+        .alert("Cache Management", isPresented: $showCacheAlert) {
+            Button("Clear Old Cache") {
+                Task {
+                    await viewModel.clearOldCache()
+                }
             }
-        }
-        .sheet(isPresented: $showingAniListAuth) {
-            AniListAuthView()
-        }
-        .alert("Cache Cleared", isPresented: $viewModel.showCacheClearedAlert) {
-            Button("OK") { }
+            Button("View Statistics") {
+                viewModel.refreshCacheStatistics()
+            }
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Image cache has been cleared successfully.")
+            Text("Choose an action to manage your offline cache.")
         }
-        .alert("Continue Watching Cleared", isPresented: $viewModel.showContinueWatchingClearedAlert) {
-            Button("OK") { }
+        .alert("Clear All Cache", isPresented: $showClearCacheAlert) {
+            Button("Clear All", role: .destructive) {
+                viewModel.clearAllCache()
+            }
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Continue watching data has been cleared successfully.")
+            Text("This will remove all cached anime details, images, and offline data. This action cannot be undone.")
         }
-        .preferredColorScheme(.dark)
+        .onAppear {
+            viewModel.refreshCacheStatistics()
+        }
+    }
+    
+    private func formatFileSize(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
     }
 }
 
-struct AboutView: View {
-    var body: some View {
-        List {
-            Section {
-                VStack(spacing: 16) {
-                    Image(systemName: "play.tv")
-                        .font(.system(size: 64))
-                        .foregroundColor(.accentColor)
-                    
-                    Text("AniKatou")
-                        .font(.title.bold())
-                    
-                    Text("Version 1.0")
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical)
-                
-                Link(destination: URL(string: "https://github.com/bshar1865/AniKatou")!) {
-                    Label("View on GitHub", systemImage: "link")
-                }
-                
-                Label("Made with ❤️ by Bshar Esfky", systemImage: "heart.fill")
-            }
-            
-            Section {
-                Text("AniKatou is a modern anime streaming client that connects to your self-hosted AniWatch API instance.")
-            } header: {
-                Text("About")
-            }
-            
-            Section {
-                Text("This app uses the unofficial AniWatch API. All content is sourced from various providers and we do not host any content.")
-            } header: {
-                Text("Disclaimer")
-            }
-        }
-        .navigationTitle("About")
-    }
+#Preview {
+    SettingsView()
 } 

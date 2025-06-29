@@ -2,32 +2,43 @@ import SwiftUI
 import AVKit
 import AVFoundation
 
-// --- Moved from EpisodeView.swift ---
+// MARK: - Custom Player View Controller
 class CustomPlayerViewController: AVPlayerViewController {
     var onDismiss: (() -> Void)?
     private var subtitleOverlay: SubtitleOverlayView?
+    private var timeObservers: [Any] = []
+    private var notificationObservers: [NSObjectProtocol] = []
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         if isBeingDismissed {
+            cleanup()
             onDismiss?()
         }
     }
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        NotificationCenter.default.addObserver(self,
-                                            selector: #selector(handleMemoryWarning),
-                                            name: UIApplication.didReceiveMemoryWarningNotification,
-                                            object: nil)
+        setupMemoryWarningObserver()
+    }
+    
+    private func setupMemoryWarningObserver() {
+        let observer = NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleMemoryWarning()
+        }
+        notificationObservers.append(observer)
     }
     
     @objc private func handleMemoryWarning() {
         player?.currentItem?.asset.cancelLoading()
     }
     
-    deinit {
-        NotificationCenter.default.removeObserver(self)
+    func addTimeObserver(_ observer: Any) {
+        timeObservers.append(observer)
     }
     
     func addSubtitleOverlay(_ overlay: SubtitleOverlayView) {
@@ -43,9 +54,36 @@ class CustomPlayerViewController: AVPlayerViewController {
             overlay.heightAnchor.constraint(equalToConstant: 100)
         ])
     }
+    
+    private func cleanup() {
+        // Remove time observers
+        timeObservers.forEach { observer in
+            player?.removeTimeObserver(observer)
+        }
+        timeObservers.removeAll()
+        
+        // Remove notification observers
+        notificationObservers.forEach { observer in
+            NotificationCenter.default.removeObserver(observer)
+        }
+        notificationObservers.removeAll()
+        
+        // Clean up player
+        player?.pause()
+        player?.replaceCurrentItem(with: nil)
+        player = nil
+        
+        // Remove subtitle overlay
+        subtitleOverlay?.removeFromSuperview()
+        subtitleOverlay = nil
+    }
+    
+    deinit {
+        cleanup()
+    }
 }
-// --- End moved class ---
 
+// MARK: - Video Player View
 struct VideoPlayerView: UIViewControllerRepresentable {
     let streamingData: StreamingData
     let animeId: String
@@ -64,10 +102,11 @@ struct VideoPlayerView: UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ uiViewController: CustomPlayerViewController, context: Context) {
-        // No-op
+        // No-op - player setup is done once
     }
     
     private func setupPlayer(for playerController: CustomPlayerViewController, context: Context) {
+        // Select best quality source
         let preferredQuality = AppSettings.shared.preferredQuality
         let source = streamingData.sources.first { source in
             source.quality?.lowercased() == preferredQuality.lowercased()
@@ -84,23 +123,47 @@ struct VideoPlayerView: UIViewControllerRepresentable {
               let url = URL(string: source.url) else {
             return
         }
+        
+        // Setup asset with headers
         let headers: [String: String] = streamingData.headers ?? [:]
         let asset = AVURLAsset(url: url, options: [
             "AVURLAssetHTTPHeaderFieldsKey": headers,
             "AVURLAssetHTTPUserAgentKey": headers["User-Agent"] ?? ""
         ])
+        
         let playerItem = AVPlayerItem(asset: asset)
         playerItem.preferredForwardBufferDuration = 10
         playerItem.canUseNetworkResourcesForLiveStreamingWhilePaused = true
+        
         let player = AVPlayer(playerItem: playerItem)
         player.automaticallyWaitsToMinimizeStalling = true
         player.volume = 1.0
         playerController.player = player
         playerController.modalPresentationStyle = .fullScreen
         playerController.showsPlaybackControls = true
-        // Handle intro/outro skipping
+        
+        // Setup intro/outro skipping with weak references
+        setupIntroOutroSkipping(player: player, streamingData: streamingData, context: context)
+        
+        // Setup subtitles
+        setupSubtitles(player: player, streamingData: streamingData, playerController: playerController)
+        
+        // Setup UI controls
+        setupUIControls(player: player, streamingData: streamingData, playerController: playerController)
+        
+        // Setup progress tracking
+        setupProgressTracking(player: player, playerController: playerController, context: context)
+        
+        // Restore previous progress
+        restoreProgress(player: player)
+    }
+    
+    private func setupIntroOutroSkipping(player: AVPlayer, streamingData: StreamingData, context: Context) {
         if let intro = streamingData.intro {
-            let introObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { [weak player] time in
+            let introObserver = player.addPeriodicTimeObserver(
+                forInterval: CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC)),
+                queue: .main
+            ) { [weak player] time in
                 let currentTime = time.seconds
                 if currentTime >= Double(intro.start) && currentTime < Double(intro.end) {
                     if AppSettings.shared.autoSkipIntro {
@@ -108,10 +171,14 @@ struct VideoPlayerView: UIViewControllerRepresentable {
                     }
                 }
             }
-            context.coordinator.timeObservers.append((player: player, observer: introObserver))
+            context.coordinator.addTimeObserver(introObserver, for: player)
         }
+        
         if let outro = streamingData.outro {
-            let outroObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { [weak player] time in
+            let outroObserver = player.addPeriodicTimeObserver(
+                forInterval: CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC)),
+                queue: .main
+            ) { [weak player] time in
                 let currentTime = time.seconds
                 if currentTime >= Double(outro.start) && currentTime < Double(outro.end) {
                     if AppSettings.shared.autoSkipOutro {
@@ -119,16 +186,22 @@ struct VideoPlayerView: UIViewControllerRepresentable {
                     }
                 }
             }
-            context.coordinator.timeObservers.append((player: player, observer: outroObserver))
+            context.coordinator.addTimeObserver(outroObserver, for: player)
         }
-        // Handle subtitles
-        if AppSettings.shared.subtitlesEnabled,
-           let tracks = streamingData.tracks?.filter({ !$0.lang.lowercased().contains("thumbnail") }) {
+    }
+    
+    private func setupSubtitles(player: AVPlayer, streamingData: StreamingData, playerController: CustomPlayerViewController) {
+        guard AppSettings.shared.subtitlesEnabled,
+              let tracks = streamingData.tracks?.filter({ !$0.lang.lowercased().contains("thumbnail") }) else {
+            return
+        }
+        
             let selectedSubtitle = tracks.first { track in
                 let langParts = track.lang.components(separatedBy: " - ")
                 let mainLang = langParts[0].lowercased()
                 return mainLang.contains("english")
             }
+        
             if let subtitle = selectedSubtitle,
                let subtitleURL = URL(string: subtitle.url) {
                 Task {
@@ -139,87 +212,48 @@ struct VideoPlayerView: UIViewControllerRepresentable {
                             playerController.addSubtitleOverlay(overlay)
                         }
                     } catch {
-                        print("Error details: \(error)")
-                    }
+                    print("Failed to load subtitles: \(error)")
                 }
             }
         }
+    }
+    
+    private func setupUIControls(player: AVPlayer, streamingData: StreamingData, playerController: CustomPlayerViewController) {
         // Add skip buttons if auto-skip is disabled
         if !AppSettings.shared.autoSkipIntro || !AppSettings.shared.autoSkipOutro {
             let skipButtonsView = UIStackView()
             skipButtonsView.axis = .vertical
             skipButtonsView.spacing = 8
             skipButtonsView.translatesAutoresizingMaskIntoConstraints = false
+            
             if let intro = streamingData.intro, !AppSettings.shared.autoSkipIntro {
-                let skipIntroButton = UIButton(type: .system)
-                skipIntroButton.setTitle("Skip Intro", for: .normal)
-                skipIntroButton.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.7)
-                skipIntroButton.layer.cornerRadius = 4
-                skipIntroButton.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
-                if #available(iOS 15.0, *) {
-                    var config = UIButton.Configuration.filled()
-                    config.baseBackgroundColor = .systemBackground.withAlphaComponent(0.7)
-                    config.cornerStyle = .medium
-                    config.title = "Skip Intro"
-                    config.titleAlignment = .center
-                    config.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8)
-                    skipIntroButton.configuration = config
-                } else {
-                    skipIntroButton.contentEdgeInsets = UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
-                }
-                skipIntroButton.addAction(UIAction { [weak player] _ in
+                let skipIntroButton = createSkipButton(title: "Skip Intro") { [weak player] in
                     player?.seek(to: CMTime(seconds: Double(intro.end), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
-                }, for: .touchUpInside)
+                }
                 skipButtonsView.addArrangedSubview(skipIntroButton)
             }
+            
             if let outro = streamingData.outro, !AppSettings.shared.autoSkipOutro {
-                let skipOutroButton = UIButton(type: .system)
-                skipOutroButton.setTitle("Skip Outro", for: .normal)
-                skipOutroButton.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.7)
-                skipOutroButton.layer.cornerRadius = 4
-                skipOutroButton.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
-                if #available(iOS 15.0, *) {
-                    var config = UIButton.Configuration.filled()
-                    config.baseBackgroundColor = .systemBackground.withAlphaComponent(0.7)
-                    config.cornerStyle = .medium
-                    config.title = "Skip Outro"
-                    config.titleAlignment = .center
-                    config.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8)
-                    skipOutroButton.configuration = config
-                } else {
-                    skipOutroButton.contentEdgeInsets = UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
-                }
-                skipOutroButton.addAction(UIAction { [weak player] _ in
+                let skipOutroButton = createSkipButton(title: "Skip Outro") { [weak player] in
                     player?.seek(to: CMTime(seconds: Double(outro.end), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
-                }, for: .touchUpInside)
+                }
                 skipButtonsView.addArrangedSubview(skipOutroButton)
             }
+            
             playerController.contentOverlayView?.addSubview(skipButtonsView)
             NSLayoutConstraint.activate([
                 skipButtonsView.topAnchor.constraint(equalTo: playerController.contentOverlayView!.topAnchor, constant: 16),
                 skipButtonsView.trailingAnchor.constraint(equalTo: playerController.contentOverlayView!.trailingAnchor, constant: -16)
             ])
         }
-        // Add modern floating close button
-        let closeButton = UIButton(type: .system)
-        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .bold)
-        let closeImage = UIImage(systemName: "xmark", withConfiguration: config)
-        closeButton.setImage(closeImage, for: .normal)
-        closeButton.tintColor = .white
-        closeButton.backgroundColor = UIColor.black.withAlphaComponent(0.5)
-        closeButton.layer.cornerRadius = 16 // For a 32x32 button
-        closeButton.layer.masksToBounds = true
-        closeButton.translatesAutoresizingMaskIntoConstraints = false
-        closeButton.addAction(UIAction { _ in
-            playerController.dismiss(animated: true) {
-                playerController.onDismiss?()
+        
+        // Add close button
+        let closeButton = createCloseButton { [weak playerController] in
+            playerController?.dismiss(animated: true) {
+                playerController?.onDismiss?()
             }
-        }, for: .touchUpInside)
-        // Add shadow
-        closeButton.layer.shadowColor = UIColor.black.cgColor
-        closeButton.layer.shadowOpacity = 0.3
-        closeButton.layer.shadowOffset = CGSize(width: 0, height: 2)
-        closeButton.layer.shadowRadius = 4
+        }
+        
         playerController.contentOverlayView?.addSubview(closeButton)
         NSLayoutConstraint.activate([
             closeButton.topAnchor.constraint(equalTo: playerController.contentOverlayView!.topAnchor, constant: 24),
@@ -227,28 +261,63 @@ struct VideoPlayerView: UIViewControllerRepresentable {
             closeButton.widthAnchor.constraint(equalToConstant: 32),
             closeButton.heightAnchor.constraint(equalToConstant: 32)
         ])
-        // Add observers for playback status and end
-        let timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { [weak playerController] _ in
-            if player.currentItem?.status == .failed {
-                playerController?.dismiss(animated: true)
-                onDismiss()
-            }
+    }
+    
+    private func createSkipButton(title: String, action: @escaping () -> Void) -> UIButton {
+        let button = UIButton(type: .system)
+        button.setTitle(title, for: .normal)
+        button.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.7)
+        button.layer.cornerRadius = 4
+        button.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
+        
+        if #available(iOS 15.0, *) {
+            var config = UIButton.Configuration.filled()
+            config.baseBackgroundColor = .systemBackground.withAlphaComponent(0.7)
+            config.cornerStyle = .medium
+            config.title = title
+            config.titleAlignment = .center
+            config.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8)
+            button.configuration = config
+        } else {
+            button.contentEdgeInsets = UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
         }
         
-        // Check for existing progress and seek to it
-        if let existingProgress = WatchProgressManager.shared.getProgress(for: animeId, episodeID: episodeId) {
-            let seekTime = CMTime(seconds: existingProgress.timestamp, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
-            player.seek(to: seekTime)
-        }
+        button.addAction(UIAction { _ in action() }, for: .touchUpInside)
+        return button
+    }
+    
+    private func createCloseButton(action: @escaping () -> Void) -> UIButton {
+        let button = UIButton(type: .system)
+        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .bold)
+        let closeImage = UIImage(systemName: "xmark", withConfiguration: config)
+        button.setImage(closeImage, for: .normal)
+        button.tintColor = .white
+        button.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        button.layer.cornerRadius = 16
+        button.layer.masksToBounds = true
+        button.translatesAutoresizingMaskIntoConstraints = false
         
+        // Add shadow
+        button.layer.shadowColor = UIColor.black.cgColor
+        button.layer.shadowOpacity = 0.3
+        button.layer.shadowOffset = CGSize(width: 0, height: 2)
+        button.layer.shadowRadius = 4
+        
+        button.addAction(UIAction { _ in action() }, for: .touchUpInside)
+        return button
+    }
+    
+    private func setupProgressTracking(player: AVPlayer, playerController: CustomPlayerViewController, context: Context) {
         // Add watch progress observer (save every 5 seconds)
-        let progressObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 5.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { [weak player] _ in
+        let progressObserver = player.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 5.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC)),
+            queue: .main
+        ) { [weak player] _ in
             guard let player = player,
                   let currentItem = player.currentItem else { return }
             
             let currentTime = player.currentTime().seconds
             
-            // Use async/await for duration
             Task {
                 do {
                     let duration = try await currentItem.asset.load(.duration).seconds
@@ -266,51 +335,29 @@ struct VideoPlayerView: UIViewControllerRepresentable {
                         )
                     }
                 } catch {
-                    print("Error loading duration: \(error)")
+                    print("Failed to load duration: \(error)")
                 }
             }
         }
         
-        context.coordinator.timeObservers.append((player: player, observer: timeObserver))
-        context.coordinator.timeObservers.append((player: player, observer: progressObserver))
+        context.coordinator.addTimeObserver(progressObserver, for: player)
         
-        NotificationCenter.default.addObserver(
+        // Add playback end observer
+        let endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
-            object: playerController.player?.currentItem,
+            object: player.currentItem,
             queue: .main
-        ) { _ in
-            player.seek(to: .zero)
+        ) { [weak player] _ in
+            player?.seek(to: .zero)
         }
-        // Set dismiss callback
-        playerController.onDismiss = {
-            // Save final progress before dismissing
-            let currentTime = player.currentTime().seconds
-            
-            Task {
-                do {
-                    let duration = try await player.currentItem?.asset.load(.duration).seconds ?? 0
-                    if currentTime > 0 && duration > 0 {
-                        WatchProgressManager.shared.saveProgress(
-                            animeID: animeId,
-                            episodeID: episodeId,
-                            timestamp: currentTime,
-                            duration: duration,
-                            title: animeTitle,
-                            episodeNumber: episodeNumber,
-                            thumbnailURL: thumbnailURL
-                        )
-                    }
-                } catch {
-                    print("Error loading duration on dismiss: \(error)")
-                }
-            }
-            
-            player.pause()
-            player.removeTimeObserver(timeObserver)
-            player.removeTimeObserver(progressObserver)
-            NotificationCenter.default.removeObserver(playerController)
-            player.replaceCurrentItem(with: nil)
-            onDismiss()
+        
+        context.coordinator.addNotificationObserver(endObserver)
+    }
+    
+    private func restoreProgress(player: AVPlayer) {
+        if let existingProgress = WatchProgressManager.shared.getProgress(for: animeId, episodeID: episodeId) {
+            let seekTime = CMTime(seconds: existingProgress.timestamp, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+            player.seek(to: seekTime)
         }
     }
     
@@ -319,12 +366,33 @@ struct VideoPlayerView: UIViewControllerRepresentable {
     }
     
     class Coordinator {
-        var timeObservers: [(player: AVPlayer, observer: Any)] = []
+        private var timeObservers: [(player: AVPlayer, observer: Any)] = []
+        private var notificationObservers: [NSObjectProtocol] = []
+        
+        func addTimeObserver(_ observer: Any, for player: AVPlayer) {
+            timeObservers.append((player: player, observer: observer))
+        }
+        
+        func addNotificationObserver(_ observer: NSObjectProtocol) {
+            notificationObservers.append(observer)
+        }
+        
         deinit {
-            for (player, observer) in timeObservers {
+            cleanup()
+        }
+        
+        private func cleanup() {
+            // Remove time observers
+            timeObservers.forEach { player, observer in
                 player.removeTimeObserver(observer)
             }
             timeObservers.removeAll()
+            
+            // Remove notification observers
+            notificationObservers.forEach { observer in
+                NotificationCenter.default.removeObserver(observer)
+            }
+            notificationObservers.removeAll()
         }
     }
 } 

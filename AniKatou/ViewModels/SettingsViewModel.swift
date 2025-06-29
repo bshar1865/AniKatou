@@ -88,9 +88,27 @@ class SettingsViewModel: ObservableObject {
         }
     }
     
-    // Cache management alerts
+    // Cache management
     @Published var showCacheClearedAlert = false
     @Published var showContinueWatchingClearedAlert = false
+    @Published var cacheStatistics: (totalSize: Int64, animeCount: Int, imageCount: Int)?
+    
+    // Computed properties for available options
+    var availableServers: [(id: String, name: String)] {
+        AppSettings.shared.availableServers
+    }
+    
+    var availableLanguages: [(id: String, name: String)] {
+        AppSettings.shared.availableLanguages
+    }
+    
+    var availableQualities: [(id: String, name: String)] {
+        AppSettings.shared.availableQualities
+    }
+    
+    var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
     
     init() {
         self.preferredServer = AppSettings.shared.preferredServer
@@ -113,5 +131,63 @@ class SettingsViewModel: ObservableObject {
         self.subtitlePosition = AppSettings.shared.subtitlePosition
         self.subtitleFontWeight = AppSettings.shared.subtitleFontWeight
         self.subtitleMaxLines = maxLines
+        
+        // Load initial cache statistics
+        refreshCacheStatistics()
+    }
+    
+    // MARK: - Cache Management
+    
+    func refreshCacheStatistics() {
+        cacheStatistics = OfflineManager.shared.getCacheStatistics()
+    }
+    
+    func clearOldCache() async {
+        await OfflineManager.shared.clearOldCache()
+        refreshCacheStatistics()
+        showCacheClearedAlert = true
+    }
+    
+    func clearAllCache() {
+        OfflineManager.shared.clearAllCache()
+        refreshCacheStatistics()
+        showCacheClearedAlert = true
+    }
+    
+    func clearSearchHistory() {
+        // Clear search history from UserDefaults
+        UserDefaults.standard.removeObject(forKey: "searchHistory")
+        showCacheClearedAlert = true
+    }
+    
+    func syncOfflineData() {
+        // Sync bookmarks and watch progress for offline use
+        OfflineManager.shared.syncBookmarksOffline()
+        OfflineManager.shared.syncWatchProgressOffline()
+    }
+    
+    // MARK: - Network Status
+    
+    var isOfflineMode: Bool {
+        OfflineManager.shared.isOfflineMode
+    }
+    
+    func checkNetworkStatus() -> Bool {
+        return OfflineManager.shared.isNetworkAvailable()
+    }
+    
+    // MARK: - Formatting Helpers
+    
+    func formatFileSize(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
+    
+    func formatCacheAge(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 } 
