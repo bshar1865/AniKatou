@@ -21,6 +21,7 @@ struct AnimeItem: Codable, Identifiable {
     let episodes: EpisodeCount?
     let isNSFW: Bool?
     let genres: [String]?
+    let anilistId: Int?
     
     // Map the API fields to our model
     var title: String { name }
@@ -77,6 +78,7 @@ struct AnimeDetails: Codable {
     let description: String?
     let stats: AnimeStats?
     let moreInfo: AnimeMoreInfo?
+    let anilistId: Int?
     
     // Map the API fields to our model
     var title: String { name }

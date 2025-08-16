@@ -104,7 +104,7 @@ class AnimeDetailViewModel: ObservableObject {
                 let episodes = try await APIService.shared.getAnimeEpisodes(id: animeId)
                 self.episodeGroups = EpisodeGroup.createGroups(from: episodes)
                 
-                self.isBookmarked = BookmarkManager.shared.isBookmarked(animeToBookmarkItem() ?? AnimeItem(id: "", name: "", jname: "", poster: "", duration: "", type: "", rating: "", episodes: nil, isNSFW: false, genres: []))
+                self.isBookmarked = BookmarkManager.shared.isBookmarked(animeToBookmarkItem() ?? AnimeItem(id: "", name: "", jname: "", poster: "", duration: "", type: "", rating: "", episodes: nil, isNSFW: false, genres: [], anilistId: nil))
                 
                 // Cache anime details for offline use
                 let details = result.data.anime.info
@@ -425,7 +425,8 @@ class AnimeDetailViewModel: ObservableObject {
                 rating: offlineDetails.rating,
                 episodes: nil,
                 isNSFW: false,
-                genres: offlineDetails.genres
+                genres: offlineDetails.genres,
+                anilistId: nil
             )
         } else {
             guard let details = animeDetails?.data.anime.info else { return nil }
@@ -440,7 +441,8 @@ class AnimeDetailViewModel: ObservableObject {
                 rating: details.stats?.rating,
                 episodes: details.stats?.episodes,
                 isNSFW: details.moreInfo?.genres?.contains { $0.lowercased().contains("hentai") || $0.lowercased().contains("ecchi") } ?? false,
-                genres: details.moreInfo?.genres
+                genres: details.moreInfo?.genres,
+                anilistId: details.anilistId
             )
         }
     }

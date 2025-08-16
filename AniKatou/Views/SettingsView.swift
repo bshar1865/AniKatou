@@ -139,6 +139,18 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+                    
+                    // Clear All Cache moved here
+                    Button(action: {
+                        showClearCacheAlert = true
+                    }) {
+                        HStack {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
+                            Text("Clear All Cache")
+                                .foregroundColor(.red)
+                        }
+                    }
                 }
                 
                 // Community Section
@@ -166,30 +178,23 @@ struct SettingsView: View {
                     }
                     .foregroundColor(.primary)
                     
-                    // App Version
-                    HStack {
-                        Image(systemName: "info.circle")
-                            .foregroundColor(.gray)
-                        Text("App Version")
-                        Spacer()
-                        Text(viewModel.appVersion)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                // Data Management Section
-                Section("Data Management") {
-                Button(action: {
-                        showClearCacheAlert = true
-                    }) {
+                    // About Section
+                    NavigationLink(destination: AboutView()) {
                         HStack {
-                            Image(systemName: "trash")
-                                .foregroundColor(.red)
-                            Text("Clear All Cache")
-                                .foregroundColor(.red)
+                            Image(systemName: "info.circle")
+                                .foregroundColor(.purple)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("About")
+                                    .font(.headline)
+                                Text("App information and credits")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     }
                 }
+                
+                // Data Management Section - removed clear cache from here
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)

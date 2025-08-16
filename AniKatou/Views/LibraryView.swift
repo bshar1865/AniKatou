@@ -131,8 +131,7 @@ struct LibraryView: View {
                             AniListCollectionCard(
                                 title: "Watching",
                                 icon: "play.circle.fill",
-                                color: .green,
-                                count: 0 // TODO: Get from AniList
+                                color: .green
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -142,8 +141,7 @@ struct LibraryView: View {
                             AniListCollectionCard(
                                 title: "Plan to Watch",
                                 icon: "clock.circle.fill",
-                                color: .blue,
-                                count: 0 // TODO: Get from AniList
+                                color: .blue
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -153,8 +151,7 @@ struct LibraryView: View {
                             AniListCollectionCard(
                                 title: "Completed",
                                 icon: "checkmark.circle.fill",
-                                color: .purple,
-                                count: 0 // TODO: Get from AniList
+                                color: .purple
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -164,8 +161,7 @@ struct LibraryView: View {
                             AniListCollectionCard(
                                 title: "Paused",
                                 icon: "pause.circle.fill",
-                                color: .orange,
-                                count: 0 // TODO: Get from AniList
+                                color: .orange
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -175,8 +171,7 @@ struct LibraryView: View {
                             AniListCollectionCard(
                                 title: "Dropped",
                                 icon: "xmark.circle.fill",
-                                color: .red,
-                                count: 0 // TODO: Get from AniList
+                                color: .red
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -186,8 +181,7 @@ struct LibraryView: View {
                             AniListCollectionCard(
                                 title: "Rewatching",
                                 icon: "repeat.circle.fill",
-                                color: .indigo,
-                                count: 0 // TODO: Get from AniList
+                                color: .indigo
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -810,7 +804,6 @@ struct AniListCollectionCard: View {
     let title: String
     let icon: String
     let color: Color
-    let count: Int
     
     var body: some View {
         HStack(spacing: 16) {
@@ -826,10 +819,6 @@ struct AniListCollectionCard: View {
                     .font(.headline)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
-                
-                Text("\(count) anime")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
             }
             
             Spacer()
@@ -992,6 +981,8 @@ struct AniListAnimeCard: View {
         isSearching = true
         searchError = nil
         searchResults = []
+        foundAnimeId = nil
+        showingAnimeDetail = false
         
         do {
             // Try searching with the main title first
@@ -1010,11 +1001,30 @@ struct AniListAnimeCard: View {
                 }
             }
             
+            // Try to match by anilistId if possible
+            var matchedAnimeId: String? = nil
+            for anime in results {
+                // Fetch details for each anime to check anilistId
+                do {
+                    let detailsResult = try await APIService.shared.getAnimeDetails(id: anime.id)
+                    let details = detailsResult.data.anime.info
+                    if let apiAniListId = details.anilistId, apiAniListId == item.mediaId {
+                        matchedAnimeId = anime.id
+                        break
+                    }
+                } catch {
+                    // Ignore errors and continue
+                }
+            }
+            
             await MainActor.run {
                 searchResults = results
                 isSearching = false
                 
-                if let firstResult = results.first {
+                if let matchId = matchedAnimeId {
+                    foundAnimeId = matchId
+                    showingAnimeDetail = true
+                } else if let firstResult = results.first {
                     foundAnimeId = firstResult.id
                     showingAnimeDetail = true
                 } else {
