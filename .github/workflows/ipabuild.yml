@@ -3,10 +3,10 @@ name: Build iOS IPA
 on:
   push:
     branches:
-      - main
+      - testing
   pull_request:
     branches:
-      - main
+      - testing
   workflow_dispatch:
 
 jobs:
