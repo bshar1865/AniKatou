@@ -5,6 +5,8 @@ struct AnimeDetailView: View {
     @StateObject private var viewModel = AnimeDetailViewModel()
     @Environment(\.colorScheme) private var colorScheme
     @State private var isDescriptionExpanded = false
+    @State private var isSelectingEpisodes = false
+    @State private var selectedEpisodeIDs: Set<String> = []
 
     var body: some View {
         ScrollView {
@@ -120,8 +122,19 @@ struct AnimeDetailView: View {
                                     .font(.title3)
                                     .fontWeight(.bold)
 
+                                Spacer()
+
+                                Button(isSelectingEpisodes ? "Done" : "Select") {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        isSelectingEpisodes.toggle()
+                                        if !isSelectingEpisodes {
+                                            selectedEpisodeIDs.removeAll()
+                                        }
+                                    }
+                                }
+                                .font(.subheadline)
+
                                 if viewModel.episodeGroups.count > 1 {
-                                    Spacer()
                                     Menu {
                                         ForEach(Array(viewModel.episodeGroups.enumerated()), id: \.element.id) { index, group in
                                             Button(group.title) { viewModel.selectGroup(index) }
@@ -140,22 +153,40 @@ struct AnimeDetailView: View {
                             LazyVStack(spacing: 12) {
                                 ForEach(viewModel.currentEpisodes) { episode in
                                     let downloaded = HLSDownloadManager.shared.isEpisodeDownloaded(episode.id)
+                                    let anime = animeItem(from: details)
                                     HStack(spacing: 12) {
-                                        NavigationLink(destination: EpisodeView(
-                                            episodeId: episode.id,
-                                            animeId: animeId,
-                                            animeTitle: details.name,
-                                            episodeNumber: "\(episode.number)",
-                                            episodeTitle: episode.title,
-                                            thumbnailURL: nil
-                                        )) {
-                                            EpisodeRow(episode: episode, isDownloaded: downloaded)
+                                        if isSelectingEpisodes {
+                                            Button {
+                                                if selectedEpisodeIDs.contains(episode.id) {
+                                                    selectedEpisodeIDs.remove(episode.id)
+                                                } else {
+                                                    selectedEpisodeIDs.insert(episode.id)
+                                                }
+                                            } label: {
+                                                HStack(spacing: 10) {
+                                                    Image(systemName: selectedEpisodeIDs.contains(episode.id) ? "checkmark.circle.fill" : "circle")
+                                                        .foregroundColor(selectedEpisodeIDs.contains(episode.id) ? .blue : .secondary)
+                                                    EpisodeRow(episode: episode, isDownloaded: downloaded)
+                                                }
+                                            }
+                                            .buttonStyle(.plain)
+                                        } else {
+                                            NavigationLink(destination: EpisodeView(
+                                                episodeId: episode.id,
+                                                animeId: animeId,
+                                                animeTitle: details.name,
+                                                episodeNumber: "\(episode.number)",
+                                                episodeTitle: episode.title,
+                                                thumbnailURL: nil
+                                            )) {
+                                                EpisodeRow(episode: episode, isDownloaded: downloaded)
+                                            }
+                                            .buttonStyle(.plain)
                                         }
-                                        .buttonStyle(.plain)
 
                                         Button {
                                             Task {
-                                                await viewModel.downloadEpisode(animeId: animeId, animeTitle: details.name, episode: episode)
+                                                await viewModel.downloadEpisode(anime: anime, episodesToCache: viewModel.currentEpisodes, episode: episode)
                                             }
                                         } label: {
                                             Image(systemName: downloaded ? "checkmark.circle.fill" : "arrow.down.circle")
@@ -168,6 +199,24 @@ struct AnimeDetailView: View {
                                 }
                             }
                             .padding(.horizontal)
+
+                            if isSelectingEpisodes {
+                                Button {
+                                    let selectedEpisodes = viewModel.currentEpisodes.filter { selectedEpisodeIDs.contains($0.id) }
+                                    let anime = animeItem(from: details)
+                                    Task {
+                                        await viewModel.downloadSelectedEpisodes(anime: anime, episodesToCache: viewModel.currentEpisodes, selectedEpisodes: selectedEpisodes)
+                                    }
+                                } label: {
+                                    Text("Download Selected (\(selectedEpisodeIDs.count))")
+                                        .fontWeight(.semibold)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(selectedEpisodeIDs.isEmpty)
+                                .padding(.horizontal)
+                            }
                         }
                         .padding(.top, 8)
                     }
@@ -210,24 +259,39 @@ struct AnimeDetailView: View {
         )
     }
 
+    private func animeItem(from details: AnimeDetails) -> AnimeItem {
+        AnimeItem(
+            id: details.id,
+            name: details.name,
+            jname: details.moreInfo?.japanese,
+            poster: details.poster,
+            duration: details.stats?.duration,
+            type: details.type,
+            rating: details.stats?.rating,
+            episodes: details.stats?.episodes,
+            isNSFW: false,
+            genres: details.moreInfo?.genres,
+            anilistId: details.anilistId
+        )
+    }
+
     private func getTruncatedDescription(_ description: String) -> String {
-        let sentences = description.components(separatedBy: CharacterSet(charactersIn: ".!?"))
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        if sentences.count <= 3 {
-            return description
+        let normalized = description
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalized.count <= 140 {
+            return normalized
         }
-
-        return sentences.prefix(3).joined(separator: ". ") + "."
+        return String(normalized.prefix(140)) + "..."
     }
 
     private func shouldShowMoreButton(for description: String) -> Bool {
-        let sentences = description.components(separatedBy: CharacterSet(charactersIn: ".!?"))
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        return sentences.count > 3
+        let normalized = description
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.count > 140
     }
 }
 

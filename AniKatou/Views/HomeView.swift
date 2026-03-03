@@ -59,15 +59,17 @@ struct HomeView: View {
                 }
 
                 ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 18) {
+                    LazyHStack(spacing: 16) {
                         ForEach(animes.prefix(12)) { anime in
                             NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
                                 AnimeCard(anime: anime, width: 140)
-                                    .padding(8)
-                                    .background(
+                                    .padding(10)
+                                    .background(Color(.secondarySystemBackground))
+                                    .overlay(
                                         RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.gray.opacity(0.35), lineWidth: 1)
+                                            .stroke(Color.gray.opacity(0.25), lineWidth: 1)
                                     )
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
                             .buttonStyle(.plain)
                         }

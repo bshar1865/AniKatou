@@ -23,20 +23,23 @@ struct AnimeCard: View {
                             .progressViewStyle(CircularProgressViewStyle())
                     )
             }
-            .frame(height: 240)
+            .frame(height: 210)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             
             Text(anime.title)
                 .font(.headline)
                 .lineLimit(2)
                 .foregroundColor(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             
             if let type = anime.type {
                 Text(type)
                     .font(.caption)
                     .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .frame(width: width)
+        .frame(width: width, alignment: .topLeading)
     }
 } 

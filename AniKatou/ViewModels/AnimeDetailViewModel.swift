@@ -125,17 +125,17 @@ class AnimeDetailViewModel: ObservableObject {
         selectedGroupIndex = index
     }
 
-    func downloadEpisode(animeId: String, animeTitle: String, episode: EpisodeInfo) async {
+    func downloadEpisode(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async {
         do {
-            // Keep downloaded anime reachable from Library.
-            if let anime = libraryItem(), !LibraryManager.shared.contains(anime) {
+            // Ensure downloaded anime is always reachable from Library.
+            if !LibraryManager.shared.contains(anime) {
                 LibraryManager.shared.toggle(anime)
                 NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
             }
 
             // Ensure anime detail + episode list are cached before download starts.
             if let details = animeDetails?.data.anime.info {
-                await OfflineManager.shared.cacheAnimeDetails(details, episodes: currentEpisodes, thumbnails: [:])
+                await OfflineManager.shared.cacheAnimeDetails(details, episodes: episodesToCache, thumbnails: [:])
             }
 
             let stream = try await APIService.shared.getStreamingSources(
@@ -152,9 +152,9 @@ class AnimeDetailViewModel: ObservableObject {
 
             HLSDownloadManager.shared.startDownload(
                 streamURL: url,
-                animeId: animeId,
+                animeId: anime.id,
                 episodeId: episode.id,
-                animeTitle: animeTitle,
+                animeTitle: anime.title,
                 episodeNumber: "\(episode.number)",
                 headers: stream.data.headers
             )
@@ -163,6 +163,22 @@ class AnimeDetailViewModel: ObservableObject {
         } catch {
             downloadMessage = "Failed to start download: \(error.localizedDescription)"
         }
+    }
+
+    func downloadSelectedEpisodes(anime: AnimeItem, episodesToCache: [EpisodeInfo], selectedEpisodes: [EpisodeInfo]) async {
+        guard !selectedEpisodes.isEmpty else {
+            downloadMessage = "No episodes selected."
+            return
+        }
+
+        var started = 0
+        for episode in selectedEpisodes {
+            await downloadEpisode(anime: anime, episodesToCache: episodesToCache, episode: episode)
+            if HLSDownloadManager.shared.isEpisodeDownloaded(episode.id) || HLSDownloadManager.shared.downloads.contains(where: { $0.episodeId == episode.id }) {
+                started += 1
+            }
+        }
+        downloadMessage = started > 0 ? "Started download for \(started) episodes." : "No episodes started."
     }
 
     deinit {
