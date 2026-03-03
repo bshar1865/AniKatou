@@ -6,6 +6,11 @@ struct LibraryView: View {
     @State private var selectedProgressForDelete: WatchProgress?
     @State private var showDeleteProgressAlert = false
 
+    private func reloadWatchHistory() {
+        WatchProgressManager.shared.cleanupFinishedEpisodes()
+        watchHistory = WatchProgressManager.shared.getWatchHistory()
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -128,19 +133,17 @@ struct LibraryView: View {
         }
         .navigationTitle("Library")
         .onAppear {
-            WatchProgressManager.shared.cleanupFinishedEpisodes()
-            watchHistory = WatchProgressManager.shared.getWatchHistory()
+            reloadWatchHistory()
         }
         .refreshable {
-            WatchProgressManager.shared.cleanupFinishedEpisodes()
-            watchHistory = WatchProgressManager.shared.getWatchHistory()
+            reloadWatchHistory()
         }
         .alert("Remove from Continue Watching?", isPresented: $showDeleteProgressAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Remove", role: .destructive) {
                 if let progress = selectedProgressForDelete {
                     WatchProgressManager.shared.removeProgress(for: progress.animeID, episodeID: progress.episodeID)
-                    watchHistory = WatchProgressManager.shared.getWatchHistory()
+                    reloadWatchHistory()
                 }
                 selectedProgressForDelete = nil
             }
