@@ -1,420 +1,71 @@
 import Foundation
-import UIKit
 
 @MainActor
 class AnimeDetailViewModel: ObservableObject {
     @Published var animeDetails: AnimeDetailsResult?
     @Published var episodeGroups: [EpisodeGroup] = []
-    @Published var episodeThumbnails: [Int: String] = [:] // Map episode number to thumbnail URL
     @Published var isLoading = false
     @Published var errorMessage: String?
-    @Published var selectedGroupIndex: Int = 0 {
-        didSet {
-            // Clear current thumbnails and reload when group changes
-            episodeThumbnails = [:]
-            if let details = animeDetails?.data.anime.info {
-                Task {
-                    await loadThumbnails(for: details.name)
-                }
-            }
-        }
-    }
-    @Published var thumbnailLoadingState: ThumbnailLoadingState = .notStarted
-    @Published var isBookmarked = false
-    @Published var customAniListId: String = ""
-    @Published var showAniListIdField = false
+    @Published var selectedGroupIndex: Int = 0
+    @Published var isInLibrary = false
     @Published var isOfflineMode = false
     @Published var offlineAnimeDetails: OfflineAnimeDetails?
-    
+    @Published var downloadMessage: String?
+
     private var loadTask: Task<Void, Never>?
-    private var aniListId: Int?
-    private var thumbnailTask: Task<Void, Never>?
-    
-    enum ThumbnailLoadingState {
-        case notStarted
-        case loading
-        case loaded
-        case failed(String)
-    }
-    
+
     func loadAnimeDetails(animeId: String) {
         loadTask?.cancel()
-        
-        // Clear previous thumbnails immediately when loading new anime
-        episodeThumbnails = [:]
-        thumbnailLoadingState = .notStarted
-        aniListId = nil
-        customAniListId = ""
+        episodeGroups = []
+        animeDetails = nil
         offlineAnimeDetails = nil
-        
+
         loadTask = Task {
             isLoading = true
             errorMessage = nil
-            
-            // Check if we're in offline mode
             isOfflineMode = OfflineManager.shared.isOfflineMode
-            
+
             if isOfflineMode {
-                await loadOfflineAnimeDetails(animeId: animeId)
+                loadOfflineAnimeDetails(animeId: animeId)
             } else {
                 await loadOnlineAnimeDetails(animeId: animeId)
             }
-            
-            if !Task.isCancelled {
-                isLoading = false
-            }
+
+            isLoading = false
         }
     }
-    
-    private func loadOfflineAnimeDetails(animeId: String) async {
-        if let offlineDetails = OfflineManager.shared.getCachedAnimeDetails(animeId) {
-            offlineAnimeDetails = offlineDetails
-            
-            // Convert offline episodes to episode groups
-            episodeGroups = EpisodeGroup.createGroups(from: offlineDetails.episodes.map { offlineEpisode in
-                EpisodeInfo(
-                    title: offlineEpisode.title,
-                    episodeId: offlineEpisode.episodeId,
-                    number: offlineEpisode.number,
-                    isFiller: offlineEpisode.isFiller
-                )
-            })
-            
-            // Load cached thumbnails
-            episodeThumbnails = offlineDetails.thumbnailURLs
-            
-            // Check bookmark status
-            let offlineBookmarks = OfflineManager.shared.getOfflineBookmarks()
-            isBookmarked = offlineBookmarks.contains { $0.id == animeId }
-            
-            print("📱 Loaded offline anime details for: \(offlineDetails.title)")
-        } else {
-            errorMessage = "Anime not available offline. Please check your internet connection and try again."
+
+    private func loadOfflineAnimeDetails(animeId: String) {
+        guard let offlineDetails = OfflineManager.shared.getCachedAnimeDetails(animeId) else {
+            errorMessage = "Anime not available offline."
+            return
         }
+
+        offlineAnimeDetails = offlineDetails
+        let episodes = offlineDetails.episodes.map {
+            EpisodeInfo(title: $0.title, episodeId: $0.episodeId, number: $0.number, isFiller: $0.isFiller)
+        }
+        episodeGroups = EpisodeGroup.createGroups(from: episodes)
+        isInLibrary = OfflineManager.shared.getOfflineBookmarks().contains(where: { $0.id == animeId })
     }
-    
+
     private func loadOnlineAnimeDetails(animeId: String) async {
         do {
-            let result = try await APIService.shared.getAnimeDetails(id: animeId)
-            
-            if !Task.isCancelled {
-                self.animeDetails = result
-                
-                // Fetch episodes separately
-                let episodes = try await APIService.shared.getAnimeEpisodes(id: animeId)
-                self.episodeGroups = EpisodeGroup.createGroups(from: episodes)
-                
-                self.isBookmarked = BookmarkManager.shared.isBookmarked(animeToBookmarkItem() ?? AnimeItem(id: "", name: "", jname: "", poster: "", duration: "", type: "", rating: "", episodes: nil, isNSFW: false, genres: [], anilistId: nil))
-                
-                // Cache anime details for offline use
-                let details = result.data.anime.info
-                Task {
-                    await cacheAnimeDetails(details: details, episodes: episodes)
-                }
-                
-                // Try to fetch thumbnails from AniList in the background
-                Task {
-                    await loadThumbnails(for: details.name)
-                    // Update custom AniList ID field if we found an ID
-                    if let foundId = self.aniListId {
-                        await MainActor.run {
-                            self.customAniListId = String(foundId)
-                        }
-                    }
-                }
-            }
+            let detailsResult = try await APIService.shared.getAnimeDetails(id: animeId)
+            let episodes = try await APIService.shared.getAnimeEpisodes(id: animeId)
+            animeDetails = detailsResult
+            episodeGroups = EpisodeGroup.createGroups(from: episodes)
+            isInLibrary = libraryItem().map { LibraryManager.shared.contains($0) } ?? false
+
+            let details = detailsResult.data.anime.info
+            await OfflineManager.shared.cacheAnimeDetails(details, episodes: episodes, thumbnails: [:])
         } catch {
-            if !Task.isCancelled {
-                self.errorMessage = error.localizedDescription
-            }
+            errorMessage = error.localizedDescription
         }
     }
-    
-    private func cacheAnimeDetails(details: AnimeDetails, episodes: [EpisodeInfo]) async {
-        // Cache the anime details for offline use
-        await OfflineManager.shared.cacheAnimeDetails(details, episodes: episodes, thumbnails: episodeThumbnails)
-    }
-    
-    private func loadThumbnails(for title: String) async {
-        // Cancel any existing thumbnail task
-        thumbnailTask?.cancel()
-        
-        thumbnailTask = Task {
-            thumbnailLoadingState = .loading
-            
-            do {
-                // Use custom AniList ID if provided, otherwise search for it
-                if !customAniListId.isEmpty, let customId = Int(customAniListId) {
-                    self.aniListId = customId
-                } else if self.aniListId == nil {
-                    self.aniListId = try? await AniListService.shared.searchAnimeByTitle(title)
-                    
-                    // If first attempt failed, try with alternative titles
-                    if self.aniListId == nil {
-                        let alternativeTitles = generateAlternativeTitles(from: title)
-                        for altTitle in alternativeTitles {
-                            if let id = try? await AniListService.shared.searchAnimeByTitle(altTitle) {
-                                self.aniListId = id
-                                print("Found AniList ID \(id) using alternative title: \(altTitle)")
-                                break
-                            }
-                        }
-                    }
-                }
-                
-                // If we have an AniList ID, fetch thumbnails
-                if let aniListId = self.aniListId {
-                    let thumbnails = try await AniListService.shared.getEpisodeThumbnails(animeId: aniListId)
-                    
-                    if !Task.isCancelled {
-                        if !thumbnails.isEmpty {
-                            let episodeMap = self.mapThumbnailsToEpisodes(thumbnails: thumbnails)
-                            
-                            if !Task.isCancelled {
-                                self.episodeThumbnails = episodeMap
-                                self.thumbnailLoadingState = .loaded
-                                print("Successfully mapped \(episodeMap.count) thumbnails for \(title) (found \(thumbnails.count) total)")
-                                
-                                // Update cached anime details with new thumbnails
-                                if let details = self.animeDetails?.data.anime.info {
-                                    await self.cacheAnimeDetails(details: details, episodes: self.currentEpisodes)
-                                }
-                            }
-                        } else {
-                            if !Task.isCancelled {
-                                self.episodeThumbnails = [:]
-                                self.thumbnailLoadingState = .failed("No thumbnails found for this anime")
-                                print("No thumbnails found for \(title) with AniList ID: \(aniListId)")
-                            }
-                        }
-                    }
-                } else {
-                    if !Task.isCancelled {
-                        self.thumbnailLoadingState = .failed("Could not find matching anime on AniList")
-                        print("Failed to find AniList ID for: \(title)")
-                    }
-                }
-            } catch {
-                if !Task.isCancelled {
-                    self.thumbnailLoadingState = .failed(error.localizedDescription)
-                    print("Error loading thumbnails for \(title): \(error.localizedDescription)")
-                }
-            }
-        }
-    }
-    
-    private func generateAlternativeTitles(from title: String) -> [String] {
-        var alternatives: [String] = []
-        
-        // Try with Japanese title if available
-        if let details = animeDetails?.data.anime.info,
-           let japanese = details.moreInfo?.japanese {
-            alternatives.append(japanese)
-        }
-        
-        // Try with English title variations
-        let englishVariations = [
-            title.replacingOccurrences(of: "Season 1", with: ""),
-            title.replacingOccurrences(of: "Season 2", with: ""),
-            title.replacingOccurrences(of: "Season 3", with: ""),
-            title.replacingOccurrences(of: "Season 4", with: ""),
-            title.replacingOccurrences(of: "Season 5", with: ""),
-            title.replacingOccurrences(of: "2nd Season", with: ""),
-            title.replacingOccurrences(of: "3rd Season", with: ""),
-            title.replacingOccurrences(of: "4th Season", with: ""),
-            title.replacingOccurrences(of: "5th Season", with: ""),
-            title.replacingOccurrences(of: " (TV)", with: ""),
-            title.replacingOccurrences(of: " (Movie)", with: ""),
-            title.replacingOccurrences(of: " (OVA)", with: ""),
-            title.replacingOccurrences(of: " (ONA)", with: ""),
-            title.replacingOccurrences(of: " (Special)", with: "")
-        ]
-        
-        alternatives.append(contentsOf: englishVariations)
-        
-        // Try with first word only if it's longer than 3 characters
-        if let firstWord = title.components(separatedBy: " ").first, firstWord.count > 3 {
-            alternatives.append(firstWord)
-        }
-        
-        // Try with common abbreviations
-        let abbreviations = [
-            title.replacingOccurrences(of: "Attack on Titan", with: "Shingeki no Kyojin"),
-            title.replacingOccurrences(of: "One Piece", with: "ワンピース"),
-            title.replacingOccurrences(of: "Naruto", with: "ナルト"),
-            title.replacingOccurrences(of: "Dragon Ball", with: "ドラゴンボール"),
-            title.replacingOccurrences(of: "Bleach", with: "ブリーチ")
-        ]
-        
-        alternatives.append(contentsOf: abbreviations)
-        
-        return Array(Set(alternatives)).filter { !$0.isEmpty && $0 != title }
-    }
-    
-    private func mapThumbnailsToEpisodes(thumbnails: [EpisodeThumbnail]) -> [Int: String] {
-        var episodeMap: [Int: String] = [:]
-        var usedThumbnails = Set<String>()
-        
-        let episodes = self.currentEpisodes
-        
-        print("Mapping \(thumbnails.count) thumbnails to \(episodes.count) episodes")
-        print("Thumbnail titles: \(thumbnails.map { $0.title ?? "Unknown" })")
-        print("Episode numbers: \(episodes.map { $0.number })")
-        
-        // Strategy 1: Try to match by episode number in title
-        for episode in episodes {
-            if let matchingThumbnail = thumbnails.first(where: { thumbnail in
-                guard let title = thumbnail.title else { return false }
-                let episodeNumber = episode.number
-                
-                // Look for various episode number patterns
-                let patterns = [
-                    "Episode \(episodeNumber)",
-                    "Ep \(episodeNumber)",
-                    "Ep.\(episodeNumber)",
-                    "Ep. \(episodeNumber)",
-                    "#\(episodeNumber)",
-                    "\(episodeNumber)",
-                    "Episode \(episodeNumber):",
-                    "Ep \(episodeNumber):"
-                ]
-                
-                return patterns.contains { pattern in
-                    title.localizedCaseInsensitiveContains(pattern)
-                }
-            }), !usedThumbnails.contains(matchingThumbnail.thumbnail) {
-                episodeMap[episode.number] = matchingThumbnail.thumbnail
-                usedThumbnails.insert(matchingThumbnail.thumbnail)
-                print("✅ Matched episode \(episode.number) to thumbnail: \(matchingThumbnail.title ?? "Unknown")")
-            }
-        }
-        
-        // Strategy 2: Simple sequential mapping (most reliable)
-        let sortedThumbnails = thumbnails.sorted { first, second in
-            // Try to extract episode numbers from titles for sorting
-            let firstNum = extractEpisodeNumber(from: first.title ?? "")
-            let secondNum = extractEpisodeNumber(from: second.title ?? "")
-            return firstNum < secondNum
-        }
-        
-        for (index, episode) in episodes.enumerated() {
-            if episodeMap[episode.number] == nil && index < sortedThumbnails.count {
-                let thumbnail = sortedThumbnails[index]
-                if !usedThumbnails.contains(thumbnail.thumbnail) {
-                    episodeMap[episode.number] = thumbnail.thumbnail
-                    usedThumbnails.insert(thumbnail.thumbnail)
-                    print("🔄 Sequentially matched episode \(episode.number) to thumbnail: \(thumbnail.title ?? "Unknown")")
-                }
-            }
-        }
-        
-        // Strategy 3: Assign remaining thumbnails sequentially (fallback)
-        var thumbnailIndex = 0
-        for episode in episodes where episodeMap[episode.number] == nil {
-            while thumbnailIndex < thumbnails.count {
-                let thumbnail = thumbnails[thumbnailIndex].thumbnail
-                if !usedThumbnails.contains(thumbnail) {
-                    episodeMap[episode.number] = thumbnail
-                    usedThumbnails.insert(thumbnail)
-                    print("📌 Fallback matched episode \(episode.number) to thumbnail: \(thumbnails[thumbnailIndex].title ?? "Unknown")")
-                    break
-                }
-                thumbnailIndex += 1
-            }
-            if thumbnailIndex >= thumbnails.count {
-                break
-            }
-        }
-        
-        print("Final mapping result: \(episodeMap.count) episodes mapped")
-        return episodeMap
-    }
-    
-    private func extractEpisodeNumber(from title: String) -> Int {
-        // Try to extract episode number from title
-        let patterns = [
-            "Episode (\\d+)",
-            "Ep\\.?\\s*(\\d+)",
-            "#(\\d+)",
-            "(\\d+)"
-        ]
-        
-        for pattern in patterns {
-            if let range = title.range(of: pattern, options: .regularExpression),
-               let number = Int(title[range].replacingOccurrences(of: "[^0-9]", with: "", options: .regularExpression)) {
-                return number
-            }
-        }
-        
-        return 0
-    }
-    
-    func getThumbnail(for episodeNumber: Int) -> String? {
-        if isOfflineMode {
-            // Return cached thumbnail URL for offline mode
-            return episodeThumbnails[episodeNumber]
-        } else {
-            // Return online thumbnail URL
-            return episodeThumbnails[episodeNumber]
-        }
-    }
-    
-    func getCachedThumbnailImage(for episodeNumber: Int) -> UIImage? {
-        guard isOfflineMode,
-              let animeId = animeDetails?.data.anime.info.id ?? offlineAnimeDetails?.id else {
-            return nil
-        }
-        
-        return OfflineManager.shared.getCachedThumbnail(for: episodeNumber, animeId: animeId)
-    }
-    
-    func refreshThumbnails() {
-        guard let details = animeDetails?.data.anime.info else { return }
-        
-        // Reset state
-        aniListId = nil
-        episodeThumbnails = [:]
-        thumbnailLoadingState = .loading
-        
-        // Try to load thumbnails again
-        Task {
-            await loadThumbnails(for: details.name)
-        }
-    }
-    
-    func updateCustomAniListId(_ newId: String) {
-        customAniListId = newId
-        if !newId.isEmpty {
-            refreshThumbnails()
-        }
-    }
-    
-    func toggleAniListIdField() {
-        showAniListIdField.toggle()
-    }
-    
-    func getThumbnailLoadingStatus() -> String {
-        switch thumbnailLoadingState {
-        case .notStarted:
-            return "Not started"
-        case .loading:
-            return "Loading thumbnails..."
-        case .loaded:
-            return "Loaded \(episodeThumbnails.count) thumbnails"
-        case .failed(let error):
-            return "Failed: \(error)"
-        }
-    }
-    
-    // Debug property to access aniListId
-    var debugAniListId: Int? {
-        return aniListId
-    }
-    
-    func animeToBookmarkItem() -> AnimeItem? {
-        if isOfflineMode {
-            guard let offlineDetails = offlineAnimeDetails else { return nil }
-            
+
+    func libraryItem() -> AnimeItem? {
+        if let offlineDetails {
             return AnimeItem(
                 id: offlineDetails.id,
                 name: offlineDetails.title,
@@ -428,71 +79,71 @@ class AnimeDetailViewModel: ObservableObject {
                 genres: offlineDetails.genres,
                 anilistId: nil
             )
-        } else {
-            guard let details = animeDetails?.data.anime.info else { return nil }
-            
-            return AnimeItem(
-                id: details.id,
-                name: details.name,
-                jname: details.moreInfo?.japanese,
-                poster: details.poster,
-                duration: details.stats?.duration,
-                type: details.type,
-                rating: details.stats?.rating,
-                episodes: details.stats?.episodes,
-                isNSFW: details.moreInfo?.genres?.contains { $0.lowercased().contains("hentai") || $0.lowercased().contains("ecchi") } ?? false,
-                genres: details.moreInfo?.genres,
-                anilistId: details.anilistId
-            )
         }
-    }
-    
-    func toggleBookmark() {
-        guard let anime = animeToBookmarkItem() else { return }
-        
-        if isOfflineMode {
-            // Handle offline bookmarking
-            var offlineBookmarks = OfflineManager.shared.getOfflineBookmarks()
-            if let index = offlineBookmarks.firstIndex(where: { $0.id == anime.id }) {
-                offlineBookmarks.remove(at: index)
-                isBookmarked = false
-            } else {
-                offlineBookmarks.append(anime)
-                isBookmarked = true
-            }
-            
-            // Save offline bookmarks
-            do {
-                let data = try JSONEncoder().encode(offlineBookmarks)
-                let fileURL = OfflineManager.shared.cacheDirectory.appendingPathComponent("offline_bookmarks.json")
-                try data.write(to: fileURL)
-            } catch {
-                print("Failed to save offline bookmarks: \(error)")
-            }
-        } else {
-            // Handle online bookmarking
-            BookmarkManager.shared.toggleBookmark(anime)
-            isBookmarked = BookmarkManager.shared.isBookmarked(anime)
-        }
-        
-        NotificationCenter.default.post(
-            name: NSNotification.Name("BookmarksDidChange"),
-            object: nil,
-            userInfo: ["animeId": anime.id]
+
+        guard let details = animeDetails?.data.anime.info else { return nil }
+
+        return AnimeItem(
+            id: details.id,
+            name: details.name,
+            jname: details.moreInfo?.japanese,
+            poster: details.poster,
+            duration: details.stats?.duration,
+            type: details.type,
+            rating: details.stats?.rating,
+            episodes: details.stats?.episodes,
+            isNSFW: false,
+            genres: details.moreInfo?.genres,
+            anilistId: details.anilistId
         )
     }
-    
-    func selectGroup(_ index: Int) {
-        selectedGroupIndex = index
+
+    func toggleLibrary() {
+        guard let anime = libraryItem() else { return }
+        LibraryManager.shared.toggle(anime)
+        isInLibrary = LibraryManager.shared.contains(anime)
+        NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
     }
-    
+
     var currentEpisodes: [EpisodeInfo] {
         guard !episodeGroups.isEmpty else { return [] }
         return episodeGroups[selectedGroupIndex].episodes
     }
-    
+
+    func selectGroup(_ index: Int) {
+        selectedGroupIndex = index
+    }
+
+    func downloadEpisode(animeId: String, animeTitle: String, episode: EpisodeInfo) async {
+        do {
+            let stream = try await APIService.shared.getStreamingSources(
+                episodeId: episode.id,
+                category: AppSettings.shared.preferredLanguage,
+                server: AppSettings.shared.preferredServer
+            )
+
+            guard let source = stream.data.sources.first(where: { ($0.isM3U8 ?? false) || $0.url.contains(".m3u8") }),
+                  let url = URL(string: source.url) else {
+                downloadMessage = "No downloadable HLS source found for this episode."
+                return
+            }
+
+            HLSDownloadManager.shared.startDownload(
+                streamURL: url,
+                animeId: animeId,
+                episodeId: episode.id,
+                animeTitle: animeTitle,
+                episodeNumber: "\(episode.number)",
+                headers: stream.data.headers
+            )
+
+            downloadMessage = "Download started for episode \(episode.number)."
+        } catch {
+            downloadMessage = "Failed to start download: \(error.localizedDescription)"
+        }
+    }
+
     deinit {
         loadTask?.cancel()
-        thumbnailTask?.cancel()
     }
-} 
+}

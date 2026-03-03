@@ -169,7 +169,7 @@ class OfflineManager {
     
     // MARK: - Bookmark Offline Sync
     func syncBookmarksOffline() {
-        let bookmarks = BookmarkManager.shared.bookmarkedAnimes
+        let bookmarks = LibraryManager.shared.libraryItems
         
         do {
             let data = try JSONEncoder().encode(bookmarks)

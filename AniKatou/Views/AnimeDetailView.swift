@@ -5,74 +5,25 @@ struct AnimeDetailView: View {
     @StateObject private var viewModel = AnimeDetailViewModel()
     @Environment(\.colorScheme) private var colorScheme
     @State private var isDescriptionExpanded = false
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
                 if viewModel.isLoading {
-                    ProgressView()
-                        .padding()
+                    ProgressView().padding()
                 } else if let error = viewModel.errorMessage {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .padding()
-                } else if let details = viewModel.animeDetails?.data.anime.info {
-                    // Header Section
+                    Text(error).foregroundColor(.red).padding()
+                } else if let details = viewModel.animeDetails?.data.anime.info ?? viewModel.offlineAnimeDetails.map(offlineToDetails) {
                     VStack(spacing: 16) {
-                        // AniList ID Field
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("AniList ID")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                
-                                Spacer()
-                                
-                                Button(action: { viewModel.toggleAniListIdField() }) {
-                                    Image(systemName: viewModel.showAniListIdField ? "chevron.up" : "chevron.down")
-                                        .font(.caption)
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                            
-                            if viewModel.showAniListIdField {
-                                HStack {
-                                    TextField("Enter AniList ID", text: $viewModel.customAniListId)
-                                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                                        .keyboardType(.numberPad)
-                                        .onSubmit {
-                                            viewModel.updateCustomAniListId(viewModel.customAniListId)
-                                        }
-                                    
-                                    Button("Update") {
-                                        viewModel.updateCustomAniListId(viewModel.customAniListId)
-                                    }
-                                    .buttonStyle(.borderedProminent)
-                                    .controlSize(.small)
-                                }
-                                
-                                if case .failed(let error) = viewModel.thumbnailLoadingState {
-                                    Text(error)
-                                        .font(.caption)
-                                        .foregroundColor(.red)
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                        
-                        // Cover Art
                         AsyncImage(url: URL(string: details.image)) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
+                            image.resizable().aspectRatio(contentMode: .fill)
                         } placeholder: {
                             Color.gray
                         }
                         .frame(width: 160, height: 240)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .shadow(radius: 8)
-                        
-                        // Title and Info
+
                         VStack(spacing: 12) {
                             Text(details.title)
                                 .font(.title2)
@@ -80,32 +31,24 @@ struct AnimeDetailView: View {
                                 .multilineTextAlignment(.center)
                                 .lineLimit(2)
                                 .padding(.horizontal)
-                            
+
                             if let jTitle = details.moreInfo?.japanese {
                                 Text(jTitle)
                                     .font(.subheadline)
                                     .foregroundColor(.gray)
                             }
-                            
-                            // Info Pills
+
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
-                                    if let type = details.type {
-                                        InfoPill(text: type, icon: "film")
-                                    }
-                                    if let status = details.status {
-                                        InfoPill(text: status, icon: "dot.radiowaves.left.and.right")
-                                    }
-                                    if let rating = details.rating {
-                                        InfoPill(text: rating, icon: "star.fill")
-                                    }
+                                    if let type = details.type { InfoPill(text: type, icon: "film") }
+                                    if let status = details.status { InfoPill(text: status, icon: "dot.radiowaves.left.and.right") }
+                                    if let rating = details.rating { InfoPill(text: rating, icon: "star.fill") }
                                 }
                                 .padding(.horizontal)
                             }
-                            
-                            // Bookmark Button
-                            Button(action: { viewModel.toggleBookmark() }) {
-                                Label(viewModel.isBookmarked ? "Bookmarked" : "Bookmark", systemImage: viewModel.isBookmarked ? "bookmark.fill" : "bookmark")
+
+                            Button(action: { viewModel.toggleLibrary() }) {
+                                Label(viewModel.isInLibrary ? "In Library" : "Add to Library", systemImage: viewModel.isInLibrary ? "books.vertical.fill" : "books.vertical")
                                     .font(.headline)
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 16)
@@ -118,11 +61,7 @@ struct AnimeDetailView: View {
                     .padding(.vertical)
                     .background(
                         AsyncImage(url: URL(string: details.image)) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .blur(radius: 20)
-                                .opacity(0.3)
+                            image.resizable().aspectRatio(contentMode: .fill).blur(radius: 20).opacity(0.3)
                         } placeholder: {
                             Color.clear
                         }
@@ -138,8 +77,7 @@ struct AnimeDetailView: View {
                             )
                         )
                     )
-                    
-                    // Description Section
+
                     if let description = details.description {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Description")
@@ -147,83 +85,50 @@ struct AnimeDetailView: View {
                                 .fontWeight(.bold)
                                 .padding(.horizontal)
                                 .padding(.top, 16)
-                            
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(isDescriptionExpanded ? description : getTruncatedDescription(description))
-                                    .font(.body)
-                                    .padding(.horizontal)
-                                
-                                if shouldShowMoreButton(for: description) {
-                                    Button(action: {
-                                        withAnimation(.easeInOut(duration: 0.3)) {
-                                            isDescriptionExpanded.toggle()
-                                        }
-                                    }) {
-                                        Text(isDescriptionExpanded ? "Show Less" : "Show More")
-                                            .font(.subheadline)
-                                            .foregroundColor(.blue)
-                                            .padding(.horizontal)
+
+                            Text(isDescriptionExpanded ? description : getTruncatedDescription(description))
+                                .font(.body)
+                                .padding(.horizontal)
+
+                            if shouldShowMoreButton(for: description) {
+                                Button(isDescriptionExpanded ? "Show Less" : "Show More") {
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        isDescriptionExpanded.toggle()
                                     }
                                 }
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                                .padding(.horizontal)
                             }
-                            .padding(.bottom, 8)
                         }
+                        .padding(.bottom, 8)
                     }
-                    
-                    // Additional Info Section
+
                     VStack(alignment: .leading, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            if let genres = details.moreInfo?.genres, !genres.isEmpty {
-                                InfoRow(title: "Genres", content: genres.joined(separator: ", "))
-                            }
-                            if let studios = details.moreInfo?.studios, !studios.isEmpty {
-                                InfoRow(title: "Studios", content: studios.joined(separator: ", "))
-                            }
-                            if let producers = details.moreInfo?.producers, !producers.isEmpty {
-                                InfoRow(title: "Producers", content: producers.joined(separator: ", "))
-                            }
-                            if let aired = details.moreInfo?.aired {
-                                InfoRow(title: "Aired", content: aired)
-                            }
-                            if let premiered = details.moreInfo?.premiered {
-                                InfoRow(title: "Premiered", content: premiered)
-                            }
-                            if let duration = details.moreInfo?.duration {
-                                InfoRow(title: "Duration", content: duration)
-                            }
-                            if let score = details.moreInfo?.malscore {
-                                InfoRow(title: "MAL Score", content: score)
-                            }
-                        }
-                        .padding(.horizontal)
+                        if let genres = details.moreInfo?.genres, !genres.isEmpty { InfoRow(title: "Genres", content: genres.joined(separator: ", ")) }
+                        if let studios = details.moreInfo?.studios, !studios.isEmpty { InfoRow(title: "Studios", content: studios.joined(separator: ", ")) }
+                        if let aired = details.moreInfo?.aired { InfoRow(title: "Aired", content: aired) }
+                        if let duration = details.moreInfo?.duration { InfoRow(title: "Duration", content: duration) }
                     }
+                    .padding(.horizontal)
                     .padding(.vertical, 8)
-                    
-                    // Episodes Section
+
                     if !viewModel.episodeGroups.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 Text("Episodes")
                                     .font(.title3)
                                     .fontWeight(.bold)
-                                
+
                                 if viewModel.episodeGroups.count > 1 {
                                     Spacer()
-                                    
                                     Menu {
                                         ForEach(Array(viewModel.episodeGroups.enumerated()), id: \.element.id) { index, group in
-                                            Button(action: { viewModel.selectedGroupIndex = index }) {
-                                                if index == viewModel.selectedGroupIndex {
-                                                    Label(group.title, systemImage: "checkmark")
-                                                } else {
-                                                    Text(group.title)
-                                                }
-                                            }
+                                            Button(group.title) { viewModel.selectGroup(index) }
                                         }
                                     } label: {
                                         HStack {
                                             Text(viewModel.episodeGroups[viewModel.selectedGroupIndex].title)
-                                                .font(.headline)
                                             Image(systemName: "chevron.up.chevron.down")
                                         }
                                         .foregroundColor(.blue)
@@ -231,21 +136,32 @@ struct AnimeDetailView: View {
                                 }
                             }
                             .padding(.horizontal)
-                            
-                            // Episodes List
+
                             LazyVStack(spacing: 12) {
                                 ForEach(viewModel.currentEpisodes) { episode in
-                                    NavigationLink(destination: EpisodeView(
-                                        episodeId: episode.id,
-                                        animeId: animeId,
-                                        animeTitle: details.name,
-                                        episodeNumber: "\(episode.number)",
-                                        episodeTitle: episode.title,
-                                        thumbnailURL: viewModel.getThumbnail(for: episode.number)
-                                    )) {
-                                        EpisodeRow(episode: episode, thumbnail: viewModel.getThumbnail(for: episode.number), thumbnailState: viewModel.thumbnailLoadingState)
+                                    HStack(spacing: 12) {
+                                        NavigationLink(destination: EpisodeView(
+                                            episodeId: episode.id,
+                                            animeId: animeId,
+                                            animeTitle: details.name,
+                                            episodeNumber: "\(episode.number)",
+                                            episodeTitle: episode.title,
+                                            thumbnailURL: nil
+                                        )) {
+                                            EpisodeRow(episode: episode)
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        Button {
+                                            Task {
+                                                await viewModel.downloadEpisode(animeId: animeId, animeTitle: details.name, episode: episode)
+                                            }
+                                        } label: {
+                                            Image(systemName: "arrow.down.circle")
+                                                .font(.title3)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(PlainButtonStyle())
                                 }
                             }
                             .padding(.horizontal)
@@ -259,37 +175,63 @@ struct AnimeDetailView: View {
         .task {
             viewModel.loadAnimeDetails(animeId: animeId)
         }
+        .alert("Download", isPresented: Binding(
+            get: { viewModel.downloadMessage != nil },
+            set: { if !$0 { viewModel.downloadMessage = nil } }
+        )) {
+            Button("OK") { viewModel.downloadMessage = nil }
+        } message: {
+            Text(viewModel.downloadMessage ?? "")
+        }
     }
-    
-    // Helper function to split description into sentences
+
+    private func offlineToDetails(_ offline: OfflineAnimeDetails) -> AnimeDetails {
+        AnimeDetails(
+            id: offline.id,
+            name: offline.title,
+            poster: offline.image,
+            description: offline.description,
+            stats: AnimeStats(rating: offline.rating, quality: nil, type: offline.type, duration: nil, episodes: nil),
+            moreInfo: AnimeMoreInfo(
+                japanese: nil,
+                aired: offline.releaseDate,
+                premiered: nil,
+                duration: nil,
+                status: offline.status,
+                malscore: nil,
+                genres: offline.genres,
+                studios: nil,
+                producers: nil
+            ),
+            anilistId: nil
+        )
+    }
+
     private func getTruncatedDescription(_ description: String) -> String {
         let sentences = description.components(separatedBy: CharacterSet(charactersIn: ".!?"))
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        
+
         if sentences.count <= 3 {
             return description
-        } else {
-            let firstThreeSentences = sentences.prefix(3).joined(separator: ". ")
-            return firstThreeSentences + "."
         }
+
+        return sentences.prefix(3).joined(separator: ". ") + "."
     }
-    
-    // Helper function to determine if "Show More" button should be shown
+
     private func shouldShowMoreButton(for description: String) -> Bool {
         let sentences = description.components(separatedBy: CharacterSet(charactersIn: ".!?"))
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        
+
         return sentences.count > 3
     }
 }
 
-// Helper Views
 private struct InfoPill: View {
     let text: String
     let icon: String
-    
+
     var body: some View {
         Label(text, systemImage: icon)
             .font(.caption)
@@ -303,7 +245,7 @@ private struct InfoPill: View {
 private struct InfoRow: View {
     let title: String
     let content: String
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
@@ -317,69 +259,44 @@ private struct InfoRow: View {
 
 private struct EpisodeRow: View {
     let episode: EpisodeInfo
-    let thumbnail: String?
-    let thumbnailState: AnimeDetailViewModel.ThumbnailLoadingState
-    
+
     var body: some View {
         HStack(spacing: 12) {
-            // Episode Thumbnail
-            Group {
-                if case .loading = thumbnailState {
-                    Color.gray
-                        .overlay(ProgressView())
-                } else if let thumbnail = thumbnail {
-                    AsyncImage(url: URL(string: thumbnail)) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Color.gray
-                    }
-                } else {
-                    Color.gray
-                        .overlay(
-                            Image(systemName: "play.rectangle.fill")
-                                .foregroundColor(.white)
-                                .font(.system(size: 24))
-                        )
-                }
-            }
-            .frame(width: 120, height: 68)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            
+            Color.gray
+                .overlay(
+                    Image(systemName: "play.rectangle.fill")
+                        .foregroundColor(.white)
+                        .font(.system(size: 24))
+                )
+                .frame(width: 120, height: 68)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
             VStack(alignment: .leading, spacing: 4) {
                 Text("Episode \(episode.number)\(episode.title.map { ": \($0)" } ?? "")")
                     .font(.headline)
                     .foregroundColor(.primary)
                     .lineLimit(1)
-                
+
                 if let title = episode.title {
                     Text(title)
                         .font(.subheadline)
                         .foregroundColor(.gray)
                         .lineLimit(2)
                 }
-                
-                if episode.isFiller == true {
+
+                if let isFiller = episode.isFiller, isFiller {
                     Text("Filler")
                         .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(Color.orange)
+                        .background(Color.orange.opacity(0.2))
                         .cornerRadius(4)
                 }
             }
-            
             Spacer()
-            
-            Image(systemName: "play.circle.fill")
-                .foregroundColor(.blue)
-                .font(.title2)
         }
-        .padding()
+        .padding(8)
         .background(Color(.secondarySystemBackground))
-        .cornerRadius(12)
+        .cornerRadius(10)
     }
-} 
+}

@@ -1,55 +1,68 @@
 import Foundation
 
-class BookmarkManager {
-    static let shared = BookmarkManager()
-    private let bookmarksKey = "bookmarked_animes"
-    private var cachedBookmarks: [AnimeItem] = []
-    
+class LibraryManager {
+    static let shared = LibraryManager()
+
+    private let libraryKey = "library_animes"
+    private let legacyBookmarksKey = "bookmarked_animes"
+    private var cachedItems: [AnimeItem] = []
+
     private init() {
-        loadBookmarks()
+        loadLibrary()
     }
-    
-    private func loadBookmarks() {
-        guard let data = UserDefaults.standard.data(forKey: bookmarksKey),
-              let bookmarks = try? JSONDecoder().decode([AnimeItem].self, from: data) else {
-            cachedBookmarks = []
+
+    private func loadLibrary() {
+        if let data = UserDefaults.standard.data(forKey: libraryKey),
+           let items = try? JSONDecoder().decode([AnimeItem].self, from: data) {
+            cachedItems = items
             return
         }
-        cachedBookmarks = bookmarks
+
+        // Migrate old bookmarks key if present.
+        if let data = UserDefaults.standard.data(forKey: legacyBookmarksKey),
+           let items = try? JSONDecoder().decode([AnimeItem].self, from: data) {
+            cachedItems = items
+            saveLibrary()
+            UserDefaults.standard.removeObject(forKey: legacyBookmarksKey)
+            return
+        }
+
+        cachedItems = []
     }
-    
-    private func saveBookmarks() {
-        if let data = try? JSONEncoder().encode(cachedBookmarks) {
-            UserDefaults.standard.set(data, forKey: bookmarksKey)
+
+    private func saveLibrary() {
+        if let data = try? JSONEncoder().encode(cachedItems) {
+            UserDefaults.standard.set(data, forKey: libraryKey)
             UserDefaults.standard.synchronize()
         }
     }
-    
-    var bookmarkedAnimes: [AnimeItem] {
-        get {
-            cachedBookmarks
-        }
+
+    var libraryItems: [AnimeItem] {
+        get { cachedItems }
         set {
-            cachedBookmarks = newValue
-            saveBookmarks()
+            cachedItems = newValue
+            saveLibrary()
         }
     }
-    
-    func isBookmarked(_ anime: AnimeItem) -> Bool {
-        cachedBookmarks.contains { $0.id == anime.id }
+
+    func contains(_ anime: AnimeItem) -> Bool {
+        cachedItems.contains { $0.id == anime.id }
     }
-    
-    func toggleBookmark(_ anime: AnimeItem) {
-        if let index = cachedBookmarks.firstIndex(where: { $0.id == anime.id }) {
-            cachedBookmarks.remove(at: index)
+
+    func toggle(_ anime: AnimeItem) {
+        if let index = cachedItems.firstIndex(where: { $0.id == anime.id }) {
+            cachedItems.remove(at: index)
         } else {
-            cachedBookmarks.append(anime)
+            cachedItems.append(anime)
         }
-        saveBookmarks()
+        saveLibrary()
     }
-    
-    func removeBookmark(_ anime: AnimeItem) {
-        cachedBookmarks.removeAll { $0.id == anime.id }
-        saveBookmarks()
+
+    func remove(_ anime: AnimeItem) {
+        cachedItems.removeAll { $0.id == anime.id }
+        saveLibrary()
     }
-} 
+}
+
+// Backward compatibility during refactor.
+typealias BookmarkManager = LibraryManager

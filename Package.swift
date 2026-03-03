@@ -13,15 +13,13 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/onevcat/Kingfisher.git", from: "7.10.2"),
-        .package(url: "https://github.com/mrdepth/SwiftSubtitles.git", from: "1.0.0")
+        .package(url: "https://github.com/onevcat/Kingfisher.git", from: "7.10.2")
     ],
     targets: [
         .target(
             name: "AniKatou",
             dependencies: [
-                "Kingfisher",
-                "SwiftSubtitles"
+                "Kingfisher"
             ],
             path: "AniKatou"
         )

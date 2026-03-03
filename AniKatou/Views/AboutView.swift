@@ -11,7 +11,7 @@ struct AboutView: View {
                         .font(.system(size: 60))
                         .foregroundColor(.blue)
                     
-                    Text("AniWatch")
+                    Text("AniKatou")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                     
@@ -38,7 +38,7 @@ struct AboutView: View {
             }
             
             Section("Description") {
-                Text("AniWatch is a modern anime streaming app that provides high-quality anime content with a beautiful and intuitive interface.")
+                Text("AniKatou is a modern anime streaming app that provides high-quality anime content with a beautiful and intuitive interface.")
                     .font(.body)
                     .foregroundColor(.secondary)
             }

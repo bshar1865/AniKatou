@@ -4,21 +4,21 @@ struct ContentView: View {
     var body: some View {
         TabView {
             NavigationStack {
+                HomeView()
+            }
+            .tabItem {
+                Label("Home", systemImage: "house")
+            }
+            .tag(0)
+
+            NavigationStack {
                 LibraryView()
             }
             .tabItem {
                 Label("Library", systemImage: "books.vertical")
             }
-            .tag(0)
-            
-            NavigationStack {
-                DownloadView()
-            }
-            .tabItem {
-                Label("Downloads", systemImage: "arrow.down.circle")
-            }
             .tag(1)
-            
+
             NavigationStack {
                 SearchView()
             }
@@ -26,7 +26,7 @@ struct ContentView: View {
                 Label("Search", systemImage: "magnifyingglass")
             }
             .tag(2)
-            
+
             NavigationStack {
                 SettingsView()
             }
@@ -36,4 +36,4 @@ struct ContentView: View {
             .tag(3)
         }
     }
-} 
+}
