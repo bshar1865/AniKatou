@@ -60,6 +60,17 @@ class AnimeDetailViewModel: ObservableObject {
             let details = detailsResult.data.anime.info
             await OfflineManager.shared.cacheAnimeDetails(details, episodes: episodes, thumbnails: [:])
         } catch {
+            // Fallback to cached data when API is unreachable but device still has internet.
+            if let offlineDetails = OfflineManager.shared.getCachedAnimeDetails(animeId) {
+                offlineAnimeDetails = offlineDetails
+                let offlineEpisodes = offlineDetails.episodes.map {
+                    EpisodeInfo(title: $0.title, episodeId: $0.episodeId, number: $0.number, isFiller: $0.isFiller)
+                }
+                episodeGroups = EpisodeGroup.createGroups(from: offlineEpisodes)
+                isInLibrary = OfflineManager.shared.getOfflineBookmarks().contains(where: { $0.id == animeId })
+                errorMessage = nil
+                return
+            }
             errorMessage = error.localizedDescription
         }
     }
@@ -116,6 +127,17 @@ class AnimeDetailViewModel: ObservableObject {
 
     func downloadEpisode(animeId: String, animeTitle: String, episode: EpisodeInfo) async {
         do {
+            // Keep downloaded anime reachable from Library.
+            if let anime = libraryItem(), !LibraryManager.shared.contains(anime) {
+                LibraryManager.shared.toggle(anime)
+                NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
+            }
+
+            // Ensure anime detail + episode list are cached before download starts.
+            if let details = animeDetails?.data.anime.info {
+                await OfflineManager.shared.cacheAnimeDetails(details, episodes: currentEpisodes, thumbnails: [:])
+            }
+
             let stream = try await APIService.shared.getStreamingSources(
                 episodeId: episode.id,
                 category: AppSettings.shared.preferredLanguage,

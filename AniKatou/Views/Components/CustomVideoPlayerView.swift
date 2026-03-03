@@ -27,9 +27,6 @@ struct CustomVideoPlayerView: View {
     @State private var currentSubtitle: String = ""
     @State private var subtitleTimeObserver: Any?
     @State private var progressSaveTimer: Timer?
-    @State private var isFullscreen: Bool = false
-    @State private var showQualityMenu: Bool = false
-    @State private var showSubtitleMenu: Bool = false
     @State private var bufferingProgress: Double = 0
     @State private var isBuffering: Bool = false
     @State private var hasSkippedIntro: Bool = false
@@ -171,63 +168,6 @@ struct CustomVideoPlayerView: View {
                 // Bottom Controls Overlay
                 VStack {
                     Spacer()
-                    
-                    // Skip Buttons
-                    if showControls {
-                        HStack {
-                            Spacer()
-                            
-                            if let intro = intro, !AppSettings.shared.autoSkipIntro {
-                                Button(action: {
-                                    let seekTime = CMTime(seconds: Double(intro.end), preferredTimescale: 600)
-                                    player.seek(to: seekTime)
-                                    autoHideControls()
-                                }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "forward.fill")
-                                            .font(.system(size: 14, weight: .semibold))
-                                        Text("Skip Intro")
-                                            .font(.system(size: 14, weight: .semibold))
-                                    }
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(
-                                        Capsule()
-                                            .fill(Color.black.opacity(0.7))
-                                            .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 3)
-                                    )
-                                }
-                                .transition(.scale.combined(with: .opacity))
-                            }
-                            
-                            if let outro = outro, !AppSettings.shared.autoSkipOutro {
-                                Button(action: {
-                                    let seekTime = CMTime(seconds: Double(outro.end), preferredTimescale: 600)
-                                    player.seek(to: seekTime)
-                                    autoHideControls()
-                                }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "forward.fill")
-                                            .font(.system(size: 14, weight: .semibold))
-                                        Text("Skip Outro")
-                                            .font(.system(size: 14, weight: .semibold))
-                                    }
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(
-                                        Capsule()
-                                            .fill(Color.black.opacity(0.7))
-                                            .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 3)
-                                    )
-                                }
-                                .transition(.scale.combined(with: .opacity))
-                            }
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 8)
-                    }
                     
                     // Progress Bar and Time
                     VStack(spacing: 8) {

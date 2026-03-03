@@ -149,10 +149,10 @@ struct VideoPlayerView: UIViewControllerRepresentable {
         setupSubtitles(player: player, streamingData: streamingData, playerController: playerController)
         
         // Setup UI controls
-        setupUIControls(player: player, streamingData: streamingData, playerController: playerController)
+        setupUIControls(playerController: playerController)
         
         // Setup progress tracking
-        setupProgressTracking(player: player, playerController: playerController, context: context)
+        setupProgressTracking(player: player, context: context)
         
         // Restore previous progress
         restoreProgress(player: player)
@@ -218,35 +218,7 @@ struct VideoPlayerView: UIViewControllerRepresentable {
         }
     }
     
-    private func setupUIControls(player: AVPlayer, streamingData: StreamingData, playerController: CustomPlayerViewController) {
-        // Add skip buttons if auto-skip is disabled
-        if !AppSettings.shared.autoSkipIntro || !AppSettings.shared.autoSkipOutro {
-            let skipButtonsView = UIStackView()
-            skipButtonsView.axis = .vertical
-            skipButtonsView.spacing = 8
-            skipButtonsView.translatesAutoresizingMaskIntoConstraints = false
-            
-            if let intro = streamingData.intro, !AppSettings.shared.autoSkipIntro {
-                let skipIntroButton = createSkipButton(title: "Skip Intro") { [weak player] in
-                    player?.seek(to: CMTime(seconds: Double(intro.end), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
-                }
-                skipButtonsView.addArrangedSubview(skipIntroButton)
-            }
-            
-            if let outro = streamingData.outro, !AppSettings.shared.autoSkipOutro {
-                let skipOutroButton = createSkipButton(title: "Skip Outro") { [weak player] in
-                    player?.seek(to: CMTime(seconds: Double(outro.end), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
-                }
-                skipButtonsView.addArrangedSubview(skipOutroButton)
-            }
-            
-            playerController.contentOverlayView?.addSubview(skipButtonsView)
-            NSLayoutConstraint.activate([
-                skipButtonsView.topAnchor.constraint(equalTo: playerController.contentOverlayView!.topAnchor, constant: 16),
-                skipButtonsView.trailingAnchor.constraint(equalTo: playerController.contentOverlayView!.trailingAnchor, constant: -16)
-            ])
-        }
-        
+    private func setupUIControls(playerController: CustomPlayerViewController) {
         // Add close button
         let closeButton = createCloseButton { [weak playerController] in
             playerController?.dismiss(animated: true) {
@@ -261,29 +233,6 @@ struct VideoPlayerView: UIViewControllerRepresentable {
             closeButton.widthAnchor.constraint(equalToConstant: 32),
             closeButton.heightAnchor.constraint(equalToConstant: 32)
         ])
-    }
-    
-    private func createSkipButton(title: String, action: @escaping () -> Void) -> UIButton {
-        let button = UIButton(type: .system)
-        button.setTitle(title, for: .normal)
-        button.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.7)
-        button.layer.cornerRadius = 4
-        button.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
-        
-        if #available(iOS 15.0, *) {
-            var config = UIButton.Configuration.filled()
-            config.baseBackgroundColor = .systemBackground.withAlphaComponent(0.7)
-            config.cornerStyle = .medium
-            config.title = title
-            config.titleAlignment = .center
-            config.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8)
-            button.configuration = config
-        } else {
-            button.contentEdgeInsets = UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
-        }
-        
-        button.addAction(UIAction { _ in action() }, for: .touchUpInside)
-        return button
     }
     
     private func createCloseButton(action: @escaping () -> Void) -> UIButton {
@@ -307,7 +256,7 @@ struct VideoPlayerView: UIViewControllerRepresentable {
         return button
     }
     
-    private func setupProgressTracking(player: AVPlayer, playerController: CustomPlayerViewController, context: Context) {
+    private func setupProgressTracking(player: AVPlayer, context: Context) {
         // Add watch progress observer (save every 5 seconds)
         let progressObserver = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 5.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC)),

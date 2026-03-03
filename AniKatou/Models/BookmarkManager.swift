@@ -63,6 +63,3 @@ class LibraryManager {
         saveLibrary()
     }
 }
-
-// Backward compatibility during refactor.
-typealias BookmarkManager = LibraryManager

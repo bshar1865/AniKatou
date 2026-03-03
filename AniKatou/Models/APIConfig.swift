@@ -25,7 +25,13 @@ struct APIConfig {
         if urlString.hasSuffix("/") { urlString.removeLast() }
         
         guard var components = URLComponents(string: urlString) else { return nil }
-        components.path = "/api/\(defaultAPIVersion)/hianime\(path.hasPrefix("/") ? path : "/\(path)")"
+        let existingPath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let endpointPath = "api/\(defaultAPIVersion)/hianime\(path.hasPrefix("/") ? path : "/\(path)")"
+        if existingPath.isEmpty {
+            components.path = "/\(endpointPath)"
+        } else {
+            components.path = "/\(existingPath)/\(endpointPath)"
+        }
         components.queryItems = queryItems
         
         return components.url
