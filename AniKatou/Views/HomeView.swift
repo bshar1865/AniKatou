@@ -20,6 +20,16 @@ struct HomeView: View {
         .overlay {
             if viewModel.isLoading {
                 ProgressView("Loading...")
+            } else if let message = viewModel.errorMessage,
+                      viewModel.trendingAnimes.isEmpty &&
+                      viewModel.latestEpisodeAnimes.isEmpty &&
+                      viewModel.topAiringAnimes.isEmpty &&
+                      viewModel.mostPopularAnimes.isEmpty {
+                ContentUnavailableView(
+                    "Offline",
+                    systemImage: "wifi.slash",
+                    description: Text(message)
+                )
             }
         }
         .refreshable {
@@ -27,19 +37,6 @@ struct HomeView: View {
         }
         .task {
             await viewModel.loadHomeData()
-        }
-        .alert("Error", isPresented: Binding(
-            get: { viewModel.errorMessage != nil },
-            set: { if !$0 { viewModel.errorMessage = nil } }
-        )) {
-            Button("Retry") {
-                Task { await viewModel.loadHomeData() }
-            }
-            Button("Dismiss", role: .cancel) {
-                viewModel.errorMessage = nil
-            }
-        } message: {
-            Text(viewModel.errorMessage ?? "")
         }
     }
 
@@ -62,10 +59,15 @@ struct HomeView: View {
                 }
 
                 ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 12) {
+                    LazyHStack(spacing: 18) {
                         ForEach(animes.prefix(12)) { anime in
                             NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
                                 AnimeCard(anime: anime, width: 140)
+                                    .padding(8)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.gray.opacity(0.35), lineWidth: 1)
+                                    )
                             }
                             .buttonStyle(.plain)
                         }

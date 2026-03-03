@@ -4,6 +4,7 @@ import AVFoundation
 @MainActor
 class EpisodeViewModel: ObservableObject {
     @Published var streamingData: StreamingResult?
+    @Published var localPlaybackURL: URL?
     @Published var isLoading = false
     @Published var errorMessage: String?
     var subtitleCues: [SubtitleManager.SubtitleCue]?
@@ -19,6 +20,19 @@ class EpisodeViewModel: ObservableObject {
     func loadStreamingSources(episodeId: String) async {
         isLoading = true
         errorMessage = nil
+        localPlaybackURL = nil
+        streamingData = nil
+
+        let isOffline = OfflineManager.shared.isOfflineMode
+        if isOffline {
+            if let localURL = HLSDownloadManager.shared.localFileURL(for: episodeId) {
+                localPlaybackURL = localURL
+            } else {
+                errorMessage = "You have not downloaded this episode."
+            }
+            isLoading = false
+            return
+        }
         
         do {
             streamingData = try await APIService.shared.getStreamingSources(
@@ -28,11 +42,20 @@ class EpisodeViewModel: ObservableObject {
             )
             
         } catch let error as APIError {
-            errorMessage = error.message
+            // If API fails, allow offline playback when this episode was downloaded.
+            if let localURL = HLSDownloadManager.shared.localFileURL(for: episodeId) {
+                localPlaybackURL = localURL
+            } else {
+                errorMessage = error.message
+            }
         } catch {
-            errorMessage = "Failed to load streaming sources: \(error.localizedDescription)"
+            if let localURL = HLSDownloadManager.shared.localFileURL(for: episodeId) {
+                localPlaybackURL = localURL
+            } else {
+                errorMessage = "Failed to load streaming sources: \(error.localizedDescription)"
+            }
         }
         
         isLoading = false
     }
-} 
+}

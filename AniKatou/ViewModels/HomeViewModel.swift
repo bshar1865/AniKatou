@@ -33,9 +33,18 @@ class HomeViewModel: ObservableObject {
             latestCompletedAnimes = filterNSFWContent(data.latestCompletedAnimes)
             top10Today = filterNSFWContent(data.top10Animes.today)
         } catch let error as APIError {
-            errorMessage = error.message
+            switch error {
+            case .networkError:
+                errorMessage = "Internet is off."
+            default:
+                errorMessage = error.message
+            }
         } catch {
-            errorMessage = "Failed to load home: \(error.localizedDescription)"
+            if OfflineManager.shared.isOfflineMode {
+                errorMessage = "Internet is off."
+            } else {
+                errorMessage = "Failed to load home: \(error.localizedDescription)"
+            }
         }
 
         isLoading = false

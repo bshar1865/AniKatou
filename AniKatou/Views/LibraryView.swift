@@ -3,6 +3,8 @@ import SwiftUI
 struct LibraryView: View {
     @StateObject private var viewModel = LibraryCollectionViewModel()
     @State private var watchHistory: [WatchProgress] = []
+    @State private var selectedProgressForDelete: WatchProgress?
+    @State private var showDeleteProgressAlert = false
 
     var body: some View {
         ScrollView {
@@ -52,6 +54,12 @@ struct LibraryView: View {
                                         ContinueWatchingCard(progress: progress, coverURL: coverURL(for: progress))
                                     }
                                     .buttonStyle(.plain)
+                                    .contextMenu {
+                                        Button("Remove from Continue Watching", role: .destructive) {
+                                            selectedProgressForDelete = progress
+                                            showDeleteProgressAlert = true
+                                        }
+                                    }
                                 }
                             }
                             .padding(.horizontal)
@@ -126,6 +134,18 @@ struct LibraryView: View {
         .refreshable {
             WatchProgressManager.shared.cleanupFinishedEpisodes()
             watchHistory = WatchProgressManager.shared.getWatchHistory()
+        }
+        .alert("Remove from Continue Watching?", isPresented: $showDeleteProgressAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Remove", role: .destructive) {
+                if let progress = selectedProgressForDelete {
+                    WatchProgressManager.shared.removeProgress(for: progress.animeID, episodeID: progress.episodeID)
+                    watchHistory = WatchProgressManager.shared.getWatchHistory()
+                }
+                selectedProgressForDelete = nil
+            }
+        } message: {
+            Text("This episode entry will be removed.")
         }
     }
 

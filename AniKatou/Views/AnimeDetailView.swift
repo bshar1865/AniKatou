@@ -139,6 +139,7 @@ struct AnimeDetailView: View {
 
                             LazyVStack(spacing: 12) {
                                 ForEach(viewModel.currentEpisodes) { episode in
+                                    let downloaded = HLSDownloadManager.shared.isEpisodeDownloaded(episode.id)
                                     HStack(spacing: 12) {
                                         NavigationLink(destination: EpisodeView(
                                             episodeId: episode.id,
@@ -148,7 +149,7 @@ struct AnimeDetailView: View {
                                             episodeTitle: episode.title,
                                             thumbnailURL: nil
                                         )) {
-                                            EpisodeRow(episode: episode)
+                                            EpisodeRow(episode: episode, isDownloaded: downloaded)
                                         }
                                         .buttonStyle(.plain)
 
@@ -157,9 +158,11 @@ struct AnimeDetailView: View {
                                                 await viewModel.downloadEpisode(animeId: animeId, animeTitle: details.name, episode: episode)
                                             }
                                         } label: {
-                                            Image(systemName: "arrow.down.circle")
+                                            Image(systemName: downloaded ? "checkmark.circle.fill" : "arrow.down.circle")
                                                 .font(.title3)
+                                                .foregroundColor(downloaded ? .green : .primary)
                                         }
+                                        .disabled(downloaded)
                                         .buttonStyle(.plain)
                                     }
                                 }
@@ -259,6 +262,7 @@ private struct InfoRow: View {
 
 private struct EpisodeRow: View {
     let episode: EpisodeInfo
+    let isDownloaded: Bool
 
     var body: some View {
         HStack(spacing: 12) {
@@ -282,6 +286,12 @@ private struct EpisodeRow: View {
                         .padding(.vertical, 2)
                         .background(Color.orange.opacity(0.2))
                         .cornerRadius(4)
+                }
+
+                if isDownloaded {
+                    Text("Downloaded")
+                        .font(.caption)
+                        .foregroundColor(.green)
                 }
             }
             Spacer()

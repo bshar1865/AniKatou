@@ -14,7 +14,6 @@ class SearchViewModel: ObservableObject {
     @Published var searchHistory: [String] = []
     
     private var searchTask: Task<Void, Never>?
-    private let debounceInterval: UInt64 = 800_000_000 // 0.8 seconds
     private let maxHistoryItems = 10
     
     init() {
@@ -34,11 +33,13 @@ class SearchViewModel: ObservableObject {
             // Only show error if it's not a 404
             if case .serverError(404, _) = error {
                 popularAnimes = []
+            } else if case .networkError = error {
+                errorMessage = "Internet is off."
             } else {
                 errorMessage = error.message
             }
         } catch {
-            errorMessage = "Failed to load popular anime: \(error.localizedDescription)"
+            errorMessage = OfflineManager.shared.isOfflineMode ? "Internet is off." : "Failed to load popular anime: \(error.localizedDescription)"
         }
         
         isLoading = false
@@ -82,14 +83,18 @@ class SearchViewModel: ObservableObject {
             default:
                 // For other errors, only show if the query is valid length
                 if query.count >= 3 {
-                    errorMessage = error.message
+                    if case .networkError = error {
+                        errorMessage = "Internet is off."
+                    } else {
+                        errorMessage = error.message
+                    }
                 }
             }
         } catch {
             guard !Task.isCancelled else { return }
             // Only show general errors if query is valid length
             if query.count >= 3 {
-                errorMessage = "Failed to search: \(error.localizedDescription)"
+                errorMessage = OfflineManager.shared.isOfflineMode ? "Internet is off." : "Failed to search: \(error.localizedDescription)"
             }
         }
         

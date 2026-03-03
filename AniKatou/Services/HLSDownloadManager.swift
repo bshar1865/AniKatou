@@ -100,6 +100,21 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         persist()
     }
 
+    func downloadedItem(for episodeId: String) -> HLSDownloadItem? {
+        downloads.first { item in
+            item.episodeId == episodeId && item.state == .completed && item.localPath != nil
+        }
+    }
+
+    func isEpisodeDownloaded(_ episodeId: String) -> Bool {
+        downloadedItem(for: episodeId) != nil
+    }
+
+    func localFileURL(for episodeId: String) -> URL? {
+        guard let path = downloadedItem(for: episodeId)?.localPath else { return nil }
+        return URL(fileURLWithPath: path)
+    }
+
     private func setState(for id: UUID, state: HLSDownloadItem.State, error: String? = nil) {
         guard let index = downloads.firstIndex(where: { $0.id == id }) else { return }
         downloads[index].state = state
