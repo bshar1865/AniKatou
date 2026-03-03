@@ -147,7 +147,7 @@ extension HLSDownloadManager: AVAssetDownloadDelegate {
         guard let id = taskMap[task.taskIdentifier] else { return }
         defer { taskMap.removeValue(forKey: task.taskIdentifier) }
 
-        if let error {
+        if let error = error {
             let nsError = error as NSError
             if nsError.code == NSURLErrorCancelled {
                 setState(for: id, state: .cancelled)

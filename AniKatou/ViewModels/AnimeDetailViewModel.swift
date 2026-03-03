@@ -65,7 +65,7 @@ class AnimeDetailViewModel: ObservableObject {
     }
 
     func libraryItem() -> AnimeItem? {
-        if let offlineDetails {
+        if let offlineDetails = offlineAnimeDetails {
             return AnimeItem(
                 id: offlineDetails.id,
                 name: offlineDetails.title,
