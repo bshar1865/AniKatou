@@ -35,7 +35,15 @@ class APIConfigViewModel: ObservableObject {
         errorMessage = nil
 
         // Validate by requesting a real app endpoint.
-        guard let homeURL = URL(string: modifiedURL.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/api/\(APIConfig.defaultAPIVersion)/hianime/home?nsfw=false") else {
+        guard var components = URLComponents(string: modifiedURL) else {
+            errorMessage = "Invalid URL format"
+            return false
+        }
+        let existingPath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let homePath = "api/\(APIConfig.defaultAPIVersion)/hianime/home"
+        components.path = existingPath.isEmpty ? "/\(homePath)" : "/\(existingPath)/\(homePath)"
+        components.queryItems = [URLQueryItem(name: "nsfw", value: "false")]
+        guard let homeURL = components.url else {
             errorMessage = "Invalid URL format"
             return false
         }

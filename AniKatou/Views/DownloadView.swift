@@ -14,8 +14,13 @@ struct DownloadView: View {
             } else {
                 ForEach(manager.downloads) { item in
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(item.animeTitle)
-                            .font(.headline)
+                        NavigationLink(destination: AnimeDetailView(animeId: item.animeId)) {
+                            Text(item.animeTitle)
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                        }
+                        .buttonStyle(.plain)
+
                         Text("Episode \(item.episodeNumber)")
                             .font(.subheadline)
                             .foregroundColor(.secondary)

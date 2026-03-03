@@ -49,7 +49,7 @@ struct LibraryView: View {
                                         episodeTitle: nil,
                                         thumbnailURL: progress.thumbnailURL
                                     )) {
-                                        ContinueWatchingCard(progress: progress)
+                                        ContinueWatchingCard(progress: progress, coverURL: coverURL(for: progress))
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -128,19 +128,30 @@ struct LibraryView: View {
             watchHistory = WatchProgressManager.shared.getWatchHistory()
         }
     }
+
+    private func coverURL(for progress: WatchProgress) -> String? {
+        if let libraryAnime = LibraryManager.shared.libraryItems.first(where: { $0.id == progress.animeID }) {
+            return libraryAnime.poster
+        }
+        if let cachedAnime = OfflineManager.shared.getCachedAnimeDetails(progress.animeID) {
+            return cachedAnime.image
+        }
+        return progress.thumbnailURL
+    }
 }
 
 private struct ContinueWatchingCard: View {
     let progress: WatchProgress
+    let coverURL: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            CachedAsyncImage(url: URL(string: progress.thumbnailURL ?? "")) { image in
+            CachedAsyncImage(url: URL(string: coverURL ?? "")) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
                 Color.gray.overlay(Image(systemName: "play.rectangle.fill").foregroundColor(.white))
             }
-            .frame(width: 220, height: 124)
+            .frame(width: 180, height: 100)
             .clipShape(RoundedRectangle(cornerRadius: 10))
 
             Text(progress.title)
@@ -157,7 +168,7 @@ private struct ContinueWatchingCard: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
-        .frame(width: 220, alignment: .leading)
+        .frame(width: 180, alignment: .leading)
         .padding(10)
         .background(Color(.secondarySystemBackground))
         .cornerRadius(12)

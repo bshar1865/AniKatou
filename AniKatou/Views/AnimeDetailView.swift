@@ -262,15 +262,6 @@ private struct EpisodeRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Color.gray
-                .overlay(
-                    Image(systemName: "play.rectangle.fill")
-                        .foregroundColor(.white)
-                        .font(.system(size: 24))
-                )
-                .frame(width: 120, height: 68)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-
             VStack(alignment: .leading, spacing: 4) {
                 Text("Episode \(episode.number)\(episode.title.map { ": \($0)" } ?? "")")
                     .font(.headline)

@@ -33,6 +33,3 @@ class LibraryCollectionViewModel: ObservableObject {
         }
     }
 }
-
-// Backward compatibility while other files are updated.
-typealias BookmarksViewModel = LibraryCollectionViewModel
