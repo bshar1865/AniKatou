@@ -111,9 +111,19 @@ class AnimeDetailViewModel: ObservableObject {
 
     func toggleLibrary() {
         guard let anime = libraryItem() else { return }
-        LibraryManager.shared.toggle(anime)
-        isInLibrary = LibraryManager.shared.contains(anime)
+        let currentlyInLibrary = LibraryManager.shared.contains(anime)
+        if currentlyInLibrary {
+            LibraryManager.shared.remove(anime)
+        } else {
+            LibraryManager.shared.toggle(anime)
+        }
+        isInLibrary = !currentlyInLibrary
         NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
+    }
+
+    func refreshLibraryState() {
+        guard let anime = libraryItem() else { return }
+        isInLibrary = LibraryManager.shared.contains(anime)
     }
 
     var currentEpisodes: [EpisodeInfo] {
@@ -127,10 +137,12 @@ class AnimeDetailViewModel: ObservableObject {
 
     func downloadEpisode(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async {
         do {
+            isInLibrary = LibraryManager.shared.contains(anime)
             // Ensure downloaded anime is always reachable from Library.
             if !LibraryManager.shared.contains(anime) {
                 LibraryManager.shared.toggle(anime)
                 NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
+                isInLibrary = true
             }
 
             // Ensure anime detail + episode list are cached before download starts.
@@ -156,7 +168,10 @@ class AnimeDetailViewModel: ObservableObject {
                 episodeId: episode.id,
                 animeTitle: anime.title,
                 episodeNumber: "\(episode.number)",
-                headers: stream.data.headers
+                headers: stream.data.headers,
+                subtitleTracks: stream.data.tracks,
+                intro: stream.data.intro,
+                outro: stream.data.outro
             )
 
             downloadMessage = "Download started for episode \(episode.number)."

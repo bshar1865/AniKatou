@@ -26,9 +26,9 @@ struct EpisodeView: View {
                 CustomVideoPlayerView(
                     videoURL: localURL,
                     headers: nil,
-                    subtitleTracks: nil,
-                    intro: nil,
-                    outro: nil,
+                    subtitleTracks: viewModel.localSubtitleTracks,
+                    intro: viewModel.localIntro,
+                    outro: viewModel.localOutro,
                     animeId: animeId,
                     episodeId: episodeId,
                     animeTitle: animeTitle,

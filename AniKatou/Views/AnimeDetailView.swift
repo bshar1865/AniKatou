@@ -134,6 +134,18 @@ struct AnimeDetailView: View {
                                 }
                                 .font(.subheadline)
 
+                                if isSelectingEpisodes {
+                                    Button("Download (\(selectedEpisodeIDs.count))") {
+                                        let selectedEpisodes = viewModel.currentEpisodes.filter { selectedEpisodeIDs.contains($0.id) }
+                                        let anime = animeItem(from: details)
+                                        Task {
+                                            await viewModel.downloadSelectedEpisodes(anime: anime, episodesToCache: viewModel.currentEpisodes, selectedEpisodes: selectedEpisodes)
+                                        }
+                                    }
+                                    .font(.subheadline)
+                                    .disabled(selectedEpisodeIDs.isEmpty)
+                                }
+
                                 if viewModel.episodeGroups.count > 1 {
                                     Menu {
                                         ForEach(Array(viewModel.episodeGroups.enumerated()), id: \.element.id) { index, group in
@@ -199,24 +211,6 @@ struct AnimeDetailView: View {
                                 }
                             }
                             .padding(.horizontal)
-
-                            if isSelectingEpisodes {
-                                Button {
-                                    let selectedEpisodes = viewModel.currentEpisodes.filter { selectedEpisodeIDs.contains($0.id) }
-                                    let anime = animeItem(from: details)
-                                    Task {
-                                        await viewModel.downloadSelectedEpisodes(anime: anime, episodesToCache: viewModel.currentEpisodes, selectedEpisodes: selectedEpisodes)
-                                    }
-                                } label: {
-                                    Text("Download Selected (\(selectedEpisodeIDs.count))")
-                                        .fontWeight(.semibold)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(selectedEpisodeIDs.isEmpty)
-                                .padding(.horizontal)
-                            }
                         }
                         .padding(.top, 8)
                     }
@@ -226,6 +220,9 @@ struct AnimeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             viewModel.loadAnimeDetails(animeId: animeId)
+        }
+        .onAppear {
+            viewModel.refreshLibraryState()
         }
         .alert("Download", isPresented: Binding(
             get: { viewModel.downloadMessage != nil },

@@ -40,17 +40,28 @@ struct DownloadView: View {
                 )
             } else {
                 ForEach(groups) { group in
-                    NavigationLink(destination: DownloadAnimeDetailView(animeId: group.animeId, animeTitle: group.animeTitle, manager: manager)) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(group.animeTitle)
-                                .font(.headline)
-                                .foregroundColor(.primary)
+                    HStack(spacing: 10) {
+                        NavigationLink(destination: DownloadAnimeDetailView(animeId: group.animeId, animeTitle: group.animeTitle, manager: manager)) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(group.animeTitle)
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
 
-                            Text("\(group.items.count) episodes | \(group.completedCount) completed | \(group.activeCount) active")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                Text("\(group.items.count) episodes | \(group.completedCount) completed | \(group.activeCount) active")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 4)
                         }
-                        .padding(.vertical, 4)
+                        .buttonStyle(.plain)
+
+                        Spacer()
+
+                        Button("Remove", role: .destructive) {
+                            manager.removeDownloads(for: group.animeId)
+                        }
+                        .font(.caption)
+                        .buttonStyle(.borderless)
                     }
                 }
             }
