@@ -17,14 +17,26 @@ class SubtitleManager {
         case decodingFailed
         case emptyContent
         case networkError
+        case fileReadError
     }
     
     func loadSubtitles(from url: URL) async throws -> [SubtitleCue] {
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let data: Data
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw SubtitleError.networkError
+        if url.isFileURL {
+            do {
+                data = try Data(contentsOf: url)
+            } catch {
+                throw SubtitleError.fileReadError
+            }
+        } else {
+            let (remoteData, response) = try await URLSession.shared.data(from: url)
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                throw SubtitleError.networkError
+            }
+            data = remoteData
         }
         
         guard let content = String(data: data, encoding: .utf8) else {

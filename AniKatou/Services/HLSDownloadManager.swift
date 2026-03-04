@@ -1,6 +1,12 @@
 import Foundation
 import AVFoundation
 
+struct DownloadedSubtitleTrack: Codable {
+    let lang: String
+    let remoteURL: String
+    var localPath: String?
+}
+
 struct HLSDownloadItem: Identifiable, Codable {
     enum State: String, Codable {
         case queued
@@ -16,6 +22,9 @@ struct HLSDownloadItem: Identifiable, Codable {
     let animeTitle: String
     let episodeNumber: String
     let streamURL: String
+    var subtitleTracks: [DownloadedSubtitleTrack]
+    var intro: IntroOutro?
+    var outro: IntroOutro?
     var localPath: String?
     var progress: Double
     var state: State
@@ -45,9 +54,26 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         loadStoredDownloads()
     }
 
-    func startDownload(streamURL: URL, animeId: String, episodeId: String, animeTitle: String, episodeNumber: String, headers: [String: String]? = nil) {
-        if downloads.contains(where: { $0.episodeId == episodeId && $0.state == .downloading }) {
-            return
+    func startDownload(
+        streamURL: URL,
+        animeId: String,
+        episodeId: String,
+        animeTitle: String,
+        episodeNumber: String,
+        headers: [String: String]? = nil,
+        subtitleTracks: [SubtitleTrack]? = nil,
+        intro: IntroOutro? = nil,
+        outro: IntroOutro? = nil
+    ) {
+        if let existingIndex = downloads.firstIndex(where: { $0.episodeId == episodeId }) {
+            let existingState = downloads[existingIndex].state
+            switch existingState {
+            case .queued, .downloading, .completed:
+                return
+            case .failed, .cancelled:
+                downloads.remove(at: existingIndex)
+                persist()
+            }
         }
 
         let options = headers == nil ? nil : ["AVURLAssetHTTPHeaderFieldsKey": headers!]
@@ -69,6 +95,9 @@ final class HLSDownloadManager: NSObject, ObservableObject {
             animeTitle: animeTitle,
             episodeNumber: episodeNumber,
             streamURL: streamURL.absoluteString,
+            subtitleTracks: (subtitleTracks ?? []).map { DownloadedSubtitleTrack(lang: $0.lang, remoteURL: $0.url, localPath: nil) },
+            intro: intro,
+            outro: outro,
             localPath: nil,
             progress: 0,
             state: .queued,
@@ -81,6 +110,13 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         setState(for: item.id, state: .downloading)
         persist()
         task.resume()
+
+        // Best-effort local subtitle caching for offline playback.
+        if let subtitleTracks, !subtitleTracks.isEmpty {
+            Task { [weak self] in
+                await self?.cacheSubtitleFiles(forEpisodeId: episodeId, tracks: subtitleTracks)
+            }
+        }
     }
 
     func cancelDownload(_ item: HLSDownloadItem) {
@@ -92,12 +128,62 @@ final class HLSDownloadManager: NSObject, ObservableObject {
     }
 
     func removeDownload(_ item: HLSDownloadItem) {
+        if item.state == .queued || item.state == .downloading {
+            if let taskID = taskMap.first(where: { $0.value == item.id })?.key,
+               let task = session.getAllTasksSync().first(where: { $0.taskIdentifier == taskID }) {
+                task.cancel()
+            }
+        }
+
         if let localPath = item.localPath {
             try? FileManager.default.removeItem(atPath: localPath)
+        }
+        for track in item.subtitleTracks {
+            if let localPath = track.localPath {
+                try? FileManager.default.removeItem(atPath: localPath)
+            }
         }
         downloads.removeAll { $0.id == item.id }
         taskMap = taskMap.filter { $0.value != item.id }
         persist()
+    }
+
+    func removeDownloads(for animeId: String) {
+        let items = downloads.filter { $0.animeId == animeId }
+        for item in items {
+            removeDownload(item)
+        }
+    }
+
+    func downloadedItem(for episodeId: String) -> HLSDownloadItem? {
+        downloads.first { item in
+            item.episodeId == episodeId && item.state == .completed && item.localPath != nil
+        }
+    }
+
+    func isEpisodeDownloaded(_ episodeId: String) -> Bool {
+        downloadedItem(for: episodeId) != nil
+    }
+
+    func localFileURL(for episodeId: String) -> URL? {
+        guard let path = downloadedItem(for: episodeId)?.localPath else { return nil }
+        return URL(fileURLWithPath: path)
+    }
+
+    func localSubtitleTracks(for episodeId: String) -> [SubtitleTrack]? {
+        guard let item = downloadedItem(for: episodeId) else { return nil }
+        let localTracks = item.subtitleTracks.compactMap { track -> SubtitleTrack? in
+            guard let localPath = track.localPath else { return nil }
+            return SubtitleTrack(url: URL(fileURLWithPath: localPath).absoluteString, lang: track.lang)
+        }
+        return localTracks.isEmpty ? nil : localTracks
+    }
+
+    func introOutro(for episodeId: String) -> (intro: IntroOutro?, outro: IntroOutro?) {
+        guard let item = downloads.first(where: { $0.episodeId == episodeId }) else {
+            return (nil, nil)
+        }
+        return (item.intro, item.outro)
     }
 
     private func setState(for id: UUID, state: HLSDownloadItem.State, error: String? = nil) {
@@ -121,6 +207,13 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         persist()
     }
 
+    private func updateSubtitlePath(for episodeId: String, remoteURL: String, localPath: String) {
+        guard let itemIndex = downloads.firstIndex(where: { $0.episodeId == episodeId }) else { return }
+        guard let trackIndex = downloads[itemIndex].subtitleTracks.firstIndex(where: { $0.remoteURL == remoteURL }) else { return }
+        downloads[itemIndex].subtitleTracks[trackIndex].localPath = localPath
+        persist()
+    }
+
     private func persist() {
         if let data = try? JSONEncoder().encode(downloads) {
             try? data.write(to: storageURL)
@@ -134,6 +227,32 @@ final class HLSDownloadManager: NSObject, ObservableObject {
             return
         }
         downloads = saved
+    }
+
+    private func cacheSubtitleFiles(forEpisodeId episodeId: String, tracks: [SubtitleTrack]) async {
+        let fileManager = FileManager.default
+        let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let subtitleDir = docs.appendingPathComponent("DownloadedSubtitles", isDirectory: true)
+        try? fileManager.createDirectory(at: subtitleDir, withIntermediateDirectories: true)
+
+        for (index, track) in tracks.enumerated() {
+            guard let remoteURL = URL(string: track.url) else { continue }
+            do {
+                let (data, response) = try await URLSession.shared.data(from: remoteURL)
+                guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { continue }
+
+                let safeEpisodeId = episodeId.replacingOccurrences(of: "/", with: "_")
+                let safeLang = track.lang.replacingOccurrences(of: " ", with: "_")
+                let localURL = subtitleDir.appendingPathComponent("\(safeEpisodeId)_\(safeLang)_\(index).vtt")
+                try data.write(to: localURL, options: .atomic)
+
+                DispatchQueue.main.async { [weak self] in
+                    self?.updateSubtitlePath(for: episodeId, remoteURL: track.url, localPath: localURL.path)
+                }
+            } catch {
+                continue
+            }
+        }
     }
 }
 

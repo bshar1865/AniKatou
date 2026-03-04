@@ -46,7 +46,7 @@ class AnimeDetailViewModel: ObservableObject {
             EpisodeInfo(title: $0.title, episodeId: $0.episodeId, number: $0.number, isFiller: $0.isFiller)
         }
         episodeGroups = EpisodeGroup.createGroups(from: episodes)
-        isInLibrary = OfflineManager.shared.getOfflineBookmarks().contains(where: { $0.id == animeId })
+        refreshLibraryState()
     }
 
     private func loadOnlineAnimeDetails(animeId: String) async {
@@ -55,7 +55,7 @@ class AnimeDetailViewModel: ObservableObject {
             let episodes = try await APIService.shared.getAnimeEpisodes(id: animeId)
             animeDetails = detailsResult
             episodeGroups = EpisodeGroup.createGroups(from: episodes)
-            isInLibrary = libraryItem().map { LibraryManager.shared.contains($0) } ?? false
+            refreshLibraryState()
 
             let details = detailsResult.data.anime.info
             await OfflineManager.shared.cacheAnimeDetails(details, episodes: episodes, thumbnails: [:])
@@ -67,7 +67,7 @@ class AnimeDetailViewModel: ObservableObject {
                     EpisodeInfo(title: $0.title, episodeId: $0.episodeId, number: $0.number, isFiller: $0.isFiller)
                 }
                 episodeGroups = EpisodeGroup.createGroups(from: offlineEpisodes)
-                isInLibrary = OfflineManager.shared.getOfflineBookmarks().contains(where: { $0.id == animeId })
+                refreshLibraryState()
                 errorMessage = nil
                 return
             }
@@ -111,9 +111,22 @@ class AnimeDetailViewModel: ObservableObject {
 
     func toggleLibrary() {
         guard let anime = libraryItem() else { return }
-        LibraryManager.shared.toggle(anime)
-        isInLibrary = LibraryManager.shared.contains(anime)
+        let currentlyInLibrary = LibraryManager.shared.contains(anime)
+        if currentlyInLibrary {
+            LibraryManager.shared.remove(anime)
+        } else {
+            LibraryManager.shared.toggle(anime)
+        }
+        isInLibrary = !currentlyInLibrary
         NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
+    }
+
+    func refreshLibraryState() {
+        guard let anime = libraryItem() else {
+            isInLibrary = false
+            return
+        }
+        isInLibrary = LibraryManager.shared.contains(anime)
     }
 
     var currentEpisodes: [EpisodeInfo] {
@@ -125,17 +138,13 @@ class AnimeDetailViewModel: ObservableObject {
         selectedGroupIndex = index
     }
 
-    func downloadEpisode(animeId: String, animeTitle: String, episode: EpisodeInfo) async {
+    func downloadEpisode(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async {
         do {
-            // Keep downloaded anime reachable from Library.
-            if let anime = libraryItem(), !LibraryManager.shared.contains(anime) {
-                LibraryManager.shared.toggle(anime)
-                NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
-            }
+            addToLibraryIfNeeded(anime)
 
             // Ensure anime detail + episode list are cached before download starts.
             if let details = animeDetails?.data.anime.info {
-                await OfflineManager.shared.cacheAnimeDetails(details, episodes: currentEpisodes, thumbnails: [:])
+                await OfflineManager.shared.cacheAnimeDetails(details, episodes: episodesToCache, thumbnails: [:])
             }
 
             let stream = try await APIService.shared.getStreamingSources(
@@ -152,11 +161,14 @@ class AnimeDetailViewModel: ObservableObject {
 
             HLSDownloadManager.shared.startDownload(
                 streamURL: url,
-                animeId: animeId,
+                animeId: anime.id,
                 episodeId: episode.id,
-                animeTitle: animeTitle,
+                animeTitle: anime.title,
                 episodeNumber: "\(episode.number)",
-                headers: stream.data.headers
+                headers: stream.data.headers,
+                subtitleTracks: stream.data.tracks,
+                intro: stream.data.intro,
+                outro: stream.data.outro
             )
 
             downloadMessage = "Download started for episode \(episode.number)."
@@ -165,7 +177,33 @@ class AnimeDetailViewModel: ObservableObject {
         }
     }
 
+    func downloadSelectedEpisodes(anime: AnimeItem, episodesToCache: [EpisodeInfo], selectedEpisodes: [EpisodeInfo]) async {
+        guard !selectedEpisodes.isEmpty else {
+            downloadMessage = "No episodes selected."
+            return
+        }
+
+        var started = 0
+        for episode in selectedEpisodes {
+            await downloadEpisode(anime: anime, episodesToCache: episodesToCache, episode: episode)
+            if HLSDownloadManager.shared.isEpisodeDownloaded(episode.id) || HLSDownloadManager.shared.downloads.contains(where: { $0.episodeId == episode.id }) {
+                started += 1
+            }
+        }
+        downloadMessage = started > 0 ? "Started download for \(started) episodes." : "No episodes started."
+    }
+
     deinit {
         loadTask?.cancel()
+    }
+
+    private func addToLibraryIfNeeded(_ anime: AnimeItem) {
+        guard !LibraryManager.shared.contains(anime) else {
+            isInLibrary = true
+            return
+        }
+        LibraryManager.shared.toggle(anime)
+        isInLibrary = true
+        NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
     }
 }

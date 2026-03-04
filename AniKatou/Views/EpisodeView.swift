@@ -22,7 +22,24 @@ struct EpisodeView: View {
             await viewModel.loadStreamingSources(episodeId: episodeId)
         }
         .fullScreenCover(isPresented: $showPlayer) {
-            if let streamingData = viewModel.streamingData?.data {
+            if let localURL = viewModel.localPlaybackURL {
+                CustomVideoPlayerView(
+                    videoURL: localURL,
+                    headers: nil,
+                    subtitleTracks: viewModel.localSubtitleTracks,
+                    intro: viewModel.localIntro,
+                    outro: viewModel.localOutro,
+                    animeId: animeId,
+                    episodeId: episodeId,
+                    animeTitle: animeTitle,
+                    episodeNumber: episodeNumber,
+                    episodeTitle: episodeTitle,
+                    thumbnailURL: thumbnailURL,
+                    onDismiss: {
+                        dismiss()
+                    }
+                )
+            } else if let streamingData = viewModel.streamingData?.data {
                 if AppSettings.shared.useCustomPlayer,
                    let bestSource = streamingData.sources.first, // You can improve this to use preferred quality
                    let url = URL(string: bestSource.url) {
@@ -59,6 +76,11 @@ struct EpisodeView: View {
         }
         .onChange(of: viewModel.streamingData) { _, newValue in
             if newValue?.data != nil {
+                showPlayer = true
+            }
+        }
+        .onChange(of: viewModel.localPlaybackURL) { _, newValue in
+            if newValue != nil {
                 showPlayer = true
             }
         }

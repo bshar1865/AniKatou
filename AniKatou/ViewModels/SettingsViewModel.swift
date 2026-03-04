@@ -89,8 +89,6 @@ class SettingsViewModel: ObservableObject {
     }
     
     // Cache management
-    @Published var showCacheClearedAlert = false
-    @Published var showContinueWatchingClearedAlert = false
     @Published var cacheStatistics: (totalSize: Int64, animeCount: Int, imageCount: Int)?
     
     // Computed properties for available options
@@ -145,49 +143,11 @@ class SettingsViewModel: ObservableObject {
     func clearOldCache() async {
         await OfflineManager.shared.clearOldCache()
         refreshCacheStatistics()
-        showCacheClearedAlert = true
     }
     
     func clearAllCache() {
         OfflineManager.shared.clearAllCache()
         refreshCacheStatistics()
-        showCacheClearedAlert = true
     }
     
-    func clearSearchHistory() {
-        // Clear search history from UserDefaults
-        UserDefaults.standard.removeObject(forKey: "searchHistory")
-        showCacheClearedAlert = true
-    }
-    
-    func syncOfflineData() {
-        // Sync bookmarks and watch progress for offline use
-        OfflineManager.shared.syncBookmarksOffline()
-        OfflineManager.shared.syncWatchProgressOffline()
-    }
-    
-    // MARK: - Network Status
-    
-    var isOfflineMode: Bool {
-        OfflineManager.shared.isOfflineMode
-    }
-    
-    func checkNetworkStatus() -> Bool {
-        return OfflineManager.shared.isNetworkAvailable()
-    }
-    
-    // MARK: - Formatting Helpers
-    
-    func formatFileSize(_ bytes: Int64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useMB, .useGB]
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: bytes)
-    }
-    
-    func formatCacheAge(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
-} 
+}

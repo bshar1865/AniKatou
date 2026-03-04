@@ -38,7 +38,13 @@ struct AboutView: View {
             }
             
             Section("Description") {
-                Text("AniKatou is a modern anime streaming app that provides high-quality anime content with a beautiful and intuitive interface.")
+                Text("AniKatou is a client app for user-configured, self-hosted API backends. The app does not bundle content sources or API endpoints.")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            }
+
+            Section("Legal") {
+                Text("AniKatou does not host, distribute, or bundle copyrighted media. Users are responsible for how they configure and use their own backend.")
                     .font(.body)
                     .foregroundColor(.secondary)
             }

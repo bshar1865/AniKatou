@@ -167,54 +167,6 @@ class OfflineManager {
         try? fileManager.removeItem(at: imageFileURL)
     }
     
-    // MARK: - Bookmark Offline Sync
-    func syncBookmarksOffline() {
-        let bookmarks = LibraryManager.shared.libraryItems
-        
-        do {
-            let data = try JSONEncoder().encode(bookmarks)
-            let fileURL = cacheDirectory.appendingPathComponent("offline_bookmarks.json")
-            try data.write(to: fileURL)
-        } catch {
-            // Failed to sync bookmarks offline
-        }
-    }
-    
-    func getOfflineBookmarks() -> [AnimeItem] {
-        let fileURL = cacheDirectory.appendingPathComponent("offline_bookmarks.json")
-        
-        guard let data = try? Data(contentsOf: fileURL),
-              let bookmarks = try? JSONDecoder().decode([AnimeItem].self, from: data) else {
-            return []
-        }
-        
-        return bookmarks
-    }
-    
-    // MARK: - Watch Progress Offline Sync
-    func syncWatchProgressOffline() {
-        let watchHistory = WatchProgressManager.shared.getWatchHistory()
-        
-        do {
-            let data = try JSONEncoder().encode(watchHistory)
-            let fileURL = cacheDirectory.appendingPathComponent("offline_watch_progress.json")
-            try data.write(to: fileURL)
-        } catch {
-            // Failed to sync watch progress offline
-        }
-    }
-    
-    func getOfflineWatchProgress() -> [WatchProgress] {
-        let fileURL = cacheDirectory.appendingPathComponent("offline_watch_progress.json")
-        
-        guard let data = try? Data(contentsOf: fileURL),
-              let watchProgress = try? JSONDecoder().decode([WatchProgress].self, from: data) else {
-            return []
-        }
-        
-        return watchProgress
-    }
-    
     // MARK: - Cache Management
     func getCacheSize() -> Int64 {
         guard let enumerator = fileManager.enumerator(at: cacheDirectory, includingPropertiesForKeys: [.fileSizeKey]) else {
