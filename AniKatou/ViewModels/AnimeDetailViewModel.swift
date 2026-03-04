@@ -46,7 +46,7 @@ class AnimeDetailViewModel: ObservableObject {
             EpisodeInfo(title: $0.title, episodeId: $0.episodeId, number: $0.number, isFiller: $0.isFiller)
         }
         episodeGroups = EpisodeGroup.createGroups(from: episodes)
-        isInLibrary = OfflineManager.shared.getOfflineBookmarks().contains(where: { $0.id == animeId })
+        refreshLibraryState()
     }
 
     private func loadOnlineAnimeDetails(animeId: String) async {
@@ -55,7 +55,7 @@ class AnimeDetailViewModel: ObservableObject {
             let episodes = try await APIService.shared.getAnimeEpisodes(id: animeId)
             animeDetails = detailsResult
             episodeGroups = EpisodeGroup.createGroups(from: episodes)
-            isInLibrary = libraryItem().map { LibraryManager.shared.contains($0) } ?? false
+            refreshLibraryState()
 
             let details = detailsResult.data.anime.info
             await OfflineManager.shared.cacheAnimeDetails(details, episodes: episodes, thumbnails: [:])
@@ -67,7 +67,7 @@ class AnimeDetailViewModel: ObservableObject {
                     EpisodeInfo(title: $0.title, episodeId: $0.episodeId, number: $0.number, isFiller: $0.isFiller)
                 }
                 episodeGroups = EpisodeGroup.createGroups(from: offlineEpisodes)
-                isInLibrary = OfflineManager.shared.getOfflineBookmarks().contains(where: { $0.id == animeId })
+                refreshLibraryState()
                 errorMessage = nil
                 return
             }
@@ -122,7 +122,10 @@ class AnimeDetailViewModel: ObservableObject {
     }
 
     func refreshLibraryState() {
-        guard let anime = libraryItem() else { return }
+        guard let anime = libraryItem() else {
+            isInLibrary = false
+            return
+        }
         isInLibrary = LibraryManager.shared.contains(anime)
     }
 
@@ -137,13 +140,7 @@ class AnimeDetailViewModel: ObservableObject {
 
     func downloadEpisode(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async {
         do {
-            isInLibrary = LibraryManager.shared.contains(anime)
-            // Ensure downloaded anime is always reachable from Library.
-            if !LibraryManager.shared.contains(anime) {
-                LibraryManager.shared.toggle(anime)
-                NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
-                isInLibrary = true
-            }
+            addToLibraryIfNeeded(anime)
 
             // Ensure anime detail + episode list are cached before download starts.
             if let details = animeDetails?.data.anime.info {
@@ -198,5 +195,15 @@ class AnimeDetailViewModel: ObservableObject {
 
     deinit {
         loadTask?.cancel()
+    }
+
+    private func addToLibraryIfNeeded(_ anime: AnimeItem) {
+        guard !LibraryManager.shared.contains(anime) else {
+            isInLibrary = true
+            return
+        }
+        LibraryManager.shared.toggle(anime)
+        isInLibrary = true
+        NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
     }
 }

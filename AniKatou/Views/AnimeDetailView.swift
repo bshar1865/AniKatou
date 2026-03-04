@@ -8,214 +8,28 @@ struct AnimeDetailView: View {
     @State private var isSelectingEpisodes = false
     @State private var selectedEpisodeIDs: Set<String> = []
 
+    private var resolvedDetails: AnimeDetails? {
+        viewModel.animeDetails?.data.anime.info ?? viewModel.offlineAnimeDetails.map(offlineToDetails)
+    }
+
     var body: some View {
         ScrollView {
-            VStack(spacing: 0) {
+            VStack(spacing: 16) {
                 if viewModel.isLoading {
                     ProgressView().padding()
                 } else if let error = viewModel.errorMessage {
-                    Text(error).foregroundColor(.red).padding()
-                } else if let details = viewModel.animeDetails?.data.anime.info ?? viewModel.offlineAnimeDetails.map(offlineToDetails) {
-                    VStack(spacing: 16) {
-                        AsyncImage(url: URL(string: details.image)) { image in
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Color.gray
-                        }
-                        .frame(width: 160, height: 240)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .shadow(radius: 8)
-
-                        VStack(spacing: 12) {
-                            Text(details.title)
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(2)
-                                .padding(.horizontal)
-
-                            if let jTitle = details.moreInfo?.japanese {
-                                Text(jTitle)
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                            }
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    if let type = details.type { InfoPill(text: type, icon: "film") }
-                                    if let status = details.status { InfoPill(text: status, icon: "dot.radiowaves.left.and.right") }
-                                    if let rating = details.rating { InfoPill(text: rating, icon: "star.fill") }
-                                }
-                                .padding(.horizontal)
-                            }
-
-                            Button(action: { viewModel.toggleLibrary() }) {
-                                Label(viewModel.isInLibrary ? "In Library" : "Add to Library", systemImage: viewModel.isInLibrary ? "books.vertical.fill" : "books.vertical")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(Color.gray)
-                                    .cornerRadius(8)
-                            }
-                        }
-                    }
-                    .padding(.vertical)
-                    .background(
-                        AsyncImage(url: URL(string: details.image)) { image in
-                            image.resizable().aspectRatio(contentMode: .fill).blur(radius: 20).opacity(0.3)
-                        } placeholder: {
-                            Color.clear
-                        }
-                        .overlay(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(colorScheme == .dark ? .black : .white),
-                                    Color(colorScheme == .dark ? .black : .white).opacity(0.8),
-                                    Color(colorScheme == .dark ? .black : .white).opacity(0.6)
-                                ]),
-                                startPoint: .bottom,
-                                endPoint: .top
-                            )
-                        )
-                    )
-
-                    if let description = details.description {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Description")
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .padding(.horizontal)
-                                .padding(.top, 16)
-
-                            Text(isDescriptionExpanded ? description : getTruncatedDescription(description))
-                                .font(.body)
-                                .padding(.horizontal)
-
-                            if shouldShowMoreButton(for: description) {
-                                Button(isDescriptionExpanded ? "Show Less" : "Show More") {
-                                    withAnimation(.easeInOut(duration: 0.3)) {
-                                        isDescriptionExpanded.toggle()
-                                    }
-                                }
-                                .font(.subheadline)
-                                .foregroundColor(.blue)
-                                .padding(.horizontal)
-                            }
-                        }
-                        .padding(.bottom, 8)
-                    }
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        if let genres = details.moreInfo?.genres, !genres.isEmpty { InfoRow(title: "Genres", content: genres.joined(separator: ", ")) }
-                        if let studios = details.moreInfo?.studios, !studios.isEmpty { InfoRow(title: "Studios", content: studios.joined(separator: ", ")) }
-                        if let aired = details.moreInfo?.aired { InfoRow(title: "Aired", content: aired) }
-                        if let duration = details.moreInfo?.duration { InfoRow(title: "Duration", content: duration) }
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-
-                    if !viewModel.episodeGroups.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text("Episodes")
-                                    .font(.title3)
-                                    .fontWeight(.bold)
-
-                                Spacer()
-
-                                Button(isSelectingEpisodes ? "Done" : "Select") {
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        isSelectingEpisodes.toggle()
-                                        if !isSelectingEpisodes {
-                                            selectedEpisodeIDs.removeAll()
-                                        }
-                                    }
-                                }
-                                .font(.subheadline)
-
-                                if isSelectingEpisodes {
-                                    Button("Download (\(selectedEpisodeIDs.count))") {
-                                        let selectedEpisodes = viewModel.currentEpisodes.filter { selectedEpisodeIDs.contains($0.id) }
-                                        let anime = animeItem(from: details)
-                                        Task {
-                                            await viewModel.downloadSelectedEpisodes(anime: anime, episodesToCache: viewModel.currentEpisodes, selectedEpisodes: selectedEpisodes)
-                                        }
-                                    }
-                                    .font(.subheadline)
-                                    .disabled(selectedEpisodeIDs.isEmpty)
-                                }
-
-                                if viewModel.episodeGroups.count > 1 {
-                                    Menu {
-                                        ForEach(Array(viewModel.episodeGroups.enumerated()), id: \.element.id) { index, group in
-                                            Button(group.title) { viewModel.selectGroup(index) }
-                                        }
-                                    } label: {
-                                        HStack {
-                                            Text(viewModel.episodeGroups[viewModel.selectedGroupIndex].title)
-                                            Image(systemName: "chevron.up.chevron.down")
-                                        }
-                                        .foregroundColor(.blue)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal)
-
-                            LazyVStack(spacing: 12) {
-                                ForEach(viewModel.currentEpisodes) { episode in
-                                    let downloaded = HLSDownloadManager.shared.isEpisodeDownloaded(episode.id)
-                                    let anime = animeItem(from: details)
-                                    HStack(spacing: 12) {
-                                        if isSelectingEpisodes {
-                                            Button {
-                                                if selectedEpisodeIDs.contains(episode.id) {
-                                                    selectedEpisodeIDs.remove(episode.id)
-                                                } else {
-                                                    selectedEpisodeIDs.insert(episode.id)
-                                                }
-                                            } label: {
-                                                HStack(spacing: 10) {
-                                                    Image(systemName: selectedEpisodeIDs.contains(episode.id) ? "checkmark.circle.fill" : "circle")
-                                                        .foregroundColor(selectedEpisodeIDs.contains(episode.id) ? .blue : .secondary)
-                                                    EpisodeRow(episode: episode, isDownloaded: downloaded)
-                                                }
-                                            }
-                                            .buttonStyle(.plain)
-                                        } else {
-                                            NavigationLink(destination: EpisodeView(
-                                                episodeId: episode.id,
-                                                animeId: animeId,
-                                                animeTitle: details.name,
-                                                episodeNumber: "\(episode.number)",
-                                                episodeTitle: episode.title,
-                                                thumbnailURL: nil
-                                            )) {
-                                                EpisodeRow(episode: episode, isDownloaded: downloaded)
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-
-                                        Button {
-                                            Task {
-                                                await viewModel.downloadEpisode(anime: anime, episodesToCache: viewModel.currentEpisodes, episode: episode)
-                                            }
-                                        } label: {
-                                            Image(systemName: downloaded ? "checkmark.circle.fill" : "arrow.down.circle")
-                                                .font(.title3)
-                                                .foregroundColor(downloaded ? .green : .primary)
-                                        }
-                                        .disabled(downloaded)
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                        .padding(.top, 8)
-                    }
+                    Text(error)
+                        .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                } else if let details = resolvedDetails {
+                    headerSection(details)
+                    descriptionSection(details)
+                    metadataSection(details)
+                    episodesSection(details)
                 }
             }
+            .padding(.bottom, 20)
         }
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -231,6 +45,248 @@ struct AnimeDetailView: View {
             Button("OK") { viewModel.downloadMessage = nil }
         } message: {
             Text(viewModel.downloadMessage ?? "")
+        }
+    }
+
+    @ViewBuilder
+    private func headerSection(_ details: AnimeDetails) -> some View {
+        VStack(spacing: 14) {
+            AsyncImage(url: URL(string: details.image)) { image in
+                image.resizable().aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Color.gray
+            }
+            .frame(width: 170, height: 245)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 8)
+
+            Text(details.title)
+                .font(.title2)
+                .fontWeight(.bold)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 16)
+
+            if let jTitle = details.moreInfo?.japanese {
+                Text(jTitle)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    if let type = details.type { InfoPill(text: type, icon: "film") }
+                    if let status = details.status { InfoPill(text: status, icon: "dot.radiowaves.left.and.right") }
+                    if let rating = details.rating { InfoPill(text: rating, icon: "star.fill") }
+                }
+                .padding(.horizontal, 16)
+            }
+
+            Button(action: { viewModel.toggleLibrary() }) {
+                Label(
+                    viewModel.isInLibrary ? "In Library" : "Add to Library",
+                    systemImage: viewModel.isInLibrary ? "books.vertical.fill" : "books.vertical"
+                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(viewModel.isInLibrary ? Color.green : Color.blue)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.top, 12)
+        .padding(.bottom, 14)
+        .frame(maxWidth: .infinity)
+        .background(
+            ZStack {
+                AsyncImage(url: URL(string: details.image)) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Color.clear
+                }
+                .blur(radius: 20)
+                .opacity(0.24)
+
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(colorScheme == .dark ? .black : .white),
+                        Color(colorScheme == .dark ? .black : .white).opacity(0.88),
+                        Color(colorScheme == .dark ? .black : .white).opacity(0.62)
+                    ]),
+                    startPoint: .bottom,
+                    endPoint: .top
+                )
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func descriptionSection(_ details: AnimeDetails) -> some View {
+        if let description = details.description {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Description")
+                    .font(.headline)
+
+                Text(isDescriptionExpanded ? normalizedDescription(description) : truncatedDescription(description))
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                if shouldShowMoreButton(for: description) {
+                    Button(isDescriptionExpanded ? "Show Less" : "Show More") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isDescriptionExpanded.toggle()
+                        }
+                    }
+                    .font(.subheadline)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal)
+        }
+    }
+
+    @ViewBuilder
+    private func metadataSection(_ details: AnimeDetails) -> some View {
+        let genres = details.moreInfo?.genres ?? []
+        let studios = details.moreInfo?.studios ?? []
+        let aired = details.moreInfo?.aired
+        let duration = details.moreInfo?.duration
+
+        if !genres.isEmpty || !studios.isEmpty || aired != nil || duration != nil {
+            VStack(alignment: .leading, spacing: 10) {
+                if !genres.isEmpty {
+                    InfoRow(title: "Genres", content: genres.joined(separator: ", "))
+                }
+                if !studios.isEmpty {
+                    InfoRow(title: "Studios", content: studios.joined(separator: ", "))
+                }
+                if let aired {
+                    InfoRow(title: "Aired", content: aired)
+                }
+                if let duration {
+                    InfoRow(title: "Duration", content: duration)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal)
+        }
+    }
+
+    @ViewBuilder
+    private func episodesSection(_ details: AnimeDetails) -> some View {
+        if !viewModel.episodeGroups.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    Text("Episodes")
+                        .font(.headline)
+
+                    Spacer()
+
+                    if viewModel.episodeGroups.count > 1 {
+                        Menu {
+                            ForEach(Array(viewModel.episodeGroups.enumerated()), id: \.element.id) { index, group in
+                                Button(group.title) { viewModel.selectGroup(index) }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(viewModel.episodeGroups[viewModel.selectedGroupIndex].title)
+                                Image(systemName: "chevron.up.chevron.down")
+                            }
+                            .font(.subheadline)
+                        }
+                    }
+
+                    Button(isSelectingEpisodes ? "Done" : "Select") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isSelectingEpisodes.toggle()
+                            if !isSelectingEpisodes {
+                                selectedEpisodeIDs.removeAll()
+                            }
+                        }
+                    }
+                    .font(.subheadline)
+
+                    if isSelectingEpisodes {
+                        Button("Download \(selectedEpisodeIDs.count)") {
+                            let selectedEpisodes = viewModel.currentEpisodes.filter { selectedEpisodeIDs.contains($0.id) }
+                            let anime = animeItem(from: details)
+                            Task {
+                                await viewModel.downloadSelectedEpisodes(
+                                    anime: anime,
+                                    episodesToCache: viewModel.currentEpisodes,
+                                    selectedEpisodes: selectedEpisodes
+                                )
+                            }
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .disabled(selectedEpisodeIDs.isEmpty)
+                    }
+                }
+                .padding(.horizontal)
+
+                LazyVStack(spacing: 10) {
+                    ForEach(viewModel.currentEpisodes) { episode in
+                        let downloaded = HLSDownloadManager.shared.isEpisodeDownloaded(episode.id)
+                        let anime = animeItem(from: details)
+
+                        HStack(spacing: 10) {
+                            if isSelectingEpisodes {
+                                Button {
+                                    if selectedEpisodeIDs.contains(episode.id) {
+                                        selectedEpisodeIDs.remove(episode.id)
+                                    } else {
+                                        selectedEpisodeIDs.insert(episode.id)
+                                    }
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: selectedEpisodeIDs.contains(episode.id) ? "checkmark.circle.fill" : "circle")
+                                            .foregroundColor(selectedEpisodeIDs.contains(episode.id) ? .blue : .secondary)
+                                        EpisodeRow(episode: episode, isDownloaded: downloaded)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                NavigationLink(destination: EpisodeView(
+                                    episodeId: episode.id,
+                                    animeId: animeId,
+                                    animeTitle: details.name,
+                                    episodeNumber: "\(episode.number)",
+                                    episodeTitle: episode.title,
+                                    thumbnailURL: nil
+                                )) {
+                                    EpisodeRow(episode: episode, isDownloaded: downloaded)
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            Button {
+                                Task {
+                                    await viewModel.downloadEpisode(anime: anime, episodesToCache: viewModel.currentEpisodes, episode: episode)
+                                }
+                            } label: {
+                                Image(systemName: downloaded ? "checkmark.circle.fill" : "arrow.down.circle")
+                                    .font(.title3)
+                                    .foregroundColor(downloaded ? .green : .primary)
+                            }
+                            .disabled(downloaded)
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
         }
     }
 
@@ -272,11 +328,15 @@ struct AnimeDetailView: View {
         )
     }
 
-    private func getTruncatedDescription(_ description: String) -> String {
-        let normalized = description
+    private func normalizedDescription(_ description: String) -> String {
+        description
             .replacingOccurrences(of: "\n", with: " ")
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func truncatedDescription(_ description: String) -> String {
+        let normalized = normalizedDescription(description)
         if normalized.count <= 140 {
             return normalized
         }
@@ -284,11 +344,7 @@ struct AnimeDetailView: View {
     }
 
     private func shouldShowMoreButton(for description: String) -> Bool {
-        let normalized = description
-            .replacingOccurrences(of: "\n", with: " ")
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return normalized.count > 140
+        normalizedDescription(description).count > 140
     }
 }
 
@@ -301,7 +357,7 @@ private struct InfoPill: View {
             .font(.caption)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Color.gray.opacity(0.2))
+            .background(Color.gray.opacity(0.16))
             .cornerRadius(12)
     }
 }
@@ -311,12 +367,13 @@ private struct InfoRow: View {
     let content: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.subheadline)
-                .foregroundColor(.gray)
+                .font(.caption)
+                .foregroundColor(.secondary)
             Text(content)
-                .font(.body)
+                .font(.subheadline)
+                .foregroundColor(.primary)
         }
     }
 }
@@ -326,39 +383,41 @@ private struct EpisodeRow: View {
     let isDownloaded: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Episode \(episode.number)\(episode.title.map { ": \($0)" } ?? "")")
-                    .font(.headline)
+                Text("Episode \(episode.number)")
+                    .font(.subheadline.weight(.semibold))
                     .foregroundColor(.primary)
                     .lineLimit(1)
 
-                if let title = episode.title {
+                if let title = episode.title, !title.isEmpty {
                     Text(title)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                        .lineLimit(2)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
                 }
 
-                if let isFiller = episode.isFiller, isFiller {
-                    Text("Filler")
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(Color.orange.opacity(0.2))
-                        .cornerRadius(4)
-                }
-
-                if isDownloaded {
-                    Text("Downloaded")
-                        .font(.caption)
-                        .foregroundColor(.green)
+                HStack(spacing: 6) {
+                    if let isFiller = episode.isFiller, isFiller {
+                        Text("Filler")
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.2))
+                            .cornerRadius(5)
+                    }
+                    if isDownloaded {
+                        Text("Downloaded")
+                            .font(.caption2)
+                            .foregroundColor(.green)
+                    }
                 }
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
-        .padding(8)
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemBackground))
-        .cornerRadius(10)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }

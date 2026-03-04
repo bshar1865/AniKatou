@@ -65,8 +65,15 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         intro: IntroOutro? = nil,
         outro: IntroOutro? = nil
     ) {
-        if downloads.contains(where: { $0.episodeId == episodeId && $0.state == .downloading }) {
-            return
+        if let existingIndex = downloads.firstIndex(where: { $0.episodeId == episodeId }) {
+            let existingState = downloads[existingIndex].state
+            switch existingState {
+            case .queued, .downloading, .completed:
+                return
+            case .failed, .cancelled:
+                downloads.remove(at: existingIndex)
+                persist()
+            }
         }
 
         let options = headers == nil ? nil : ["AVURLAssetHTTPHeaderFieldsKey": headers!]
@@ -121,6 +128,13 @@ final class HLSDownloadManager: NSObject, ObservableObject {
     }
 
     func removeDownload(_ item: HLSDownloadItem) {
+        if item.state == .queued || item.state == .downloading {
+            if let taskID = taskMap.first(where: { $0.value == item.id })?.key,
+               let task = session.getAllTasksSync().first(where: { $0.taskIdentifier == taskID }) {
+                task.cancel()
+            }
+        }
+
         if let localPath = item.localPath {
             try? FileManager.default.removeItem(atPath: localPath)
         }

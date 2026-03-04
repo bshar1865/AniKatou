@@ -31,13 +31,7 @@ class EpisodeViewModel: ObservableObject {
 
         let isOffline = OfflineManager.shared.isOfflineMode
         if isOffline {
-            if let localURL = HLSDownloadManager.shared.localFileURL(for: episodeId) {
-                localPlaybackURL = localURL
-                localSubtitleTracks = HLSDownloadManager.shared.localSubtitleTracks(for: episodeId)
-                let introOutro = HLSDownloadManager.shared.introOutro(for: episodeId)
-                localIntro = introOutro.intro
-                localOutro = introOutro.outro
-            } else {
+            if !loadDownloadedEpisodeIfAvailable(episodeId: episodeId) {
                 errorMessage = "You have not downloaded this episode."
             }
             isLoading = false
@@ -53,27 +47,28 @@ class EpisodeViewModel: ObservableObject {
             
         } catch let error as APIError {
             // If API fails, allow offline playback when this episode was downloaded.
-            if let localURL = HLSDownloadManager.shared.localFileURL(for: episodeId) {
-                localPlaybackURL = localURL
-                localSubtitleTracks = HLSDownloadManager.shared.localSubtitleTracks(for: episodeId)
-                let introOutro = HLSDownloadManager.shared.introOutro(for: episodeId)
-                localIntro = introOutro.intro
-                localOutro = introOutro.outro
-            } else {
+            if !loadDownloadedEpisodeIfAvailable(episodeId: episodeId) {
                 errorMessage = error.message
             }
         } catch {
-            if let localURL = HLSDownloadManager.shared.localFileURL(for: episodeId) {
-                localPlaybackURL = localURL
-                localSubtitleTracks = HLSDownloadManager.shared.localSubtitleTracks(for: episodeId)
-                let introOutro = HLSDownloadManager.shared.introOutro(for: episodeId)
-                localIntro = introOutro.intro
-                localOutro = introOutro.outro
-            } else {
+            if !loadDownloadedEpisodeIfAvailable(episodeId: episodeId) {
                 errorMessage = "Failed to load streaming sources: \(error.localizedDescription)"
             }
         }
         
         isLoading = false
+    }
+
+    @discardableResult
+    private func loadDownloadedEpisodeIfAvailable(episodeId: String) -> Bool {
+        guard let localURL = HLSDownloadManager.shared.localFileURL(for: episodeId) else {
+            return false
+        }
+        localPlaybackURL = localURL
+        localSubtitleTracks = HLSDownloadManager.shared.localSubtitleTracks(for: episodeId)
+        let introOutro = HLSDownloadManager.shared.introOutro(for: episodeId)
+        localIntro = introOutro.intro
+        localOutro = introOutro.outro
+        return true
     }
 }
