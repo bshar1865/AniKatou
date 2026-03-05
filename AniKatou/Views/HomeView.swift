@@ -10,7 +10,6 @@ struct HomeView: View {
                 section(title: "Latest Episodes", animes: viewModel.latestEpisodeAnimes)
                 section(title: "Top Airing", animes: viewModel.topAiringAnimes)
                 section(title: "Most Popular", animes: viewModel.mostPopularAnimes)
-                section(title: "Top Upcoming", animes: viewModel.topUpcomingAnimes)
                 section(title: "Latest Completed", animes: viewModel.latestCompletedAnimes)
                 section(title: "Top 10 Today", animes: viewModel.top10Today)
             }
@@ -63,13 +62,6 @@ struct HomeView: View {
                         ForEach(animes.prefix(12)) { anime in
                             NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
                                 AnimeCard(anime: anime, width: 140)
-                                    .padding(10)
-                                    .background(Color(.secondarySystemBackground))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.gray.opacity(0.25), lineWidth: 1)
-                                    )
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
                             .buttonStyle(.plain)
                         }
