@@ -362,12 +362,12 @@ struct CustomVideoPlayerView: View {
             }
             
             // Auto-skip intro - only skip when we enter the intro range
-            if let intro = intro, AppSettings.shared.autoSkipIntro, !hasSkippedIntro, !isAutoSkipping {
+            if let intro = intro, AppSettings.shared.autoSkipIntro, !hasSkippedIntro, !isAutoSkipping, !isSeeking {
                 let introStart = Double(intro.start)
                 let introEnd = Double(intro.end)
-                
-                // Only skip if we're within the intro range and haven't skipped yet
-                if currentTime >= introStart && currentTime <= introEnd {
+
+                // Skip only for valid ranges and when playback time is inside the window.
+                if introEnd > introStart, time.seconds >= introStart, time.seconds <= introEnd {
                     isAutoSkipping = true
                     let seekTime = CMTime(seconds: introEnd, preferredTimescale: 600)
                     player.seek(to: seekTime) { finished in
@@ -393,12 +393,12 @@ struct CustomVideoPlayerView: View {
             }
             
             // Auto-skip outro - only skip when we enter the outro range
-            if let outro = outro, AppSettings.shared.autoSkipOutro, !hasSkippedOutro, !isAutoSkipping {
+            if let outro = outro, AppSettings.shared.autoSkipOutro, !hasSkippedOutro, !isAutoSkipping, !isSeeking {
                 let outroStart = Double(outro.start)
                 let outroEnd = Double(outro.end)
-                
-                // Only skip if we're within the outro range and haven't skipped yet
-                if currentTime >= outroStart && currentTime <= outroEnd {
+
+                // Skip only for valid ranges and when playback time is inside the window.
+                if outroEnd > outroStart, time.seconds >= outroStart, time.seconds <= outroEnd {
                     isAutoSkipping = true
                     let seekTime = CMTime(seconds: outroEnd, preferredTimescale: 600)
                     player.seek(to: seekTime) { finished in

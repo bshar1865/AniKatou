@@ -64,10 +64,10 @@ struct HomeView: View {
                             NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
                                 AnimeCard(anime: anime, width: 140)
                                     .padding(10)
-                                    .background(Color(.secondarySystemBackground))
+                                    .background(Color(.tertiarySystemBackground))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.gray.opacity(0.25), lineWidth: 1)
+                                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                                     )
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                             }

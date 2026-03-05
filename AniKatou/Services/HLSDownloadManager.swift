@@ -68,8 +68,15 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         if let existingIndex = downloads.firstIndex(where: { $0.episodeId == episodeId }) {
             let existingState = downloads[existingIndex].state
             switch existingState {
-            case .queued, .downloading, .completed:
+            case .queued, .downloading:
                 return
+            case .completed:
+                if let path = downloads[existingIndex].localPath,
+                   FileManager.default.fileExists(atPath: path) {
+                    return
+                }
+                downloads.remove(at: existingIndex)
+                persist()
             case .failed, .cancelled:
                 downloads.remove(at: existingIndex)
                 persist()
@@ -157,7 +164,10 @@ final class HLSDownloadManager: NSObject, ObservableObject {
 
     func downloadedItem(for episodeId: String) -> HLSDownloadItem? {
         downloads.first { item in
-            item.episodeId == episodeId && item.state == .completed && item.localPath != nil
+            guard item.episodeId == episodeId,
+                  item.state == .completed,
+                  let path = item.localPath else { return false }
+            return FileManager.default.fileExists(atPath: path)
         }
     }
 

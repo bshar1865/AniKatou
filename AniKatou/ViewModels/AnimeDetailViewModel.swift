@@ -16,6 +16,7 @@ class AnimeDetailViewModel: ObservableObject {
 
     func loadAnimeDetails(animeId: String) {
         loadTask?.cancel()
+        selectedGroupIndex = 0
         episodeGroups = []
         animeDetails = nil
         offlineAnimeDetails = nil
@@ -130,11 +131,13 @@ class AnimeDetailViewModel: ObservableObject {
     }
 
     var currentEpisodes: [EpisodeInfo] {
-        guard !episodeGroups.isEmpty else { return [] }
+        guard !episodeGroups.isEmpty,
+              episodeGroups.indices.contains(selectedGroupIndex) else { return [] }
         return episodeGroups[selectedGroupIndex].episodes
     }
 
     func selectGroup(_ index: Int) {
+        guard episodeGroups.indices.contains(index) else { return }
         selectedGroupIndex = index
     }
 
