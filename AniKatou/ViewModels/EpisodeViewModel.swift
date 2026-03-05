@@ -32,7 +32,7 @@ class EpisodeViewModel: ObservableObject {
         let isOffline = OfflineManager.shared.isOfflineMode
         if isOffline {
             if !loadDownloadedEpisodeIfAvailable(episodeId: episodeId) {
-                errorMessage = "You have not downloaded this episode."
+                errorMessage = "This episode is not available offline. Please download it while connected to the internet."
             }
             isLoading = false
             return
@@ -52,7 +52,7 @@ class EpisodeViewModel: ObservableObject {
             }
         } catch {
             if !loadDownloadedEpisodeIfAvailable(episodeId: episodeId) {
-                errorMessage = "Failed to load streaming sources: \(error.localizedDescription)"
+                errorMessage = "Unable to load streaming sources at this time. Please try again."
             }
         }
         

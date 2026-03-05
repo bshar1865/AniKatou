@@ -38,7 +38,7 @@ class AnimeDetailViewModel: ObservableObject {
 
     private func loadOfflineAnimeDetails(animeId: String) {
         guard let offlineDetails = OfflineManager.shared.getCachedAnimeDetails(animeId) else {
-            errorMessage = "Anime not available offline."
+            errorMessage = "This anime is not available offline. Please connect to the internet to load its details."
             return
         }
 
@@ -72,7 +72,7 @@ class AnimeDetailViewModel: ObservableObject {
                 errorMessage = nil
                 return
             }
-            errorMessage = error.localizedDescription
+            errorMessage = "Unable to load anime details at this time. Please try again."
         }
     }
 
@@ -158,7 +158,7 @@ class AnimeDetailViewModel: ObservableObject {
 
             guard let source = stream.data.sources.first(where: { ($0.isM3U8 ?? false) || $0.url.contains(".m3u8") }),
                   let url = URL(string: source.url) else {
-                downloadMessage = "No downloadable HLS source found for this episode."
+                downloadMessage = "No downloadable stream was found for this episode."
                 return
             }
 
@@ -174,15 +174,15 @@ class AnimeDetailViewModel: ObservableObject {
                 outro: stream.data.outro
             )
 
-            downloadMessage = "Download started for episode \(episode.number)."
+            downloadMessage = "The download has started for episode \(episode.number)."
         } catch {
-            downloadMessage = "Failed to start download: \(error.localizedDescription)"
+            downloadMessage = "Unable to start the download at this time. Please try again."
         }
     }
 
     func downloadSelectedEpisodes(anime: AnimeItem, episodesToCache: [EpisodeInfo], selectedEpisodes: [EpisodeInfo]) async {
         guard !selectedEpisodes.isEmpty else {
-            downloadMessage = "No episodes selected."
+            downloadMessage = "Please select at least one episode to download."
             return
         }
 
@@ -193,7 +193,9 @@ class AnimeDetailViewModel: ObservableObject {
                 started += 1
             }
         }
-        downloadMessage = started > 0 ? "Started download for \(started) episodes." : "No episodes started."
+        downloadMessage = started > 0
+            ? "Download started for \(started) episode(s)."
+            : "No downloads were started."
     }
 
     deinit {

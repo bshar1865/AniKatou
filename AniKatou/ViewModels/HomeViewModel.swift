@@ -35,15 +35,15 @@ class HomeViewModel: ObservableObject {
         } catch let error as APIError {
             switch error {
             case .networkError:
-                errorMessage = "Internet connection is required for Home."
+                errorMessage = "No internet connection. Please connect to the internet to load Home."
             default:
                 errorMessage = error.message
             }
         } catch {
             if OfflineManager.shared.isOfflineMode {
-                errorMessage = "Internet connection is required for Home."
+                errorMessage = "No internet connection. Please connect to the internet to load Home."
             } else {
-                errorMessage = "Failed to load home: \(error.localizedDescription)"
+                errorMessage = "Unable to load Home at this time. Please try again."
             }
         }
 

@@ -14,16 +14,16 @@ enum APIError: Error {
     
     var message: String {
         switch self {
-        case .invalidURL: return "Invalid URL format"
-        case .invalidResponse: return "Invalid response from server"
-        case .networkError(let error): return "Network error: \(error.localizedDescription)"
-        case .decodingError(let error): return "Failed to decode response: \(error.localizedDescription)"
-        case .serverError(let code, let message): return message ?? "Server error with code: \(code)"
-        case .notConfigured: return "API URL not configured"
-        case .invalidEndpoint: return "Invalid API endpoint"
-        case .invalidAnimeURL: return "Invalid anime URL format"
-        case .invalidEpisodeId: return "Invalid episode ID format"
-        case .searchQueryTooShort: return "Search query must be at least 3 characters"
+        case .invalidURL: return "The request URL is invalid."
+        case .invalidResponse: return "The server returned an invalid response."
+        case .networkError(let error): return "Unable to connect to the server. Please check your internet connection and try again. (\(error.localizedDescription))"
+        case .decodingError: return "The server response could not be processed."
+        case .serverError(let code, let message): return message ?? "The server returned an error (code \(code))."
+        case .notConfigured: return "The API server URL is not configured."
+        case .invalidEndpoint: return "The requested API endpoint is invalid."
+        case .invalidAnimeURL: return "The anime URL format is invalid."
+        case .invalidEpisodeId: return "The episode identifier is invalid."
+        case .searchQueryTooShort: return "Please enter at least 3 characters to search."
         }
     }
 }
@@ -102,19 +102,19 @@ class APIService {
     
     private func validateResponse<T: Codable>(_ response: T) throws -> T {
         if let result = response as? HomePageResult, result.status != 200 {
-            throw APIError.serverError(result.status, "Server returned error status: \(result.status)")
+            throw APIError.serverError(result.status, "The server returned an unexpected status (\(result.status)).")
         }
         if let result = response as? AnimeSearchResult, result.status != 200 {
-            throw APIError.serverError(result.status, "Server returned error status: \(result.status)")
+            throw APIError.serverError(result.status, "The server returned an unexpected status (\(result.status)).")
         }
         if let result = response as? AnimeDetailsResult, result.status != 200 {
-            throw APIError.serverError(result.status, "Server returned error status: \(result.status)")
+            throw APIError.serverError(result.status, "The server returned an unexpected status (\(result.status)).")
         }
         if let result = response as? EpisodesResponse, result.status != 200 {
-            throw APIError.serverError(result.status, "Server returned error status: \(result.status)")
+            throw APIError.serverError(result.status, "The server returned an unexpected status (\(result.status)).")
         }
         if let result = response as? StreamingResult, result.status != 200 {
-            throw APIError.serverError(result.status, "Server returned error status: \(result.status)")
+            throw APIError.serverError(result.status, "The server returned an unexpected status (\(result.status)).")
         }
         return response
     }
@@ -138,11 +138,11 @@ class APIService {
             }
             
             if httpResponse.statusCode == 404 {
-                throw APIError.serverError(404, "Not found")
+                throw APIError.serverError(404, "The requested resource was not found.")
             }
             
             if httpResponse.statusCode != 200 {
-                throw APIError.serverError(httpResponse.statusCode, "Server error")
+                throw APIError.serverError(httpResponse.statusCode, "The server could not complete the request.")
             }
             
             let decodedResponse = try decoder.decode(T.self, from: data)
