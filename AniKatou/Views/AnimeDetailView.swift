@@ -3,6 +3,7 @@ import SwiftUI
 struct AnimeDetailView: View {
     let animeId: String
     @StateObject private var viewModel = AnimeDetailViewModel()
+    @StateObject private var downloadManager = HLSDownloadManager.shared
     @Environment(\.colorScheme) private var colorScheme
     @State private var isDescriptionExpanded = false
     @State private var isSelectingEpisodes = false
@@ -13,23 +14,29 @@ struct AnimeDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                if viewModel.isLoading {
-                    ProgressView().padding()
-                } else if let error = viewModel.errorMessage {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                } else if let details = resolvedDetails {
-                    headerSection(details)
-                    descriptionSection(details)
-                    metadataSection(details)
-                    episodesSection(details)
+        ZStack(alignment: .bottomTrailing) {
+            ScrollView {
+                VStack(spacing: 16) {
+                    if viewModel.isLoading {
+                        ProgressView().padding()
+                    } else if let error = viewModel.errorMessage {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
+                            .padding()
+                    } else if let details = resolvedDetails {
+                        headerSection(details)
+                        descriptionSection(details)
+                        metadataSection(details)
+                        episodesSection(details)
+                    }
                 }
+                .padding(.bottom, isSelectingEpisodes ? 88 : 20)
             }
-            .padding(.bottom, 20)
+
+            if isSelectingEpisodes {
+                floatingDownloadButton
+            }
         }
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -197,7 +204,10 @@ struct AnimeDetailView: View {
                     if viewModel.episodeGroups.count > 1 {
                         Menu {
                             ForEach(Array(viewModel.episodeGroups.enumerated()), id: \.element.id) { index, group in
-                                Button(group.title) { viewModel.selectGroup(index) }
+                                Button(group.title) {
+                                    viewModel.selectGroup(index)
+                                    selectedEpisodeIDs.removeAll()
+                                }
                             }
                         } label: {
                             HStack(spacing: 4) {
@@ -218,46 +228,36 @@ struct AnimeDetailView: View {
                     }
                     .font(.subheadline)
 
-                    if isSelectingEpisodes {
-                        Button("Download \(selectedEpisodeIDs.count)") {
-                            let selectedEpisodes = viewModel.currentEpisodes.filter { selectedEpisodeIDs.contains($0.id) }
-                            let anime = animeItem(from: details)
-                            Task {
-                                await viewModel.downloadSelectedEpisodes(
-                                    anime: anime,
-                                    episodesToCache: viewModel.currentEpisodes,
-                                    selectedEpisodes: selectedEpisodes
-                                )
-                            }
-                        }
-                        .font(.subheadline.weight(.semibold))
-                        .disabled(selectedEpisodeIDs.isEmpty)
-                    }
                 }
                 .padding(.horizontal)
 
                 LazyVStack(spacing: 10) {
                     ForEach(viewModel.currentEpisodes) { episode in
-                        let downloaded = HLSDownloadManager.shared.isEpisodeDownloaded(episode.id)
+                        let downloadItem = downloadManager.downloads.first(where: { $0.episodeId == episode.id })
+                        let downloaded = downloadManager.isEpisodeDownloaded(episode.id)
                         let anime = animeItem(from: details)
 
-                        HStack(spacing: 10) {
-                            if isSelectingEpisodes {
-                                Button {
-                                    if selectedEpisodeIDs.contains(episode.id) {
-                                        selectedEpisodeIDs.remove(episode.id)
-                                    } else {
-                                        selectedEpisodeIDs.insert(episode.id)
-                                    }
-                                } label: {
-                                    HStack(spacing: 10) {
-                                        Image(systemName: selectedEpisodeIDs.contains(episode.id) ? "checkmark.circle.fill" : "circle")
-                                            .foregroundColor(selectedEpisodeIDs.contains(episode.id) ? .blue : .secondary)
-                                        EpisodeRow(episode: episode, isDownloaded: downloaded)
-                                    }
+                        if isSelectingEpisodes {
+                            Button {
+                                if selectedEpisodeIDs.contains(episode.id) {
+                                    selectedEpisodeIDs.remove(episode.id)
+                                } else {
+                                    selectedEpisodeIDs.insert(episode.id)
                                 }
-                                .buttonStyle(.plain)
-                            } else {
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: selectedEpisodeIDs.contains(episode.id) ? "checkmark.circle.fill" : "circle")
+                                        .foregroundColor(selectedEpisodeIDs.contains(episode.id) ? .blue : .secondary)
+                                    EpisodeRow(
+                                        episode: episode,
+                                        isDownloaded: downloaded,
+                                        downloadItem: downloadItem
+                                    )
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            HStack(spacing: 10) {
                                 NavigationLink(destination: EpisodeView(
                                     episodeId: episode.id,
                                     animeId: animeId,
@@ -266,22 +266,26 @@ struct AnimeDetailView: View {
                                     episodeTitle: episode.title,
                                     thumbnailURL: nil
                                 )) {
-                                    EpisodeRow(episode: episode, isDownloaded: downloaded)
+                                    EpisodeRow(
+                                        episode: episode,
+                                        isDownloaded: downloaded,
+                                        downloadItem: downloadItem
+                                    )
                                 }
                                 .buttonStyle(.plain)
-                            }
 
-                            Button {
-                                Task {
-                                    await viewModel.downloadEpisode(anime: anime, episodesToCache: viewModel.currentEpisodes, episode: episode)
+                                Button {
+                                    Task {
+                                        await viewModel.downloadEpisode(anime: anime, episodesToCache: viewModel.currentEpisodes, episode: episode)
+                                    }
+                                } label: {
+                                    Image(systemName: downloadButtonSymbol(isDownloaded: downloaded, item: downloadItem))
+                                        .font(.title3)
+                                        .foregroundColor(downloadButtonColor(isDownloaded: downloaded, item: downloadItem))
                                 }
-                            } label: {
-                                Image(systemName: downloaded ? "checkmark.circle.fill" : "arrow.down.circle")
-                                    .font(.title3)
-                                    .foregroundColor(downloaded ? .green : .primary)
+                                .buttonStyle(.plain)
+                                .disabled(isDownloadButtonDisabled(isDownloaded: downloaded, item: downloadItem))
                             }
-                            .disabled(downloaded)
-                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -346,6 +350,70 @@ struct AnimeDetailView: View {
     private func shouldShowMoreButton(for description: String) -> Bool {
         normalizedDescription(description).count > 140
     }
+
+    @ViewBuilder
+    private var floatingDownloadButton: some View {
+        if let details = resolvedDetails {
+            Button {
+                let selectedIDsInCurrentGroup = Set(viewModel.currentEpisodes.map(\.id))
+                selectedEpisodeIDs = selectedEpisodeIDs.intersection(selectedIDsInCurrentGroup)
+                let selectedEpisodes = viewModel.currentEpisodes.filter { selectedEpisodeIDs.contains($0.id) }
+                let anime = animeItem(from: details)
+                Task {
+                    await viewModel.downloadSelectedEpisodes(
+                        anime: anime,
+                        episodesToCache: viewModel.currentEpisodes,
+                        selectedEpisodes: selectedEpisodes
+                    )
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.headline)
+                    Text("Download \(selectedEpisodeIDs.count)")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(
+                    Capsule()
+                        .fill(selectedEpisodeIDs.isEmpty ? Color.gray : Color.blue)
+                )
+                .shadow(color: .black.opacity(0.22), radius: 8, x: 0, y: 4)
+            }
+            .padding(.trailing, 18)
+            .padding(.bottom, 14)
+            .disabled(selectedEpisodeIDs.isEmpty)
+        }
+    }
+
+    private func isDownloadButtonDisabled(isDownloaded: Bool, item: HLSDownloadItem?) -> Bool {
+        isDownloaded || item?.state == .queued || item?.state == .downloading
+    }
+
+    private func downloadButtonSymbol(isDownloaded: Bool, item: HLSDownloadItem?) -> String {
+        if isDownloaded { return "checkmark.circle.fill" }
+        if let item {
+            switch item.state {
+            case .queued, .downloading:
+                return "hourglass"
+            case .failed:
+                return "arrow.clockwise.circle"
+            case .cancelled:
+                return "arrow.down.circle"
+            case .completed:
+                return "checkmark.circle.fill"
+            }
+        }
+        return "arrow.down.circle"
+    }
+
+    private func downloadButtonColor(isDownloaded: Bool, item: HLSDownloadItem?) -> Color {
+        if isDownloaded { return .green }
+        if let item, item.state == .failed { return .red }
+        return .primary
+    }
 }
 
 private struct InfoPill: View {
@@ -381,6 +449,7 @@ private struct InfoRow: View {
 private struct EpisodeRow: View {
     let episode: EpisodeInfo
     let isDownloaded: Bool
+    let downloadItem: HLSDownloadItem?
 
     var body: some View {
         HStack(spacing: 10) {
@@ -410,7 +479,18 @@ private struct EpisodeRow: View {
                         Text("Downloaded")
                             .font(.caption2)
                             .foregroundColor(.green)
+                    } else if let item = downloadItem {
+                        Text(downloadStateText(item))
+                            .font(.caption2)
+                            .foregroundColor(downloadStateColor(item))
                     }
+                }
+
+                if let item = downloadItem,
+                   item.state == .downloading || item.state == .queued {
+                    DownloadDashProgress(progress: item.progress)
+                        .frame(height: 5)
+                        .padding(.trailing, 6)
                 }
             }
             Spacer(minLength: 0)
@@ -419,5 +499,55 @@ private struct EpisodeRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func downloadStateText(_ item: HLSDownloadItem) -> String {
+        switch item.state {
+        case .queued:
+            return "Queued"
+        case .downloading:
+            return "Downloading \(Int(item.progress * 100))%"
+        case .completed:
+            return "Downloaded"
+        case .failed:
+            return "Failed"
+        case .cancelled:
+            return "Cancelled"
+        }
+    }
+
+    private func downloadStateColor(_ item: HLSDownloadItem) -> Color {
+        switch item.state {
+        case .completed:
+            return .green
+        case .failed:
+            return .red
+        case .queued, .downloading:
+            return .blue
+        case .cancelled:
+            return .orange
+        }
+    }
+}
+
+private struct DownloadDashProgress: View {
+    let progress: Double
+
+    private var clampedProgress: Double {
+        min(max(progress, 0), 1)
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 3)
+                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                    .foregroundColor(.blue.opacity(0.35))
+
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.blue.opacity(0.9))
+                    .frame(width: geo.size.width * clampedProgress)
+            }
+        }
     }
 }

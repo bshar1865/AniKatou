@@ -159,15 +159,22 @@ struct VideoPlayerView: UIViewControllerRepresentable {
     }
     
     private func setupIntroOutroSkipping(player: AVPlayer, streamingData: StreamingData, context: Context) {
+        var hasSkippedIntro = false
+        var hasSkippedOutro = false
+
         if let intro = streamingData.intro {
             let introObserver = player.addPeriodicTimeObserver(
                 forInterval: CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC)),
                 queue: .main
             ) { [weak player] time in
                 let currentTime = time.seconds
-                if currentTime >= Double(intro.start) && currentTime < Double(intro.end) {
+                let introStart = Double(intro.start)
+                let introEnd = Double(intro.end)
+                guard introEnd > introStart else { return }
+                if !hasSkippedIntro, currentTime >= introStart, currentTime < introEnd {
                     if AppSettings.shared.autoSkipIntro {
                         player?.seek(to: CMTime(seconds: Double(intro.end), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
+                        hasSkippedIntro = true
                     }
                 }
             }
@@ -180,9 +187,13 @@ struct VideoPlayerView: UIViewControllerRepresentable {
                 queue: .main
             ) { [weak player] time in
                 let currentTime = time.seconds
-                if currentTime >= Double(outro.start) && currentTime < Double(outro.end) {
+                let outroStart = Double(outro.start)
+                let outroEnd = Double(outro.end)
+                guard outroEnd > outroStart else { return }
+                if !hasSkippedOutro, currentTime >= outroStart, currentTime < outroEnd {
                     if AppSettings.shared.autoSkipOutro {
                         player?.seek(to: CMTime(seconds: Double(outro.end), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
+                        hasSkippedOutro = true
                     }
                 }
             }

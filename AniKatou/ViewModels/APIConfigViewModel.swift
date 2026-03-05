@@ -17,7 +17,7 @@ class APIConfigViewModel: ObservableObject {
         defer { isValidating = false }
 
         guard !apiURL.isEmpty else {
-            errorMessage = "Please enter an API URL"
+            errorMessage = "Please enter an API server URL."
             return false
         }
 
@@ -27,7 +27,7 @@ class APIConfigViewModel: ObservableObject {
         }
 
         guard APIConfig.validateURL(modifiedURL) else {
-            errorMessage = "Please enter a valid URL"
+            errorMessage = "Please enter a valid URL."
             return false
         }
 
@@ -36,7 +36,7 @@ class APIConfigViewModel: ObservableObject {
 
         // Validate by requesting a real app endpoint.
         guard var components = URLComponents(string: modifiedURL) else {
-            errorMessage = "Invalid URL format"
+            errorMessage = "The URL format is invalid."
             return false
         }
         let existingPath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
@@ -44,7 +44,7 @@ class APIConfigViewModel: ObservableObject {
         components.path = existingPath.isEmpty ? "/\(homePath)" : "/\(existingPath)/\(homePath)"
         components.queryItems = [URLQueryItem(name: "nsfw", value: "false")]
         guard let homeURL = components.url else {
-            errorMessage = "Invalid URL format"
+            errorMessage = "The URL format is invalid."
             return false
         }
 
@@ -58,18 +58,18 @@ class APIConfigViewModel: ObservableObject {
 
             let (data, response) = try await session.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse else {
-                errorMessage = "Invalid response from server"
+                errorMessage = "The server returned an invalid response."
                 return false
             }
 
             guard httpResponse.statusCode == 200 else {
-                errorMessage = "Server returned error code: \(httpResponse.statusCode)"
+                errorMessage = "The server returned an error (code \(httpResponse.statusCode))."
                 return false
             }
 
             let homeResult = try? JSONDecoder().decode(HomePageResult.self, from: data)
             guard homeResult?.status == 200 else {
-                errorMessage = "This server is reachable but did not return a valid AniWatch API response"
+                errorMessage = "The server is reachable, but it did not return a valid AniWatch API response."
                 return false
             }
 
@@ -79,19 +79,19 @@ class APIConfigViewModel: ObservableObject {
         } catch let error as URLError {
             switch error.code {
             case .timedOut:
-                errorMessage = "Connection timed out."
+                errorMessage = "The connection timed out. Please try again."
             case .notConnectedToInternet:
-                errorMessage = "No internet connection."
+                errorMessage = "No internet connection. Please connect to the internet and try again."
             case .cannotFindHost:
-                errorMessage = "Cannot find API host."
+                errorMessage = "The API host could not be found."
             case .cannotConnectToHost:
-                errorMessage = "Cannot connect to API host."
+                errorMessage = "Unable to connect to the API host."
             default:
-                errorMessage = "Network error: \(error.localizedDescription)"
+                errorMessage = "A network error occurred while validating the API server."
             }
             return false
         } catch {
-            errorMessage = "Failed to validate API: \(error.localizedDescription)"
+            errorMessage = "Unable to validate the API server at this time."
             return false
         }
     }

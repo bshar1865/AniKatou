@@ -34,12 +34,14 @@ class SearchViewModel: ObservableObject {
             if case .serverError(404, _) = error {
                 popularAnimes = []
             } else if case .networkError = error {
-                errorMessage = "Internet is off."
+                errorMessage = "No internet connection. Please connect to the internet and try again."
             } else {
                 errorMessage = error.message
             }
         } catch {
-            errorMessage = OfflineManager.shared.isOfflineMode ? "Internet is off." : "Failed to load popular anime: \(error.localizedDescription)"
+            errorMessage = OfflineManager.shared.isOfflineMode
+                ? "No internet connection. Please connect to the internet and try again."
+                : "Unable to load popular anime at this time. Please try again."
         }
         
         isLoading = false
@@ -84,7 +86,7 @@ class SearchViewModel: ObservableObject {
                 // For other errors, only show if the query is valid length
                 if query.count >= 3 {
                     if case .networkError = error {
-                        errorMessage = "Internet is off."
+                        errorMessage = "No internet connection. Please connect to the internet and try again."
                     } else {
                         errorMessage = error.message
                     }
@@ -94,7 +96,9 @@ class SearchViewModel: ObservableObject {
             guard !Task.isCancelled else { return }
             // Only show general errors if query is valid length
             if query.count >= 3 {
-                errorMessage = OfflineManager.shared.isOfflineMode ? "Internet is off." : "Failed to search: \(error.localizedDescription)"
+                errorMessage = OfflineManager.shared.isOfflineMode
+                    ? "No internet connection. Please connect to the internet and try again."
+                    : "Unable to complete the search right now. Please try again."
             }
         }
         

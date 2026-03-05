@@ -59,14 +59,9 @@ struct LibraryView: View {
                         .font(.title3)
                         .foregroundColor(.blue)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Downloads")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        Text("Manage offline episodes")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    Text("Downloads")
+                        .font(.headline)
+                        .foregroundColor(.primary)
 
                     Spacer()
 
@@ -218,7 +213,7 @@ private struct ContinueWatchingCard: View {
                 } placeholder: {
                     Color.gray.overlay(Image(systemName: "play.rectangle.fill").foregroundColor(.white))
                 }
-                .frame(width: 168, height: 102)
+                .frame(width: 136, height: 194)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
                 LinearGradient(
@@ -226,7 +221,7 @@ private struct ContinueWatchingCard: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(width: 168, height: 102)
+                .frame(width: 136, height: 194)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
                 Text("Ep \(progress.episodeNumber)")
@@ -266,7 +261,7 @@ private struct ContinueWatchingCard: View {
                 .foregroundColor(.secondary)
                 .lineLimit(1)
         }
-        .frame(width: 168, alignment: .leading)
+        .frame(width: 136, alignment: .leading)
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)

@@ -9,9 +9,12 @@ struct AnimeCard: View {
         self.width = width
     }
     
+    private var imageHeight: CGFloat {
+        (width ?? 140) * 1.5
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Image with caching
             CachedAsyncImage(url: URL(string: anime.image)) { image in
                 image
                     .resizable()
@@ -23,21 +26,26 @@ struct AnimeCard: View {
                             .progressViewStyle(CircularProgressViewStyle())
                     )
             }
-            .frame(height: 210)
+            .frame(height: imageHeight)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             
             Text(anime.title)
-                .font(.headline)
+                .font(.subheadline.weight(.semibold))
                 .lineLimit(2)
                 .foregroundColor(.primary)
+                .frame(height: 36, alignment: .topLeading)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
-            if let type = anime.type {
+            if let type = anime.type, !type.isEmpty {
                 Text(type)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
+                    .frame(height: 14, alignment: .topLeading)
                     .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Color.clear
+                    .frame(height: 14)
             }
         }
         .frame(width: width, alignment: .topLeading)
