@@ -1,36 +1,32 @@
 # AniKatou (iOS)
 
-AniKatou is an iOS client built with SwiftUI.
+AniKatou is a SwiftUI iOS app for browsing anime metadata and playing streams from your own API.
 
-It does not ship with content sources. You connect it to your own self-hosted AniWatch-compatible API.
+It does not include built-in content sources.
 
-## What it does
+## Features
 
-- Home feed (trending, popular, latest, etc.)
-- Search anime
-- Anime details + episode list
-- Streaming playback (custom or native player)
+- Home sections (trending, latest, top airing, popular, upcoming, top 10)
+- Search
+- Anime details with episode groups
+- Library
 - Continue Watching
-- Library (saved anime)
-- Episode downloads (HLS)
+- HLS episode downloads
 - Offline playback for downloaded episodes
+- Subtitle support (including downloaded subtitle files)
+- Custom player and native player support
 
 ## Setup
 
-1. Sideload the app (AltStore, SideStore, Sideloadly, Feather, etc.).
-2. Deploy your AniWatch-compatible API backend.
-3. Open AniKatou and enter your API base URL in Settings.
+1. Build or sideload the app.
+2. Run an AniWatch-compatible API backend.
+3. Open `Settings -> Server Settings` and set your API base URL.
 
-## Important
+## Notes
 
-- AniKatou is only a client.
-- It does not host or distribute media.
-- There are no bundled API endpoints or content sources.
-- You are responsible for your backend and usage.
-
-## Dependency
-
-- [Kingfisher](https://github.com/onevcat/Kingfisher) (MIT)
+- AniKatou is a client only.
+- No media is hosted or bundled by this app.
+- You are responsible for the backend and how it is used.
 
 ## API backend reference
 
