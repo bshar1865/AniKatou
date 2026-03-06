@@ -5,8 +5,6 @@ import SwiftUI
 class SearchViewModel: ObservableObject {
     @Published var searchResults: [AnimeItem] = []
     @Published var popularAnimes: [AnimeItem] = []
-    @Published var availableGenres: [String] = ["All"]
-    @Published var selectedGenre: String = "All"
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var searchHistory: [String] = []
@@ -18,7 +16,7 @@ class SearchViewModel: ObservableObject {
     }
 
     func loadPopularAnime() async {
-        if !popularAnimes.isEmpty && availableGenres.count > 1 {
+        if !popularAnimes.isEmpty {
             return
         }
 
@@ -26,16 +24,8 @@ class SearchViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            async let popularTask = APIService.shared.getPopularAnime()
-            async let homeTask = APIService.shared.getHomePage()
-            let popular = try await popularTask
-            let home = try await homeTask
+            let popular = try await APIService.shared.getPopularAnime()
             popularAnimes = filterNSFWContent(popular)
-            let safeGenres = home.genres.filter { genre in
-                let lower = genre.lowercased()
-                return !lower.contains("hentai") && !lower.contains("adult")
-            }
-            availableGenres = ["All"] + safeGenres.sorted()
         } catch let error as APIError {
             if case .serverError(404, _) = error {
                 popularAnimes = []
@@ -46,9 +36,6 @@ class SearchViewModel: ObservableObject {
             errorMessage = OfflineManager.shared.isOfflineMode ? UserMessage.noInternet : UserMessage.popularUnavailable
         }
 
-        if availableGenres.isEmpty {
-            availableGenres = ["All"]
-        }
         isLoading = false
     }
 
@@ -67,7 +54,7 @@ class SearchViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let results = try await APIService.shared.searchAnime(query: trimmed, genre: selectedGenre)
+            let results = try await APIService.shared.searchAnime(query: trimmed)
             guard !Task.isCancelled else { return }
             searchResults = filterNSFWContent(results)
 

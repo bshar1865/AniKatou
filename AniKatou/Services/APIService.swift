@@ -62,25 +62,20 @@ class APIService {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
     }
 
-    func searchAnime(query: String, genre: String? = nil) async throws -> [AnimeItem] {
+    func searchAnime(query: String) async throws -> [AnimeItem] {
         guard query.count >= 3 else {
             throw APIError.searchQueryTooShort
         }
 
-        var queryItems = [
+        let queryItems = [
             URLQueryItem(name: "q", value: query),
             URLQueryItem(name: "page", value: "1"),
             URLQueryItem(name: "nsfw", value: "false")
         ]
 
-        if let genre, !genre.isEmpty, genre != "All" {
-            queryItems.append(URLQueryItem(name: "genres", value: genre.lowercased()))
-        }
-
         let result: AnimeSearchResult = try await fetch("search", queryItems: queryItems)
         return result.data.animes
     }
-
 
     func getAnimeDetails(id: String) async throws -> AnimeDetailsResult {
         try await fetch("anime/\(id)", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
@@ -282,4 +277,3 @@ class APIService {
         }
     }
 }
-

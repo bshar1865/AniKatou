@@ -170,8 +170,9 @@ class AnimeDetailViewModel: ObservableObject {
     }
 
     func downloadEpisode(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async {
-        if let resolvedServer = await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode) {
-            downloadMessage = UserMessage.downloadStarted(forEpisode: episode.number, server: resolvedServer)
+        let result = await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode)
+        if result.queued {
+            downloadMessage = UserMessage.downloadStarted(forEpisode: episode.number, server: result.serverName)
         } else {
             downloadMessage = UserMessage.downloadStartFailed
         }
@@ -185,7 +186,8 @@ class AnimeDetailViewModel: ObservableObject {
 
         var queuedCount = 0
         for episode in selectedEpisodes {
-            if await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode) != nil {
+            let result = await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode)
+            if result.queued {
                 queuedCount += 1
             }
         }
@@ -213,7 +215,7 @@ class AnimeDetailViewModel: ObservableObject {
         }
     }
 
-    private func queueEpisodeDownload(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async throws -> String? {
+    private func queueEpisodeDownload(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async throws -> (queued: Bool, serverName: String?) {
         addToLibraryIfNeeded(anime)
 
         if let details = animeDetails?.data.anime.info {
@@ -229,7 +231,7 @@ class AnimeDetailViewModel: ObservableObject {
         guard let source = resolved.result.data.sources.first(where: { ($0.isM3U8 ?? false) || $0.url.contains(".m3u8") }),
               let url = URL(string: source.url) else {
             downloadMessage = UserMessage.noDownloadableStream
-            return nil
+            return (false, nil)
         }
 
         let started = HLSDownloadManager.shared.startDownload(
@@ -244,17 +246,15 @@ class AnimeDetailViewModel: ObservableObject {
             outro: resolved.result.data.outro
         )
 
-        guard started else { return nil }
-        return resolved.didFallback ? displayName(for: resolved.server) : nil
+        guard started else { return (false, nil) }
+        return (true, resolved.didFallback ? displayName(for: resolved.server) : nil)
     }
 
-    private func queueEpisodeDownloadWithRetry(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async -> String? {
+    private func queueEpisodeDownloadWithRetry(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async -> (queued: Bool, serverName: String?) {
         do {
-            if let serverName = try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode) {
-                return serverName
-            }
-            if HLSDownloadManager.shared.downloads.contains(where: { $0.episodeId == episode.id }) {
-                return nil
+            let result = try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode)
+            if result.queued || HLSDownloadManager.shared.downloads.contains(where: { $0.episodeId == episode.id }) {
+                return result.queued ? result : (true, nil)
             }
         } catch {
         }
@@ -262,10 +262,14 @@ class AnimeDetailViewModel: ObservableObject {
         try? await Task.sleep(nanoseconds: 500_000_000)
 
         do {
-            return try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode)
+            let result = try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode)
+            if result.queued || HLSDownloadManager.shared.downloads.contains(where: { $0.episodeId == episode.id }) {
+                return result.queued ? result : (true, nil)
+            }
         } catch {
-            return nil
         }
+
+        return (false, nil)
     }
 
     private func cacheCurrentAnimeForOffline() async {
