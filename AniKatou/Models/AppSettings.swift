@@ -102,12 +102,22 @@ class AppSettings {
     static let defaultSubtitleMaxLines: Int = 3
 
     var autoSkipIntro: Bool {
-        get { defaults.bool(forKey: autoSkipIntroKey) }
+        get {
+            if defaults.object(forKey: autoSkipIntroKey) == nil {
+                return true
+            }
+            return defaults.bool(forKey: autoSkipIntroKey)
+        }
         set { defaults.set(newValue, forKey: autoSkipIntroKey) }
     }
 
     var autoSkipOutro: Bool {
-        get { defaults.bool(forKey: autoSkipOutroKey) }
+        get {
+            if defaults.object(forKey: autoSkipOutroKey) == nil {
+                return true
+            }
+            return defaults.bool(forKey: autoSkipOutroKey)
+        }
         set { defaults.set(newValue, forKey: autoSkipOutroKey) }
     }
 
