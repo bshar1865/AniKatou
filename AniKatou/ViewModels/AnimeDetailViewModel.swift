@@ -166,12 +166,8 @@ class AnimeDetailViewModel: ObservableObject {
 
         var queuedCount = 0
         for episode in selectedEpisodes {
-            do {
-                if try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode) {
-                    queuedCount += 1
-                }
-            } catch {
-                continue
+            if await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode) {
+                queuedCount += 1
             }
         }
 
@@ -224,5 +220,22 @@ class AnimeDetailViewModel: ObservableObject {
             intro: stream.data.intro,
             outro: stream.data.outro
         )
+    }
+
+    private func queueEpisodeDownloadWithRetry(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async -> Bool {
+        do {
+            if try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode) {
+                return true
+            }
+        } catch {
+        }
+
+        try? await Task.sleep(nanoseconds: 500_000_000)
+
+        do {
+            return try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode)
+        } catch {
+            return false
+        }
     }
 }

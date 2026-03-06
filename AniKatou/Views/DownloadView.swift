@@ -61,12 +61,28 @@ struct DownloadView: View {
     }
 
     private var summaryCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Overview")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.blue.opacity(0.12))
+                        .frame(width: 46, height: 46)
+
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.title3)
+                        .foregroundColor(.blue)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Download Queue")
+                        .font(.headline)
+                    Text("Queued episodes will start automatically as download slots open.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
 
             HStack(spacing: 8) {
-                downloadStatChip(title: "Total", value: "\(manager.downloads.count)", tint: .secondary)
                 downloadStatChip(title: "Active", value: "\(activeCount)", tint: .blue)
                 downloadStatChip(title: "Completed", value: "\(completedCount)", tint: .green)
                 if failedCount > 0 {
@@ -74,14 +90,14 @@ struct DownloadView: View {
                 }
             }
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Color(.secondarySystemBackground))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
     }

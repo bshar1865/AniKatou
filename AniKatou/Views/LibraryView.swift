@@ -3,9 +3,6 @@ import SwiftUI
 struct LibraryView: View {
     @StateObject private var viewModel = LibraryCollectionViewModel()
     @StateObject private var downloadManager = HLSDownloadManager.shared
-    @State private var watchHistory: [WatchProgress] = []
-    @State private var selectedProgressForDelete: WatchProgress?
-    @State private var showDeleteProgressAlert = false
 
     private var activeDownloads: Int {
         downloadManager.downloads.filter { $0.state == .queued || $0.state == .downloading }.count
@@ -21,53 +18,40 @@ struct LibraryView: View {
         }
     }
 
-    private func reloadWatchHistory() {
-        WatchProgressManager.shared.cleanupFinishedEpisodes()
-        watchHistory = WatchProgressManager.shared.getWatchHistory()
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 downloadsCard
-                continueWatchingSection
                 librarySection
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
         }
         .navigationTitle("Library")
-        .onAppear {
-            reloadWatchHistory()
-        }
-        .refreshable {
-            reloadWatchHistory()
-        }
-        .alert("Remove from Continue Watching?", isPresented: $showDeleteProgressAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Remove", role: .destructive) {
-                if let progress = selectedProgressForDelete {
-                    WatchProgressManager.shared.removeProgress(for: progress.animeID, episodeID: progress.episodeID)
-                    reloadWatchHistory()
-                }
-                selectedProgressForDelete = nil
-            }
-        } message: {
-            Text("This episode entry will be removed.")
-        }
     }
 
     private var downloadsCard: some View {
         NavigationLink(destination: DownloadView()) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 10) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.blue)
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.blue.opacity(0.12))
+                            .frame(width: 42, height: 42)
 
-                    Text("Downloads")
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(.blue)
+                    }
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Downloads")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        Text("Offline queue and saved episodes")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
 
                     Spacer()
 
@@ -77,57 +61,22 @@ struct LibraryView: View {
                 }
 
                 HStack(spacing: 8) {
-                    libraryStatChip(title: "Total", value: "\(downloadManager.downloads.count)", tint: .secondary)
                     libraryStatChip(title: "Active", value: "\(activeDownloads)", tint: .blue)
                     libraryStatChip(title: "Completed", value: "\(completedDownloads)", tint: .green)
                 }
             }
-            .padding(14)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(Color(.secondarySystemBackground))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(Color.primary.opacity(0.08), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
-    private var continueWatchingSection: some View {
-        if !watchHistory.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                sectionHeader(title: "Continue Watching", symbol: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 12) {
-                        ForEach(watchHistory.prefix(15)) { progress in
-                            NavigationLink(destination: EpisodeView(
-                                episodeId: progress.episodeID,
-                                animeId: progress.animeID,
-                                animeTitle: progress.title,
-                                episodeNumber: progress.episodeNumber,
-                                episodeTitle: nil,
-                                thumbnailURL: progress.thumbnailURL
-                            )) {
-                                ContinueWatchingCard(progress: progress, coverURL: coverURL(for: progress))
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                Button("Remove from Continue Watching", role: .destructive) {
-                                    selectedProgressForDelete = progress
-                                    showDeleteProgressAlert = true
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 1)
-                }
-            }
-        }
     }
 
     private var librarySection: some View {
@@ -215,89 +164,6 @@ struct LibraryView: View {
         .background(
             Capsule()
                 .fill(Color(.tertiarySystemBackground))
-        )
-    }
-
-    private func coverURL(for progress: WatchProgress) -> String? {
-        if let libraryAnime = LibraryManager.shared.libraryItems.first(where: { $0.id == progress.animeID }) {
-            return libraryAnime.poster
-        }
-        if let cachedAnime = OfflineManager.shared.getCachedAnimeDetails(progress.animeID) {
-            return cachedAnime.image
-        }
-        return progress.thumbnailURL
-    }
-}
-
-private struct ContinueWatchingCard: View {
-    let progress: WatchProgress
-    let coverURL: String?
-
-    private var clampedProgress: Double {
-        min(max(progress.progressPercentage, 0), 1)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .bottomLeading) {
-                CachedAsyncImage(url: URL(string: coverURL ?? ""), maxPixelSize: 600) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Color.gray.overlay(Image(systemName: "play.rectangle.fill").foregroundColor(.white))
-                }
-                .frame(width: 136, height: 194)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                LinearGradient(
-                    gradient: Gradient(colors: [.clear, .black.opacity(0.65)]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(width: 136, height: 194)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                Text("Ep \(progress.episodeNumber)")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.black.opacity(0.45))
-                    .clipShape(Capsule())
-                    .padding(8)
-            }
-
-            Text(progress.title)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(2)
-                .foregroundColor(.primary)
-
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.primary.opacity(0.12))
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.blue)
-                        .frame(width: geo.size.width * clampedProgress)
-                }
-            }
-            .frame(height: 6)
-
-            Text(progress.formattedTimestamp)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-        }
-        .frame(width: 136, alignment: .leading)
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
     }
 }
