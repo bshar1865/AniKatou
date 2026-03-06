@@ -247,7 +247,7 @@ private struct DownloadEpisodeRow: View {
     }
 
     private var actionLabel: String {
-        isActive ? "Cancel" : "Remove"
+        isActive ? "Stop" : "Remove"
     }
 
     private var actionRole: ButtonRole? {
@@ -303,9 +303,9 @@ private struct DownloadEpisodeRow: View {
 
     private var statusTitle: String {
         switch item.state {
-        case .queued: return "Queued"
+        case .queued: return "Preparing"
         case .downloading: return "Downloading"
-        case .completed: return "Completed"
+        case .completed: return "Saved offline"
         case .failed: return "Failed"
         case .cancelled: return "Cancelled"
         }
@@ -324,15 +324,15 @@ private struct DownloadEpisodeRow: View {
     private var statusText: String {
         switch item.state {
         case .queued:
-            return "Waiting to start"
+            return "Preparing this episode for offline playback"
         case .downloading:
             return "Downloading \(Int(item.progress * 100))%"
         case .completed:
-            return "Saved for offline playback"
+            return "Saved offline and ready without internet"
         case .failed:
-            return item.errorMessage ?? "Download failed"
+            return item.errorMessage ?? "Needs internet to continue"
         case .cancelled:
-            return "Cancelled by user"
+            return "Stopped before completion"
         }
     }
 }

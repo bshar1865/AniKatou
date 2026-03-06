@@ -38,7 +38,7 @@ class AnimeDetailViewModel: ObservableObject {
 
     private func loadOfflineAnimeDetails(animeId: String) {
         guard let offlineDetails = OfflineManager.shared.getCachedAnimeDetails(animeId) else {
-            errorMessage = "This anime is not available offline. Please connect to the internet to load its details."
+            errorMessage = UserMessage.animeOfflineUnavailable
             return
         }
 
@@ -61,7 +61,6 @@ class AnimeDetailViewModel: ObservableObject {
             let details = detailsResult.data.anime.info
             await OfflineManager.shared.cacheAnimeDetails(details, episodes: episodes, thumbnails: [:])
         } catch {
-            // Fallback to cached data when API is unreachable but device still has internet.
             if let offlineDetails = OfflineManager.shared.getCachedAnimeDetails(animeId) {
                 offlineAnimeDetails = offlineDetails
                 let offlineEpisodes = offlineDetails.episodes.map {
@@ -72,7 +71,7 @@ class AnimeDetailViewModel: ObservableObject {
                 errorMessage = nil
                 return
             }
-            errorMessage = "Unable to load anime details at this time. Please try again."
+            errorMessage = UserMessage.animeDetailsUnavailable
         }
     }
 
@@ -145,7 +144,6 @@ class AnimeDetailViewModel: ObservableObject {
         do {
             addToLibraryIfNeeded(anime)
 
-            // Ensure anime detail + episode list are cached before download starts.
             if let details = animeDetails?.data.anime.info {
                 await OfflineManager.shared.cacheAnimeDetails(details, episodes: episodesToCache, thumbnails: [:])
             }
@@ -158,7 +156,7 @@ class AnimeDetailViewModel: ObservableObject {
 
             guard let source = stream.data.sources.first(where: { ($0.isM3U8 ?? false) || $0.url.contains(".m3u8") }),
                   let url = URL(string: source.url) else {
-                downloadMessage = "No downloadable stream was found for this episode."
+                downloadMessage = UserMessage.noDownloadableStream
                 return
             }
 
@@ -174,15 +172,15 @@ class AnimeDetailViewModel: ObservableObject {
                 outro: stream.data.outro
             )
 
-            downloadMessage = "The download has started for episode \(episode.number)."
+            downloadMessage = UserMessage.downloadStarted(forEpisode: episode.number)
         } catch {
-            downloadMessage = "Unable to start the download at this time. Please try again."
+            downloadMessage = UserMessage.downloadStartFailed
         }
     }
 
     func downloadSelectedEpisodes(anime: AnimeItem, episodesToCache: [EpisodeInfo], selectedEpisodes: [EpisodeInfo]) async {
         guard !selectedEpisodes.isEmpty else {
-            downloadMessage = "Please select at least one episode to download."
+            downloadMessage = UserMessage.selectEpisodeToDownload
             return
         }
 
@@ -193,9 +191,7 @@ class AnimeDetailViewModel: ObservableObject {
                 started += 1
             }
         }
-        downloadMessage = started > 0
-            ? "Download started for \(started) episode(s)."
-            : "No downloads were started."
+        downloadMessage = started > 0 ? UserMessage.bulkDownloadStarted(started) : "No downloads were started."
     }
 
     deinit {

@@ -1,6 +1,5 @@
 import SwiftUI
 import AVFoundation
-import Combine
 
 struct CustomVideoPlayerView: View {
     let videoURL: URL
@@ -17,38 +16,35 @@ struct CustomVideoPlayerView: View {
     let onDismiss: () -> Void
     
     @State private var player: AVPlayer = AVPlayer()
-    @State private var isPlaying: Bool = true
+    @State private var isPlaying = true
     @State private var duration: Double = 0
     @State private var currentTime: Double = 0
-    @State private var isSeeking: Bool = false
-    @State private var showControls: Bool = true
+    @State private var isSeeking = false
+    @State private var showControls = true
     @State private var hideControlsWorkItem: DispatchWorkItem?
-    @State private var subtitleCues: [SubtitleManager.SubtitleCue] = []
-    @State private var currentSubtitle: String = ""
+    @State private var currentSubtitle = ""
     @State private var subtitleTimeObserver: Any?
+    @State private var playbackTimeObserver: Any?
     @State private var progressSaveTimer: Timer?
     @State private var bufferingProgress: Double = 0
-    @State private var isBuffering: Bool = false
-    @State private var hasSkippedIntro: Bool = false
-    @State private var hasSkippedOutro: Bool = false
-    @State private var showAutoSkipNotification: Bool = false
-    @State private var autoSkipMessage: String = ""
-    @State private var isAutoSkipping: Bool = false
+    @State private var isBuffering = false
+    @State private var hasSkippedIntro = false
+    @State private var hasSkippedOutro = false
+    @State private var showAutoSkipNotification = false
+    @State private var autoSkipMessage = ""
+    @State private var isAutoSkipping = false
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Video Player Background
                 Color.black
                     .ignoresSafeArea()
                 
-                // Video Player Container
                 ZStack {
                     VideoPlayerContainer(player: player)
                         .ignoresSafeArea()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     
-                    // Buffering Indicator
                     if isBuffering {
                         VStack(spacing: 16) {
                             ProgressView()
@@ -66,10 +62,8 @@ struct CustomVideoPlayerView: View {
                     }
                 }
                 
-                // Top Controls Overlay
                 VStack {
                     HStack {
-                        // Back Button
                         Button(action: {
                             withAnimation(.spring()) {
                                 onDismiss()
@@ -86,7 +80,6 @@ struct CustomVideoPlayerView: View {
                         
                         Spacer()
                         
-                        // Title
                         VStack(alignment: .trailing, spacing: 2) {
                             Text(animeTitle)
                                 .font(.headline)
@@ -114,10 +107,8 @@ struct CustomVideoPlayerView: View {
                 .opacity(showControls ? 1 : 0)
                 .animation(.easeInOut(duration: 0.3), value: showControls)
                 
-                // Center Play/Pause Button and Seek Controls
                 if showControls {
                     HStack(spacing: 25) {
-                        // Rewind 5 seconds
                         Button(action: {
                             let newTime = max(0, currentTime - 5)
                             let seekTime = CMTime(seconds: newTime, preferredTimescale: 600)
@@ -130,7 +121,6 @@ struct CustomVideoPlayerView: View {
                                 .frame(width: 60, height: 60)
                         }
                         
-                        // Play/Pause Button
                         Button(action: {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                 if isPlaying {
@@ -150,7 +140,6 @@ struct CustomVideoPlayerView: View {
                         .scaleEffect(isPlaying ? 1 : 1.1)
                         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPlaying)
                         
-                        // Forward 5 seconds
                         Button(action: {
                             let newTime = min(duration, currentTime + 5)
                             let seekTime = CMTime(seconds: newTime, preferredTimescale: 600)
@@ -165,37 +154,29 @@ struct CustomVideoPlayerView: View {
                     }
                 }
                 
-                // Bottom Controls Overlay
                 VStack {
                     Spacer()
                     
-                    // Progress Bar and Time
                     VStack(spacing: 8) {
-                        // Custom Progress Bar
                         VStack(spacing: 4) {
-                            // Progress Bar Background
                             GeometryReader { barGeometry in
                                 ZStack(alignment: .leading) {
-                                    // Background Track
                                     Rectangle()
                                         .fill(Color.white.opacity(0.3))
                                         .frame(height: 4)
                                         .cornerRadius(2)
                                     
-                                    // Buffering Progress
                                     Rectangle()
                                         .fill(Color.white.opacity(0.5))
                                         .frame(width: barGeometry.size.width * bufferingProgress, height: 4)
                                         .cornerRadius(2)
                                     
-                                    // Playback Progress
                                     Rectangle()
                                         .fill(Color.white)
                                         .frame(width: barGeometry.size.width * (currentTime / max(duration, 1)), height: 4)
                                         .cornerRadius(2)
                                         .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 0)
                                     
-                                    // Seek Handle
                                     Circle()
                                         .fill(Color.white)
                                         .frame(width: 16, height: 16)
@@ -225,7 +206,6 @@ struct CustomVideoPlayerView: View {
                         }
                         .padding(.horizontal, 24)
                         
-                        // Time Labels
                         HStack {
                             Text(formatTime(currentTime))
                                 .font(.system(size: 14, weight: .medium))
@@ -244,12 +224,10 @@ struct CustomVideoPlayerView: View {
                     .animation(.easeInOut(duration: 0.3), value: showControls)
                 }
                 
-                // Subtitle Overlay
                 if AppSettings.shared.subtitlesEnabled, !currentSubtitle.isEmpty {
                     subtitleOverlay(geometry: geometry)
                 }
                 
-                // Auto-skip Notification
                 if showAutoSkipNotification {
                     VStack {
                         Spacer()
@@ -298,7 +276,7 @@ struct CustomVideoPlayerView: View {
         let asset: AVURLAsset
         if let headers = headers {
             asset = AVURLAsset(url: videoURL, options: [
-                "AVURLAssetHTTPHeaderFieldsKey": headers,
+                "AVURLAssetHTTPHeaderFieldsKey": headers
             ])
         } else {
             asset = AVURLAsset(url: videoURL)
@@ -307,16 +285,15 @@ struct CustomVideoPlayerView: View {
         let item = AVPlayerItem(asset: asset)
         player.replaceCurrentItem(with: item)
         
-        // Reset skip flags for new episode
         hasSkippedIntro = false
         hasSkippedOutro = false
         isAutoSkipping = false
         
+        updateDuration()
         observePlayer()
         loadSubtitles()
         startProgressSaving()
         
-        // Check for existing progress and seek to it
         if let existingProgress = WatchProgressManager.shared.getProgress(for: animeId, episodeID: episodeId) {
             let seekTime = CMTime(seconds: existingProgress.timestamp, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
             player.seek(to: seekTime)
@@ -331,7 +308,15 @@ struct CustomVideoPlayerView: View {
         player.pause()
         player.replaceCurrentItem(with: nil)
         hideControlsWorkItem?.cancel()
+        hideControlsWorkItem = nil
         progressSaveTimer?.invalidate()
+        progressSaveTimer = nil
+
+        if let observer = playbackTimeObserver {
+            player.removeTimeObserver(observer)
+            playbackTimeObserver = nil
+        }
+
         if let observer = subtitleTimeObserver {
             player.removeTimeObserver(observer)
             subtitleTimeObserver = nil
@@ -339,51 +324,33 @@ struct CustomVideoPlayerView: View {
     }
     
     private func observePlayer() {
-        // Observe duration
-        if let item = player.currentItem {
-            if #available(iOS 16.0, *) {
-                Task {
-                    do {
-                        let loadedDuration = try await item.asset.load(.duration)
-                        await MainActor.run { duration = loadedDuration.seconds }
-                    } catch {
-                        await MainActor.run { duration = 0 }
-                    }
-                }
-            } else {
-                duration = item.asset.duration.seconds
-            }
+        if let observer = playbackTimeObserver {
+            player.removeTimeObserver(observer)
+            playbackTimeObserver = nil
         }
-        
-        // Observe time and buffering
-        player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.2, preferredTimescale: 600), queue: .main) { time in
+
+        playbackTimeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.2, preferredTimescale: 600), queue: .main) { time in
             if !isSeeking && !isAutoSkipping {
                 currentTime = time.seconds
             }
             
-            // Auto-skip intro - only skip when we enter the intro range
             if let intro = intro, AppSettings.shared.autoSkipIntro, !hasSkippedIntro, !isAutoSkipping, !isSeeking {
                 let introStart = Double(intro.start)
                 let introEnd = Double(intro.end)
 
-                // Skip only for valid ranges and when playback time is inside the window.
                 if introEnd > introStart, time.seconds >= introStart, time.seconds <= introEnd {
                     isAutoSkipping = true
                     let seekTime = CMTime(seconds: introEnd, preferredTimescale: 600)
-                    player.seek(to: seekTime) { finished in
+                    player.seek(to: seekTime) { _ in
                         DispatchQueue.main.async {
                             self.isAutoSkipping = false
                         }
                     }
                     hasSkippedIntro = true
-                    
-                    // Show auto-skip notification
                     autoSkipMessage = "Skipped Intro"
                     withAnimation(.easeInOut(duration: 0.3)) {
                         showAutoSkipNotification = true
                     }
-                    
-                    // Hide notification after 2 seconds
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showAutoSkipNotification = false
@@ -392,29 +359,23 @@ struct CustomVideoPlayerView: View {
                 }
             }
             
-            // Auto-skip outro - only skip when we enter the outro range
             if let outro = outro, AppSettings.shared.autoSkipOutro, !hasSkippedOutro, !isAutoSkipping, !isSeeking {
                 let outroStart = Double(outro.start)
                 let outroEnd = Double(outro.end)
 
-                // Skip only for valid ranges and when playback time is inside the window.
                 if outroEnd > outroStart, time.seconds >= outroStart, time.seconds <= outroEnd {
                     isAutoSkipping = true
                     let seekTime = CMTime(seconds: outroEnd, preferredTimescale: 600)
-                    player.seek(to: seekTime) { finished in
+                    player.seek(to: seekTime) { _ in
                         DispatchQueue.main.async {
                             self.isAutoSkipping = false
                         }
                     }
                     hasSkippedOutro = true
-                    
-                    // Show auto-skip notification
                     autoSkipMessage = "Skipped Outro"
                     withAnimation(.easeInOut(duration: 0.3)) {
                         showAutoSkipNotification = true
                     }
-                    
-                    // Hide notification after 2 seconds
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showAutoSkipNotification = false
@@ -423,20 +384,27 @@ struct CustomVideoPlayerView: View {
                 }
             }
             
-            // Update buffering status
             if let item = player.currentItem {
                 let loadedRanges = item.loadedTimeRanges
                 if let timeRange = loadedRanges.first?.timeRangeValue {
                     let bufferedDuration = timeRange.duration.seconds
-                    let currentTime = time.seconds
+                    let playbackTime = time.seconds
                     bufferingProgress = min(1.0, bufferedDuration / max(duration, 1))
-                    
-                    // Check if we're buffering
-                    let timeToEnd = bufferedDuration - currentTime
+                    let timeToEnd = bufferedDuration - playbackTime
                     isBuffering = timeToEnd < 5.0 && !item.isPlaybackLikelyToKeepUp
                 }
-                
-                // Update duration
+            }
+        }
+
+        autoHideControls()
+    }
+
+    private func updateDuration() {
+        guard let item = player.currentItem else {
+            duration = 0
+            return
+        }
+
                 if #available(iOS 16.0, *) {
                     Task {
                         do {
@@ -449,10 +417,6 @@ struct CustomVideoPlayerView: View {
                 } else {
                     duration = item.asset.duration.seconds
                 }
-            }
-        }
-        
-        autoHideControls()
     }
     
     private func autoHideControls() {
@@ -476,9 +440,10 @@ struct CustomVideoPlayerView: View {
     
     private func loadSubtitles() {
         guard AppSettings.shared.subtitlesEnabled,
-              let tracks = subtitleTracks?.filter({ !$0.lang.lowercased().contains("thumbnail") }) else { return }
+              let tracks = subtitleTracks?.filter({ !$0.lang.lowercased().contains("thumbnail") }) else {
+            return
+        }
         
-        // Look for English subtitles
         let selectedSubtitle = tracks.first { track in
             let langParts = track.lang.components(separatedBy: " - ")
             let mainLang = langParts[0].lowercased()
@@ -486,23 +451,23 @@ struct CustomVideoPlayerView: View {
         }
         
         guard let subtitle = selectedSubtitle,
-              let subtitleURL = URL(string: subtitle.url) else { return }
+              let subtitleURL = URL(string: subtitle.url) else {
+            return
+        }
         
         Task {
             do {
-                let cues = try await SubtitleManager.shared.loadSubtitles(from: subtitleURL)
+                let cues = try await SubtitleManager.shared.loadSubtitles(from: subtitleURL, headers: headers)
                 await MainActor.run {
-                    subtitleCues = cues
                     if let observer = subtitleTimeObserver {
                         player.removeTimeObserver(observer)
                         subtitleTimeObserver = nil
                     }
-                    let observer = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.2, preferredTimescale: 600), queue: .main) { time in
+                    subtitleTimeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.2, preferredTimescale: 600), queue: .main) { time in
                         let seconds = time.seconds
                         let current = cues.first { $0.startTime <= seconds && seconds <= $0.endTime }
                         currentSubtitle = current?.text ?? ""
                     }
-                    subtitleTimeObserver = observer
                 }
             } catch {
                 // Subtitle loading failed silently
@@ -512,7 +477,7 @@ struct CustomVideoPlayerView: View {
     
     private func startProgressSaving() {
         progressSaveTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
-            self.saveWatchProgress()
+            saveWatchProgress()
         }
     }
     
@@ -531,7 +496,6 @@ struct CustomVideoPlayerView: View {
     }
 }
 
-// UIViewRepresentable to host AVPlayerLayer
 struct VideoPlayerContainer: UIViewRepresentable {
     let player: AVPlayer
     
@@ -552,7 +516,7 @@ class PlayerView: UIView {
     }
     
     var playerLayer: AVPlayerLayer {
-        return layer as! AVPlayerLayer
+        layer as! AVPlayerLayer
     }
     
     var player: AVPlayer? {
@@ -569,11 +533,9 @@ class PlayerView: UIView {
     }
 }
 
-// MARK: - Subtitle Overlay View
 private extension CustomVideoPlayerView {
     @ViewBuilder
     func subtitleOverlay(geometry: GeometryProxy) -> some View {
-        // Read settings
         let textSize = AppSettings.shared.subtitleTextSize > 0 ? AppSettings.shared.subtitleTextSize : AppSettings.defaultSubtitleTextSize
         let bgOpacity = AppSettings.shared.subtitleBackgroundOpacity > 0 ? AppSettings.shared.subtitleBackgroundOpacity : AppSettings.defaultSubtitleBackgroundOpacity
         let textColor = colorFromString(AppSettings.shared.subtitleTextColor)
@@ -617,7 +579,7 @@ private extension CustomVideoPlayerView {
                 subtitleView
                     .padding(.bottom, geometry.size.height * 0.18)
             }
-        default: // "bottom"
+        default:
             VStack {
                 Spacer()
                 subtitleView

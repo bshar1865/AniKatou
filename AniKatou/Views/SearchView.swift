@@ -204,10 +204,7 @@ struct SearchView: View {
                 if !Task.isCancelled {
                     await viewModel.search(query: newValue)
                 }
-            } catch {
-                #if DEBUG
-                print("Search task cancelled")
-                #endif
+            } catch { }
             }
         }
     }

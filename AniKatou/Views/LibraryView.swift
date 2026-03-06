@@ -147,7 +147,7 @@ struct LibraryView: View {
                 LazyVStack(spacing: 10) {
                     ForEach(viewModel.libraryItems.prefix(12)) { anime in
                         NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
-                            LibraryRowCard(anime: anime)
+                            LibraryRowCard(anime: anime, offlineEpisodeCount: downloadManager.downloadedEpisodeCount(for: anime.id))
                         }
                         .buttonStyle(.plain)
                     }
@@ -276,6 +276,7 @@ private struct ContinueWatchingCard: View {
 
 private struct LibraryRowCard: View {
     let anime: AnimeItem
+    let offlineEpisodeCount: Int
 
     var body: some View {
         HStack(spacing: 12) {
@@ -297,6 +298,12 @@ private struct LibraryRowCard: View {
                     .lineLimit(2)
 
                 HStack(spacing: 8) {
+                    if offlineEpisodeCount > 0 {
+                        Label("Offline \(offlineEpisodeCount)", systemImage: "arrow.down.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+
                     if let type = anime.type, !type.isEmpty {
                         Text(type)
                             .font(.caption)

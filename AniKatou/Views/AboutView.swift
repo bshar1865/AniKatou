@@ -1,8 +1,10 @@
 import SwiftUI
 
 struct AboutView: View {
-    @StateObject private var viewModel = SettingsViewModel()
-    
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
+
     var body: some View {
         List {
             Section {
@@ -10,19 +12,19 @@ struct AboutView: View {
                     Image(systemName: "play.rectangle.fill")
                         .font(.system(size: 60))
                         .foregroundColor(.blue)
-                    
+
                     Text("AniKatou")
                         .font(.largeTitle)
                         .fontWeight(.bold)
-                    
-                    Text("Version \(viewModel.appVersion)")
+
+                    Text("Version \(appVersion)")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
             }
-            
+
             Section("Creator") {
                 HStack {
                     Image(systemName: "heart.fill")
@@ -36,7 +38,7 @@ struct AboutView: View {
                     }
                 }
             }
-            
+
             Section("Description") {
                 Text("AniKatou is a client app for user-configured, self-hosted API backends. The app does not bundle content sources or API endpoints.")
                     .font(.body)
@@ -58,4 +60,4 @@ struct AboutView: View {
     NavigationView {
         AboutView()
     }
-} 
+}

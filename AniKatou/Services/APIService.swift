@@ -14,16 +14,26 @@ enum APIError: Error {
     
     var message: String {
         switch self {
-        case .invalidURL: return "The request URL is invalid."
-        case .invalidResponse: return "The server returned an invalid response."
-        case .networkError(let error): return "Unable to connect to the server. Please check your internet connection and try again. (\(error.localizedDescription))"
-        case .decodingError: return "The server response could not be processed."
-        case .serverError(let code, let message): return message ?? "The server returned an error (code \(code))."
-        case .notConfigured: return "The API server URL is not configured."
-        case .invalidEndpoint: return "The requested API endpoint is invalid."
-        case .invalidAnimeURL: return "The anime URL format is invalid."
-        case .invalidEpisodeId: return "The episode identifier is invalid."
-        case .searchQueryTooShort: return "Please enter at least 3 characters to search."
+        case .invalidURL:
+            return UserMessage.invalidURLFormat
+        case .invalidResponse:
+            return UserMessage.invalidServerResponse
+        case .networkError:
+            return UserMessage.noInternet
+        case .decodingError:
+            return UserMessage.apiResponseProcessingFailed
+        case .serverError(let code, let message):
+            return message ?? UserMessage.serverError(code)
+        case .notConfigured:
+            return UserMessage.apiNotConfigured
+        case .invalidEndpoint:
+            return "The requested API endpoint is invalid."
+        case .invalidAnimeURL:
+            return "The anime URL format is invalid."
+        case .invalidEpisodeId:
+            return "The episode identifier is invalid."
+        case .searchQueryTooShort:
+            return "Please enter at least 3 characters to search."
         }
     }
 }
@@ -43,7 +53,6 @@ class APIService {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
     }
     
-    // Search anime
     func searchAnime(query: String) async throws -> [AnimeItem] {
         guard query.count >= 3 else {
             throw APIError.searchQueryTooShort
@@ -58,18 +67,15 @@ class APIService {
         return result.data.animes
     }
     
-    // Get anime details
     func getAnimeDetails(id: String) async throws -> AnimeDetailsResult {
-        return try await fetch("anime/\(id)", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
+        try await fetch("anime/\(id)", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
     }
     
-    // Get anime episodes
     func getAnimeEpisodes(id: String) async throws -> [EpisodeInfo] {
         let result: EpisodesResponse = try await fetch("anime/\(id)/episodes", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
         return result.data.episodes
     }
     
-    // Get streaming URLs
     func getStreamingSources(episodeId: String, category: String = "sub", server: String = "hd-1") async throws -> StreamingResult {
         guard episodeId.contains("?ep=") else {
             throw APIError.invalidEpisodeId
@@ -83,43 +89,38 @@ class APIService {
         ]
         
         let result: StreamingResult = try await fetch("episode/sources", queryItems: queryItems)
-        
         return result
     }
     
-    // Get home page data
     func getHomePage() async throws -> HomePageData {
         let result: HomePageResult = try await fetch("home", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
         return result.data
     }
     
-    // Get popular anime
     func getPopularAnime() async throws -> [AnimeItem] {
-        let queryItems = [URLQueryItem(name: "nsfw", value: "false")]
-        let result: AnimeSearchResult = try await fetch("popular", queryItems: queryItems)
+        let result: AnimeSearchResult = try await fetch("popular", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
         return result.data.animes
     }
     
     private func validateResponse<T: Codable>(_ response: T) throws -> T {
         if let result = response as? HomePageResult, result.status != 200 {
-            throw APIError.serverError(result.status, "The server returned an unexpected status (\(result.status)).")
+            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
         }
         if let result = response as? AnimeSearchResult, result.status != 200 {
-            throw APIError.serverError(result.status, "The server returned an unexpected status (\(result.status)).")
+            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
         }
         if let result = response as? AnimeDetailsResult, result.status != 200 {
-            throw APIError.serverError(result.status, "The server returned an unexpected status (\(result.status)).")
+            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
         }
         if let result = response as? EpisodesResponse, result.status != 200 {
-            throw APIError.serverError(result.status, "The server returned an unexpected status (\(result.status)).")
+            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
         }
         if let result = response as? StreamingResult, result.status != 200 {
-            throw APIError.serverError(result.status, "The server returned an unexpected status (\(result.status)).")
+            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
         }
         return response
     }
 
-    // Base fetch method
     private func fetch<T: Codable>(_ endpoint: String, queryItems: [URLQueryItem] = []) async throws -> T {
         guard let url = APIConfig.buildEndpoint(endpoint, queryItems: queryItems) else {
             throw APIError.notConfigured
@@ -138,11 +139,11 @@ class APIService {
             }
             
             if httpResponse.statusCode == 404 {
-                throw APIError.serverError(404, "The requested resource was not found.")
+                throw APIError.serverError(404, UserMessage.apiResourceNotFound)
             }
             
             if httpResponse.statusCode != 200 {
-                throw APIError.serverError(httpResponse.statusCode, "The server could not complete the request.")
+                throw APIError.serverError(httpResponse.statusCode, UserMessage.apiRequestFailed)
             }
             
             let decodedResponse = try decoder.decode(T.self, from: data)

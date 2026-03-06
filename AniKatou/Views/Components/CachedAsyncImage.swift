@@ -1,17 +1,15 @@
 import SwiftUI
 import Combine
 
-// Improved image cache with better memory management
 class ImageCache {
     static let shared = ImageCache()
     private let cache = NSCache<NSString, CachedImage>()
     
     private init() {
-        cache.countLimit = 200 // Increased limit
-        cache.totalCostLimit = 100 * 1024 * 1024 // 100 MB
+        cache.countLimit = 200
+        cache.totalCostLimit = 100 * 1024 * 1024
         cache.evictsObjectsWithDiscardedContent = true
         
-        // Listen for memory warnings
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(clearCacheOnMemoryWarning),
@@ -47,7 +45,6 @@ class ImageCache {
     }
 }
 
-// Cached image wrapper with timestamp
 private class CachedImage {
     let image: UIImage
     let timestamp: Date
@@ -58,7 +55,6 @@ private class CachedImage {
     }
 }
 
-// Improved CachedAsyncImage with retry logic and better error handling
 struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     private let url: URL?
     private let scale: CGFloat
@@ -101,8 +97,7 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
                     }
             }
         }
-        .onChange(of: url) { oldValue, newValue in
-            // Reset state when URL changes
+        .onChange(of: url) { _, _ in
             image = nil
             error = nil
             retryCount = 0
@@ -112,16 +107,10 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     
     private func loadImage() {
         guard let url = url, !isLoading else { return }
+        guard url.scheme != nil, url.host != nil else { return }
         
-        // Validate URL
-        guard url.scheme != nil, url.host != nil else {
-            print("Invalid image URL: \(url)")
-            return
-        }
-        
-        // Check cache first
         if let cachedImage = ImageCache.shared.get(url) {
-            self.image = cachedImage
+            image = cachedImage
             return
         }
         
@@ -140,21 +129,16 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
                 let image = try await loadImageFromURL(url)
                 if !Task.isCancelled {
                     self.image = image
-                    self.isLoading = false
-                    
-                    // Cache the image with estimated cost based on size
-                    let cost = Int(image.size.width * image.size.height * 4) / (1024 * 1024) // Rough estimate in MB
+                    isLoading = false
+                    let cost = Int(image.size.width * image.size.height * 4) / (1024 * 1024)
                     ImageCache.shared.set(image, for: url, cost: max(1, cost))
                 }
                 return
             } catch {
                 if attempt == retryAttempts - 1 {
-                    // Last attempt failed
                     self.error = error
-                    self.isLoading = false
-                    print("Failed to load image after \(retryAttempts) attempts: \(error.localizedDescription)")
+                    isLoading = false
                 } else {
-                    // Wait before retrying with exponential backoff
                     try? await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 1_000_000_000))
                 }
             }
@@ -168,33 +152,21 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
         config.requestCachePolicy = .returnCacheDataElseLoad
         
         let session = URLSession(configuration: config)
-        
-        do {
             let (data, response) = try await session.data(from: url)
             
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw URLError(.badServerResponse)
-            }
-            
-            guard httpResponse.statusCode == 200 else {
-                print("Image loading failed with status code: \(httpResponse.statusCode) for URL: \(url)")
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
                 throw URLError(.badServerResponse)
             }
             
             guard let image = UIImage(data: data) else {
-                print("Failed to decode image data for URL: \(url)")
                 throw URLError(.cannotDecodeContentData)
             }
             
             return image
-        } catch {
-            print("Image loading error for URL \(url): \(error.localizedDescription)")
-            throw error
-        }
     }
 }
 
-// Convenience initializer for simple use cases
 extension CachedAsyncImage where Content == Image, Placeholder == Color {
     init(url: URL?, scale: CGFloat = 1.0) {
         self.init(
@@ -206,7 +178,6 @@ extension CachedAsyncImage where Content == Image, Placeholder == Color {
     }
 }
 
-// MARK: - Previews
 #Preview {
     VStack(spacing: 20) {
         CachedAsyncImage(url: URL(string: "https://picsum.photos/200/300")) { image in

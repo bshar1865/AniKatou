@@ -45,11 +45,12 @@ final class HLSDownloadManager: NSObject, ObservableObject {
     }()
 
     private var taskMap: [Int: UUID] = [:]
+    private var activeTasks: [UUID: AVAssetDownloadTask] = [:]
     private let storageURL: URL
 
     private override init() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        self.storageURL = docs.appendingPathComponent("hls_downloads.json")
+        storageURL = docs.appendingPathComponent("hls_downloads.json")
         super.init()
         loadStoredDownloads()
     }
@@ -102,7 +103,9 @@ final class HLSDownloadManager: NSObject, ObservableObject {
             animeTitle: animeTitle,
             episodeNumber: episodeNumber,
             streamURL: streamURL.absoluteString,
-            subtitleTracks: (subtitleTracks ?? []).map { DownloadedSubtitleTrack(lang: $0.lang, remoteURL: $0.url, localPath: nil) },
+            subtitleTracks: (subtitleTracks ?? []).map {
+                DownloadedSubtitleTrack(lang: $0.lang, remoteURL: $0.url, localPath: nil)
+            },
             intro: intro,
             outro: outro,
             localPath: nil,
@@ -114,32 +117,26 @@ final class HLSDownloadManager: NSObject, ObservableObject {
 
         downloads.insert(item, at: 0)
         taskMap[task.taskIdentifier] = item.id
+        activeTasks[item.id] = task
         setState(for: item.id, state: .downloading)
         persist()
         task.resume()
 
-        // Best-effort local subtitle caching for offline playback.
         if let subtitleTracks, !subtitleTracks.isEmpty {
             Task { [weak self] in
-                await self?.cacheSubtitleFiles(forEpisodeId: episodeId, tracks: subtitleTracks)
+                await self?.cacheSubtitleFiles(forEpisodeId: episodeId, tracks: subtitleTracks, headers: headers)
             }
         }
     }
 
     func cancelDownload(_ item: HLSDownloadItem) {
-        if let taskID = taskMap.first(where: { $0.value == item.id })?.key,
-           let task = session.getAllTasksSync().first(where: { $0.taskIdentifier == taskID }) {
-            task.cancel()
-        }
+        activeTasks[item.id]?.cancel()
         setState(for: item.id, state: .cancelled)
     }
 
     func removeDownload(_ item: HLSDownloadItem) {
         if item.state == .queued || item.state == .downloading {
-            if let taskID = taskMap.first(where: { $0.value == item.id })?.key,
-               let task = session.getAllTasksSync().first(where: { $0.taskIdentifier == taskID }) {
-                task.cancel()
-            }
+            activeTasks[item.id]?.cancel()
         }
 
         if let localPath = item.localPath {
@@ -150,7 +147,9 @@ final class HLSDownloadManager: NSObject, ObservableObject {
                 try? FileManager.default.removeItem(atPath: localPath)
             }
         }
+
         downloads.removeAll { $0.id == item.id }
+        activeTasks.removeValue(forKey: item.id)
         taskMap = taskMap.filter { $0.value != item.id }
         persist()
     }
@@ -166,13 +165,19 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         downloads.first { item in
             guard item.episodeId == episodeId,
                   item.state == .completed,
-                  let path = item.localPath else { return false }
+                  let path = item.localPath else {
+                return false
+            }
             return FileManager.default.fileExists(atPath: path)
         }
     }
 
     func isEpisodeDownloaded(_ episodeId: String) -> Bool {
         downloadedItem(for: episodeId) != nil
+    }
+
+    func downloadedEpisodeCount(for animeId: String) -> Int {
+        downloads.filter { $0.animeId == animeId && downloadedItem(for: $0.episodeId) != nil }.count
     }
 
     func localFileURL(for episodeId: String) -> URL? {
@@ -224,6 +229,19 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         persist()
     }
 
+    private func friendlyDownloadErrorMessage(for error: NSError) -> String {
+        switch error.code {
+        case NSURLErrorNotConnectedToInternet:
+            return "Needs internet to continue"
+        case NSURLErrorTimedOut:
+            return "Download timed out"
+        case NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost:
+            return "Unable to reach the video server"
+        default:
+            return "Download could not be completed"
+        }
+    }
+
     private func persist() {
         if let data = try? JSONEncoder().encode(downloads) {
             try? data.write(to: storageURL)
@@ -239,7 +257,7 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         downloads = saved
     }
 
-    private func cacheSubtitleFiles(forEpisodeId episodeId: String, tracks: [SubtitleTrack]) async {
+    private func cacheSubtitleFiles(forEpisodeId episodeId: String, tracks: [SubtitleTrack], headers: [String: String]?) async {
         let fileManager = FileManager.default
         let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
         let subtitleDir = docs.appendingPathComponent("DownloadedSubtitles", isDirectory: true)
@@ -247,9 +265,15 @@ final class HLSDownloadManager: NSObject, ObservableObject {
 
         for (index, track) in tracks.enumerated() {
             guard let remoteURL = URL(string: track.url) else { continue }
+
             do {
-                let (data, response) = try await URLSession.shared.data(from: remoteURL)
-                guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { continue }
+                var request = URLRequest(url: remoteURL)
+                headers?.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard let http = response as? HTTPURLResponse,
+                      (200...299).contains(http.statusCode) else {
+                    continue
+                }
 
                 let safeEpisodeId = episodeId.replacingOccurrences(of: "/", with: "_")
                 let safeLang = track.lang.replacingOccurrences(of: " ", with: "_")
@@ -274,14 +298,17 @@ extension HLSDownloadManager: AVAssetDownloadDelegate {
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         guard let id = taskMap[task.taskIdentifier] else { return }
-        defer { taskMap.removeValue(forKey: task.taskIdentifier) }
+        defer {
+            taskMap.removeValue(forKey: task.taskIdentifier)
+            activeTasks.removeValue(forKey: id)
+        }
 
         if let error = error {
             let nsError = error as NSError
             if nsError.code == NSURLErrorCancelled {
                 setState(for: id, state: .cancelled)
             } else {
-                setState(for: id, state: .failed, error: error.localizedDescription)
+                setState(for: id, state: .failed, error: friendlyDownloadErrorMessage(for: nsError))
             }
         } else {
             setState(for: id, state: .completed)
@@ -302,18 +329,5 @@ extension HLSDownloadManager: AVAssetDownloadDelegate {
         let expectedDuration = timeRangeExpectedToLoad.duration.seconds
         guard expectedDuration > 0 else { return }
         updateProgress(for: id, progress: loadedDuration / expectedDuration)
-    }
-}
-
-private extension AVAssetDownloadURLSession {
-    func getAllTasksSync() -> [URLSessionTask] {
-        let semaphore = DispatchSemaphore(value: 0)
-        var fetchedTasks: [URLSessionTask] = []
-        getAllTasks { tasks in
-            fetchedTasks = tasks
-            semaphore.signal()
-        }
-        _ = semaphore.wait(timeout: .now() + 2)
-        return fetchedTasks
     }
 }

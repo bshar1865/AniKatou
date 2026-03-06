@@ -8,7 +8,6 @@ class HomeViewModel: ObservableObject {
     @Published var topUpcomingAnimes: [AnimeItem] = []
     @Published var topAiringAnimes: [AnimeItem] = []
     @Published var mostPopularAnimes: [AnimeItem] = []
-    @Published var mostFavoriteAnimes: [AnimeItem] = []
     @Published var latestCompletedAnimes: [AnimeItem] = []
     @Published var top10Today: [AnimeItem] = []
     @Published var isLoading = false
@@ -29,22 +28,17 @@ class HomeViewModel: ObservableObject {
             topUpcomingAnimes = filterNSFWContent(data.topUpcomingAnimes)
             topAiringAnimes = filterNSFWContent(data.topAiringAnimes)
             mostPopularAnimes = filterNSFWContent(data.mostPopularAnimes)
-            mostFavoriteAnimes = filterNSFWContent(data.mostFavoriteAnimes)
             latestCompletedAnimes = filterNSFWContent(data.latestCompletedAnimes)
             top10Today = filterNSFWContent(data.top10Animes.today)
         } catch let error as APIError {
             switch error {
             case .networkError:
-                errorMessage = "No internet connection. Please connect to the internet to load Home."
+                errorMessage = UserMessage.homeOffline
             default:
                 errorMessage = error.message
             }
         } catch {
-            if OfflineManager.shared.isOfflineMode {
-                errorMessage = "No internet connection. Please connect to the internet to load Home."
-            } else {
-                errorMessage = "Unable to load Home at this time. Please try again."
-            }
+            errorMessage = OfflineManager.shared.isOfflineMode ? UserMessage.homeOffline : UserMessage.homeLoadFailed
         }
 
         isLoading = false

@@ -12,7 +12,6 @@ struct HomePageData: Codable {
     let topUpcomingAnimes: [AnimeItem]
     let topAiringAnimes: [AnimeItem]
     let mostPopularAnimes: [AnimeItem]
-    let mostFavoriteAnimes: [AnimeItem]
     let latestCompletedAnimes: [AnimeItem]
     let genres: [String]
     let top10Animes: Top10Animes
