@@ -54,7 +54,7 @@ class SearchViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let results = try await APIService.shared.searchAnime(query: trimmed)
+            let results = try await APIService.shared.searchAnime(query: trimmed, excludeRatings: ["r+", "rx"])
             guard !Task.isCancelled else { return }
 
             let preliminarilyFiltered = filterNSFWContent(results)

@@ -1,7 +1,8 @@
 import Foundation
 
-struct HomePageResult: Codable {
-    let status: Int
+struct HomePageResult: Codable, APIResultEnvelope {
+    let status: Int?
+    let success: Bool?
     let data: HomePageData
 }
 
@@ -21,4 +22,4 @@ struct Top10Animes: Codable {
     let today: [AnimeItem]
     let week: [AnimeItem]
     let month: [AnimeItem]
-} 
+}
