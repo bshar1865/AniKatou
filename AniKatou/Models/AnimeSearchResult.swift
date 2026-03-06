@@ -1,6 +1,5 @@
 import Foundation
 
-// Search Results
 struct AnimeSearchResult: Codable {
     let status: Int
     let data: AnimeSearchData
@@ -27,26 +26,12 @@ struct AnimeItem: Codable, Identifiable {
     var image: String { poster }
 
     var containsNSFWContent: Bool {
-        if let isNSFW, isNSFW {
-            return true
-        }
-
-        let nsfwGenres = ["Hentai", "Adult"]
-        if let genres {
-            if genres.contains(where: { genre in
-                nsfwGenres.contains { blocked in
-                    genre.lowercased().contains(blocked.lowercased())
-                }
-            }) {
-                return true
-            }
-        }
-
-        let nsfwKeywords = ["hentai", "adult", "nsfw", "xxx"]
-        let titleLowercased = name.lowercased()
-        return nsfwKeywords.contains { keyword in
-            titleLowercased.contains(keyword)
-        }
+        ContentSafety.containsAdultContent(
+            title: name,
+            genres: genres,
+            rating: rating,
+            isNSFW: isNSFW
+        )
     }
 }
 
@@ -55,11 +40,6 @@ struct EpisodeCount: Codable {
     let dub: Int?
 }
 
-
-
-
-
-// Anime Details
 struct AnimeDetailsResult: Codable {
     let status: Int
     let data: AnimeDetailsData
@@ -91,22 +71,12 @@ struct AnimeDetails: Codable {
     var rating: String? { stats?.rating }
 
     var containsNSFWContent: Bool {
-        let genreNames = genres ?? []
-        let blockedGenres = ["hentai", "adult"]
-        if genreNames.contains(where: { genre in
-            blockedGenres.contains { blocked in
-                genre.lowercased().contains(blocked)
-            }
-        }) {
-            return true
-        }
-
-        let titleText = name.lowercased()
-        let descriptionText = (description ?? "").lowercased()
-        let blockedKeywords = ["hentai", "adult", "xxx"]
-        return blockedKeywords.contains { keyword in
-            titleText.contains(keyword) || descriptionText.contains(keyword)
-        }
+        ContentSafety.containsAdultContent(
+            title: name,
+            description: description,
+            genres: genres,
+            rating: rating
+        )
     }
 }
 
@@ -154,18 +124,12 @@ struct AnimeQtipInfo: Codable {
     let genres: [String]?
 
     var containsNSFWContent: Bool {
-        let blockedGenres = ["hentai", "adult"]
-        if let genres, genres.contains(where: { genre in
-            blockedGenres.contains { blocked in
-                genre.lowercased().contains(blocked)
-            }
-        }) {
-            return true
-        }
-
-        let blockedKeywords = ["hentai", "adult", "xxx"]
-        let haystack = [name, description ?? "", synonyms ?? ""].joined(separator: " ").lowercased()
-        return blockedKeywords.contains { haystack.contains($0) }
+        ContentSafety.containsAdultContent(
+            title: name,
+            description: description,
+            synonyms: synonyms,
+            genres: genres
+        )
     }
 }
 
@@ -206,7 +170,6 @@ struct ResolvedStreamingSource {
     let didFallback: Bool
 }
 
-// Episodes Response
 struct EpisodesResponse: Codable {
     let status: Int
     let data: EpisodesData
@@ -226,7 +189,6 @@ struct EpisodeInfo: Codable, Identifiable {
     var id: String { episodeId }
 }
 
-// Streaming
 struct StreamingResult: Codable, Equatable {
     let status: Int
     let data: StreamingData

@@ -66,7 +66,7 @@ class AnimeDetailViewModel: ObservableObject {
             nextEpisodeSchedule = await scheduleTask.value
 
             if detailsResult.data.anime.info.containsNSFWContent || qtipResult?.data.anime.containsNSFWContent == true {
-                errorMessage = "This title is unavailable in AniKatou."
+                errorMessage = "This app does not support hentai shows."
                 animeDetails = nil
                 episodeGroups = []
                 return
@@ -133,13 +133,12 @@ class AnimeDetailViewModel: ObservableObject {
         if currentlyInLibrary {
             LibraryManager.shared.remove(anime)
         } else {
-            LibraryManager.shared.toggle(anime)
+            LibraryManager.shared.add(anime)
             Task {
                 await cacheCurrentAnimeForOffline()
             }
         }
         isInLibrary = !currentlyInLibrary
-        NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
     }
 
     func refreshLibraryState() {
@@ -206,9 +205,8 @@ class AnimeDetailViewModel: ObservableObject {
             isInLibrary = true
             return
         }
-        LibraryManager.shared.toggle(anime)
+        LibraryManager.shared.add(anime)
         isInLibrary = true
-        NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
 
         Task {
             await cacheCurrentAnimeForOffline()

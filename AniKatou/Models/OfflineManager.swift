@@ -2,7 +2,6 @@ import Foundation
 import Network
 import UIKit
 
-// MARK: - Offline Cache Models
 struct OfflineAnimeDetails: Codable {
     let id: String
     let title: String
@@ -18,18 +17,18 @@ struct OfflineAnimeDetails: Codable {
     let thumbnailURLs: [Int: String]
 
     init(from animeDetails: AnimeDetails, episodes: [EpisodeInfo], thumbnails: [Int: String]) {
-        self.id = animeDetails.id
-        self.title = animeDetails.title
-        self.image = animeDetails.image
-        self.description = animeDetails.description
-        self.type = animeDetails.type
-        self.status = animeDetails.status
-        self.releaseDate = animeDetails.releaseDate
-        self.genres = animeDetails.genres
-        self.rating = animeDetails.rating
+        id = animeDetails.id
+        title = animeDetails.title
+        image = animeDetails.image
+        description = animeDetails.description
+        type = animeDetails.type
+        status = animeDetails.status
+        releaseDate = animeDetails.releaseDate
+        genres = animeDetails.genres
+        rating = animeDetails.rating
         self.episodes = episodes.map { OfflineEpisode(from: $0) }
-        self.cachedDate = Date()
-        self.thumbnailURLs = thumbnails
+        cachedDate = Date()
+        thumbnailURLs = thumbnails
     }
 }
 
@@ -40,21 +39,25 @@ struct OfflineEpisode: Codable {
     let isFiller: Bool?
 
     init(from episode: EpisodeInfo) {
-        self.title = episode.title
-        self.episodeId = episode.episodeId
-        self.number = episode.number
-        self.isFiller = episode.isFiller
+        title = episode.title
+        episodeId = episode.episodeId
+        number = episode.number
+        isFiller = episode.isFiller
     }
 }
 
-struct OfflineImage: Codable {
+struct OfflineImageMetadata: Codable {
+    let url: String
+    let cachedDate: Date
+}
+
+struct LegacyOfflineImage: Codable {
     let url: String
     let data: Data
     let cachedDate: Date
 }
 
-// MARK: - Offline Manager
-class OfflineManager {
+final class OfflineManager {
     static let shared = OfflineManager()
 
     private let fileManager = FileManager.default
@@ -75,7 +78,6 @@ class OfflineManager {
         startNetworkMonitor()
     }
 
-    // MARK: - Cache Directory Management
     private func createCacheDirectoryIfNeeded() {
         if !fileManager.fileExists(atPath: cacheDirectory.path) {
             try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
@@ -100,11 +102,14 @@ class OfflineManager {
             .replacingOccurrences(of: "=", with: "")
     }
 
-    private func imageFileURL(for urlString: String) -> URL {
+    private func imageDataURL(for urlString: String) -> URL {
+        imageCacheDirectory.appendingPathComponent(cacheKey(for: urlString)).appendingPathExtension("img")
+    }
+
+    private func imageMetadataURL(for urlString: String) -> URL {
         imageCacheDirectory.appendingPathComponent(cacheKey(for: urlString)).appendingPathExtension("json")
     }
 
-    // MARK: - Anime Details Caching
     func cacheAnimeDetails(_ animeDetails: AnimeDetails, episodes: [EpisodeInfo], thumbnails: [Int: String]) async {
         let offlineDetails = OfflineAnimeDetails(from: animeDetails, episodes: episodes, thumbnails: thumbnails)
 
@@ -116,7 +121,6 @@ class OfflineManager {
             await cacheImage(from: animeDetails.image)
             await cacheThumbnailImages(thumbnails, for: animeDetails.id)
         } catch {
-            // Failed to cache anime details
         }
     }
 
@@ -144,7 +148,6 @@ class OfflineManager {
         try? fileManager.removeItem(at: thumbnailDirectory)
     }
 
-    // MARK: - Generic Image Caching
     func cacheImage(from urlString: String) async {
         guard let url = URL(string: urlString) else { return }
 
@@ -156,36 +159,54 @@ class OfflineManager {
             }
             cacheImageData(data, for: urlString)
         } catch {
-            // Failed to cache image
         }
     }
 
     func cacheImageData(_ data: Data, for urlString: String) {
         guard UIImage(data: data) != nil else { return }
 
-        let offlineImage = OfflineImage(url: urlString, data: data, cachedDate: Date())
-        guard let imageData = try? JSONEncoder().encode(offlineImage) else { return }
-        try? imageData.write(to: imageFileURL(for: urlString), options: .atomic)
+        let metadata = OfflineImageMetadata(url: urlString, cachedDate: Date())
+        guard let metadataData = try? JSONEncoder().encode(metadata) else { return }
+        try? data.write(to: imageDataURL(for: urlString), options: .atomic)
+        try? metadataData.write(to: imageMetadataURL(for: urlString), options: .atomic)
     }
 
     func getCachedImage(for urlString: String) -> UIImage? {
-        let fileURL = imageFileURL(for: urlString)
+        let dataURL = imageDataURL(for: urlString)
+        let metadataURL = imageMetadataURL(for: urlString)
 
-        guard let data = try? Data(contentsOf: fileURL),
-              let offlineImage = try? JSONDecoder().decode(OfflineImage.self, from: data),
+        if let metadataData = try? Data(contentsOf: metadataURL),
+           let metadata = try? JSONDecoder().decode(OfflineImageMetadata.self, from: metadataData),
+           let data = try? Data(contentsOf: dataURL),
+           let image = UIImage(data: data) {
+            if Date().timeIntervalSince(metadata.cachedDate) > maxCacheAge {
+                try? fileManager.removeItem(at: dataURL)
+                try? fileManager.removeItem(at: metadataURL)
+                return nil
+            }
+            return image
+        }
+
+        return getLegacyCachedImage(for: urlString)
+    }
+
+    private func getLegacyCachedImage(for urlString: String) -> UIImage? {
+        let legacyURL = imageMetadataURL(for: urlString)
+        guard let data = try? Data(contentsOf: legacyURL),
+              let offlineImage = try? JSONDecoder().decode(LegacyOfflineImage.self, from: data),
               let image = UIImage(data: offlineImage.data) else {
             return nil
         }
 
         if Date().timeIntervalSince(offlineImage.cachedDate) > maxCacheAge {
-            try? fileManager.removeItem(at: fileURL)
+            try? fileManager.removeItem(at: legacyURL)
             return nil
         }
 
+        cacheImageData(offlineImage.data, for: urlString)
         return image
     }
 
-    // MARK: - Thumbnail Image Caching
     private func cacheThumbnailImages(_ thumbnails: [Int: String], for animeId: String) async {
         let thumbnailDirectory = cacheDirectory.appendingPathComponent("thumbnails_\(animeId)")
 
@@ -197,25 +218,45 @@ class OfflineManager {
             guard let url = URL(string: thumbnailURL) else { continue }
 
             do {
-                let (data, _) = try await URLSession.shared.data(from: url)
-                let offlineImage = OfflineImage(url: thumbnailURL, data: data, cachedDate: Date())
-                let imageData = try JSONEncoder().encode(offlineImage)
+                let (data, response) = try await URLSession.shared.data(from: url)
+                guard let httpResponse = response as? HTTPURLResponse,
+                      (200...299).contains(httpResponse.statusCode),
+                      UIImage(data: data) != nil else {
+                    continue
+                }
 
-                let imageFileURL = thumbnailDirectory.appendingPathComponent("episode_\(episodeNumber).json")
-                try imageData.write(to: imageFileURL)
+                let imageFileURL = thumbnailDirectory.appendingPathComponent("episode_\(episodeNumber).img")
+                let metaFileURL = thumbnailDirectory.appendingPathComponent("episode_\(episodeNumber).json")
+                let metadata = OfflineImageMetadata(url: thumbnailURL, cachedDate: Date())
+                let metaData = try JSONEncoder().encode(metadata)
+
+                try data.write(to: imageFileURL, options: .atomic)
+                try metaData.write(to: metaFileURL, options: .atomic)
                 cacheImageData(data, for: thumbnailURL)
             } catch {
-                // Failed to cache thumbnail
             }
         }
     }
 
     func getCachedThumbnail(for episodeNumber: Int, animeId: String) -> UIImage? {
         let thumbnailDirectory = cacheDirectory.appendingPathComponent("thumbnails_\(animeId)")
-        let imageFileURL = thumbnailDirectory.appendingPathComponent("episode_\(episodeNumber).json")
+        let imageFileURL = thumbnailDirectory.appendingPathComponent("episode_\(episodeNumber).img")
+        let metaFileURL = thumbnailDirectory.appendingPathComponent("episode_\(episodeNumber).json")
 
-        guard let data = try? Data(contentsOf: imageFileURL),
-              let offlineImage = try? JSONDecoder().decode(OfflineImage.self, from: data),
+        if let metaData = try? Data(contentsOf: metaFileURL),
+           let metadata = try? JSONDecoder().decode(OfflineImageMetadata.self, from: metaData),
+           let data = try? Data(contentsOf: imageFileURL),
+           let image = UIImage(data: data) {
+            if Date().timeIntervalSince(metadata.cachedDate) > maxCacheAge {
+                removeCachedThumbnail(for: episodeNumber, animeId: animeId)
+                return nil
+            }
+            return image
+        }
+
+        let legacyFileURL = thumbnailDirectory.appendingPathComponent("episode_\(episodeNumber).json")
+        guard let data = try? Data(contentsOf: legacyFileURL),
+              let offlineImage = try? JSONDecoder().decode(LegacyOfflineImage.self, from: data),
               let image = UIImage(data: offlineImage.data) else {
             return nil
         }
@@ -225,23 +266,25 @@ class OfflineManager {
             return nil
         }
 
+        try? offlineImage.data.write(to: imageFileURL, options: .atomic)
+        if let metadataData = try? JSONEncoder().encode(OfflineImageMetadata(url: offlineImage.url, cachedDate: offlineImage.cachedDate)) {
+            try? metadataData.write(to: metaFileURL, options: .atomic)
+        }
         return image
     }
 
     private func removeCachedThumbnail(for episodeNumber: Int, animeId: String) {
         let thumbnailDirectory = cacheDirectory.appendingPathComponent("thumbnails_\(animeId)")
-        let imageFileURL = thumbnailDirectory.appendingPathComponent("episode_\(episodeNumber).json")
-        try? fileManager.removeItem(at: imageFileURL)
+        try? fileManager.removeItem(at: thumbnailDirectory.appendingPathComponent("episode_\(episodeNumber).img"))
+        try? fileManager.removeItem(at: thumbnailDirectory.appendingPathComponent("episode_\(episodeNumber).json"))
     }
 
-    // MARK: - Cache Management
     func getCacheSize() -> Int64 {
         guard let enumerator = fileManager.enumerator(at: cacheDirectory, includingPropertiesForKeys: [.fileSizeKey]) else {
             return 0
         }
 
         var totalSize: Int64 = 0
-
         for case let fileURL as URL in enumerator {
             if let fileSize = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
                 totalSize += Int64(fileSize)
@@ -256,7 +299,6 @@ class OfflineManager {
 
         do {
             let contents = try fileManager.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: [.creationDateKey])
-
             for fileURL in contents {
                 if let creationDate = try? fileURL.resourceValues(forKeys: [.creationDateKey]).creationDate,
                    currentDate.timeIntervalSince(creationDate) > maxCacheAge {
@@ -264,7 +306,6 @@ class OfflineManager {
                 }
             }
         } catch {
-            // Failed to clear old cache
         }
     }
 
@@ -276,21 +317,17 @@ class OfflineManager {
             }
             createCacheDirectoryIfNeeded()
         } catch {
-            // Failed to clear cache
         }
     }
 
-    // MARK: - Network Status
     func isNetworkAvailable() -> Bool {
         networkStatus == .satisfied
     }
 
-    // MARK: - Offline Mode Detection
     var isOfflineMode: Bool {
         !isNetworkAvailable()
     }
 
-    // MARK: - Cache Statistics
     func getCacheStatistics() -> (totalSize: Int64, animeCount: Int, imageCount: Int) {
         let totalSize = getCacheSize()
 
@@ -298,7 +335,7 @@ class OfflineManager {
             .filter { $0.lastPathComponent.hasPrefix("anime_") && $0.pathExtension == "json" }
 
         let imageFiles = try? fileManager.contentsOfDirectory(at: imageCacheDirectory, includingPropertiesForKeys: nil)
-            .filter { $0.pathExtension == "json" }
+            .filter { $0.pathExtension == "img" || $0.pathExtension == "json" }
 
         return (
             totalSize: totalSize,
