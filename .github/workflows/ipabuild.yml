@@ -23,9 +23,13 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Clean previous build artifacts
+      - name: Clean Xcode derived data
         run: |
+          rm -rf ~/Library/Developer/Xcode/DerivedData/*
           rm -rf build
+
+      - name: Clean project build state
+        run: |
           xcodebuild -project AniKatou.xcodeproj -scheme AniKatou clean || true
 
       - name: Make build script executable
