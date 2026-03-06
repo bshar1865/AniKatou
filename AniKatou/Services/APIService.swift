@@ -170,7 +170,7 @@ class APIService {
     }
 
     private func fetch<T: Codable>(_ endpoint: String, queryItems: [URLQueryItem] = []) async throws -> T {
-        try await performWithRetryWindow {
+        try await performWithRetryWindow { [self] in
             guard let url = APIConfig.buildEndpoint(endpoint, queryItems: queryItems) else {
                 throw APIError.notConfigured
             }
@@ -178,11 +178,11 @@ class APIService {
             var request = URLRequest(url: url)
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("application/json", forHTTPHeaderField: "Accept")
-            request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+            request.setValue(self.userAgent, forHTTPHeaderField: "User-Agent")
             request.timeoutInterval = 5
 
             do {
-                let (data, response) = try await session.data(for: request)
+                let (data, response) = try await self.session.data(for: request)
 
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw APIError.invalidResponse
@@ -196,8 +196,8 @@ class APIService {
                     throw APIError.serverError(httpResponse.statusCode, UserMessage.apiRequestFailed)
                 }
 
-                let decodedResponse = try decoder.decode(T.self, from: data)
-                return try validateResponse(decodedResponse)
+                let decodedResponse = try self.decoder.decode(T.self, from: data)
+                return try self.validateResponse(decodedResponse)
             } catch let error as DecodingError {
                 throw APIError.decodingError(error)
             } catch let error as APIError {
@@ -208,4 +208,5 @@ class APIService {
         }
     }
 }
+
 
