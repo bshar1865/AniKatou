@@ -219,8 +219,8 @@ struct AnimeDetailView: View {
     }
 
     private var selectionDragGesture: some Gesture {
-        LongPressGesture(minimumDuration: 0.12)
-            .sequenced(before: DragGesture(minimumDistance: 8, coordinateSpace: .named("episodeSelectionList")))
+        LongPressGesture(minimumDuration: 0.3)
+            .sequenced(before: DragGesture(minimumDistance: 20, coordinateSpace: .named("episodeSelectionList")))
             .onChanged { value in
                 switch value {
                 case .second(true, let drag?):
