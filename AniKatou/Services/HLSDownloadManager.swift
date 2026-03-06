@@ -22,6 +22,7 @@ struct HLSDownloadItem: Identifiable, Codable {
     let animeTitle: String
     let episodeNumber: String
     let streamURL: String
+    var requestHeaders: [String: String]?
     var subtitleTracks: [DownloadedSubtitleTrack]
     var intro: IntroOutro?
     var outro: IntroOutro?
@@ -110,6 +111,7 @@ final class HLSDownloadManager: NSObject, ObservableObject {
             animeTitle: animeTitle,
             episodeNumber: episodeNumber,
             streamURL: streamURL.absoluteString,
+            requestHeaders: headers,
             subtitleTracks: (subtitleTracks ?? []).map {
                 DownloadedSubtitleTrack(lang: $0.lang, remoteURL: $0.url, localPath: nil)
             },
@@ -135,6 +137,23 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         }
 
         return true
+    }
+
+    @discardableResult
+    func retryDownload(_ item: HLSDownloadItem) -> Bool {
+        guard let url = URL(string: item.streamURL) else { return false }
+        let subtitleTracks = item.subtitleTracks.map { SubtitleTrack(url: $0.remoteURL, lang: $0.lang) }
+        return startDownload(
+            streamURL: url,
+            animeId: item.animeId,
+            episodeId: item.episodeId,
+            animeTitle: item.animeTitle,
+            episodeNumber: item.episodeNumber,
+            headers: item.requestHeaders,
+            subtitleTracks: subtitleTracks,
+            intro: item.intro,
+            outro: item.outro
+        )
     }
 
     func cancelDownload(_ item: HLSDownloadItem) {

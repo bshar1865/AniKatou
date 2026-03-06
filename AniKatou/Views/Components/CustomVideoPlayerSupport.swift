@@ -41,13 +41,15 @@ final class PlayerView: UIView {
 extension CustomVideoPlayerView {
     @ViewBuilder
     func subtitleOverlay(geometry: GeometryProxy, currentSubtitle: String) -> some View {
-        let textSize = AppSettings.shared.subtitleTextSize > 0 ? AppSettings.shared.subtitleTextSize : AppSettings.defaultSubtitleTextSize
-        let bgOpacity = AppSettings.shared.subtitleBackgroundOpacity > 0 ? AppSettings.shared.subtitleBackgroundOpacity : AppSettings.defaultSubtitleBackgroundOpacity
+        let textSize = AppSettings.shared.subtitleTextSize
+        let bgOpacity = AppSettings.shared.subtitleBackgroundOpacity
         let textColor = colorFromString(AppSettings.shared.subtitleTextColor)
         let showBg = AppSettings.shared.subtitleShowBackground
         let fontWeight = fontWeightFromString(AppSettings.shared.subtitleFontWeight)
-        let maxLines = AppSettings.shared.subtitleMaxLines > 0 ? AppSettings.shared.subtitleMaxLines : AppSettings.defaultSubtitleMaxLines
+        let maxLines = AppSettings.shared.subtitleMaxLines
         let position = AppSettings.shared.subtitlePosition
+        let shadowOpacity = AppSettings.shared.subtitleShadowOpacity
+        let verticalOffset = CGFloat(AppSettings.shared.subtitleVerticalOffset)
 
         let subtitleView = HStack {
             Spacer()
@@ -58,18 +60,20 @@ extension CustomVideoPlayerView {
                 .lineLimit(maxLines)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
-                .background(
-                    Group {
-                        if showBg {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.black.opacity(bgOpacity))
-                        }
+                .background {
+                    if showBg {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.black.opacity(bgOpacity))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                            )
                     }
-                )
-                .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
+                }
+                .shadow(color: .black.opacity(shadowOpacity), radius: 10, x: 0, y: 5)
             Spacer()
         }
-        .transition(.opacity)
+        .transition(.opacity.combined(with: .move(edge: .bottom)))
 
         switch position {
         case "center":
@@ -82,13 +86,13 @@ extension CustomVideoPlayerView {
             VStack {
                 Spacer()
                 subtitleView
-                    .padding(.bottom, geometry.size.height * 0.18)
+                    .padding(.bottom, geometry.size.height * 0.16 + verticalOffset)
             }
         default:
             VStack {
                 Spacer()
                 subtitleView
-                    .padding(.bottom, geometry.size.height * 0.08)
+                    .padding(.bottom, geometry.safeAreaInsets.bottom + geometry.size.height * 0.06 + verticalOffset)
             }
         }
     }

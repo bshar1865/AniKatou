@@ -11,6 +11,15 @@ class AppSettings {
     private let autoSkipIntroKey = "auto_skip_intro"
     private let autoSkipOutroKey = "auto_skip_outro"
     private let concurrentDownloadsKey = "concurrent_downloads_limit"
+    private let subtitleTextSizeKey = "subtitleTextSize"
+    private let subtitleBackgroundOpacityKey = "subtitleBackgroundOpacity"
+    private let subtitleTextColorKey = "subtitleTextColor"
+    private let subtitleShowBackgroundKey = "subtitleShowBackground"
+    private let subtitlePositionKey = "subtitlePosition"
+    private let subtitleFontWeightKey = "subtitleFontWeight"
+    private let subtitleMaxLinesKey = "subtitleMaxLines"
+    private let subtitleShadowOpacityKey = "subtitleShadowOpacity"
+    private let subtitleVerticalOffsetKey = "subtitleVerticalOffset"
 
     private init() {}
 
@@ -63,43 +72,77 @@ class AppSettings {
     }
 
     var subtitleTextSize: Double {
-        get { defaults.double(forKey: "subtitleTextSize") }
-        set { defaults.set(newValue, forKey: "subtitleTextSize") }
+        get {
+            let value = defaults.double(forKey: subtitleTextSizeKey)
+            return value > 0 ? value : Self.defaultSubtitleTextSize
+        }
+        set { defaults.set(newValue, forKey: subtitleTextSizeKey) }
     }
 
     var subtitleBackgroundOpacity: Double {
-        get { defaults.double(forKey: "subtitleBackgroundOpacity") }
-        set { defaults.set(newValue, forKey: "subtitleBackgroundOpacity") }
+        get {
+            let value = defaults.double(forKey: subtitleBackgroundOpacityKey)
+            return value > 0 ? value : Self.defaultSubtitleBackgroundOpacity
+        }
+        set { defaults.set(newValue, forKey: subtitleBackgroundOpacityKey) }
     }
 
     var subtitleTextColor: String {
-        get { defaults.string(forKey: "subtitleTextColor") ?? "white" }
-        set { defaults.set(newValue, forKey: "subtitleTextColor") }
+        get { defaults.string(forKey: subtitleTextColorKey) ?? "white" }
+        set { defaults.set(newValue, forKey: subtitleTextColorKey) }
     }
 
     var subtitleShowBackground: Bool {
-        get { defaults.bool(forKey: "subtitleShowBackground") }
-        set { defaults.set(newValue, forKey: "subtitleShowBackground") }
+        get {
+            if defaults.object(forKey: subtitleShowBackgroundKey) == nil {
+                return true
+            }
+            return defaults.bool(forKey: subtitleShowBackgroundKey)
+        }
+        set { defaults.set(newValue, forKey: subtitleShowBackgroundKey) }
     }
 
     var subtitlePosition: String {
-        get { defaults.string(forKey: "subtitlePosition") ?? "bottom" }
-        set { defaults.set(newValue, forKey: "subtitlePosition") }
+        get { defaults.string(forKey: subtitlePositionKey) ?? "bottom" }
+        set { defaults.set(newValue, forKey: subtitlePositionKey) }
     }
 
     var subtitleFontWeight: String {
-        get { defaults.string(forKey: "subtitleFontWeight") ?? "medium" }
-        set { defaults.set(newValue, forKey: "subtitleFontWeight") }
+        get { defaults.string(forKey: subtitleFontWeightKey) ?? "medium" }
+        set { defaults.set(newValue, forKey: subtitleFontWeightKey) }
     }
 
     var subtitleMaxLines: Int {
-        get { defaults.integer(forKey: "subtitleMaxLines") }
-        set { defaults.set(newValue, forKey: "subtitleMaxLines") }
+        get {
+            let value = defaults.integer(forKey: subtitleMaxLinesKey)
+            return value > 0 ? value : Self.defaultSubtitleMaxLines
+        }
+        set { defaults.set(newValue, forKey: subtitleMaxLinesKey) }
+    }
+
+    var subtitleShadowOpacity: Double {
+        get {
+            let value = defaults.double(forKey: subtitleShadowOpacityKey)
+            return value > 0 ? value : Self.defaultSubtitleShadowOpacity
+        }
+        set { defaults.set(newValue, forKey: subtitleShadowOpacityKey) }
+    }
+
+    var subtitleVerticalOffset: Double {
+        get {
+            if defaults.object(forKey: subtitleVerticalOffsetKey) == nil {
+                return Self.defaultSubtitleVerticalOffset
+            }
+            return defaults.double(forKey: subtitleVerticalOffsetKey)
+        }
+        set { defaults.set(newValue, forKey: subtitleVerticalOffsetKey) }
     }
 
     static let defaultSubtitleTextSize: Double = 18.0
     static let defaultSubtitleBackgroundOpacity: Double = 0.8
     static let defaultSubtitleMaxLines: Int = 3
+    static let defaultSubtitleShadowOpacity: Double = 0.65
+    static let defaultSubtitleVerticalOffset: Double = 14
 
     var autoSkipIntro: Bool {
         get {

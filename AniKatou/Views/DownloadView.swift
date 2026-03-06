@@ -61,6 +61,7 @@ struct DownloadView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
         }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle("Downloads")
         .confirmationDialog(
             "Remove downloads for \(pendingGroupRemoval?.animeTitle ?? "")?",
@@ -78,7 +79,7 @@ struct DownloadView: View {
                 pendingGroupRemoval = nil
             }
         } message: {
-            Text("This will remove every queued, failed, and saved episode for this anime.")
+            Text("This removes every queued, failed, and saved episode for this anime.")
         }
         .alert("Remove All Downloads", isPresented: Binding(
             get: { confirmedGroupRemoval != nil },
@@ -102,9 +103,9 @@ struct DownloadView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(Color.blue.opacity(0.12))
-                        .frame(width: 46, height: 46)
+                        .frame(width: 48, height: 48)
 
                     Image(systemName: "arrow.down.circle.fill")
                         .font(.title3)
@@ -114,7 +115,7 @@ struct DownloadView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Download Queue")
                         .font(.headline)
-                    Text("Queued episodes will start automatically as download slots open.")
+                    Text("Active episodes continue automatically. Failed items can be retried in place.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -128,14 +129,14 @@ struct DownloadView: View {
                 }
             }
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(.ultraThinMaterial)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
     }
@@ -146,18 +147,18 @@ struct DownloadView: View {
                 .font(.headline)
                 .foregroundColor(.red)
 
-            Text("Your recent downloads did not finish. Reconnect to the internet and retry, or remove failed items you no longer need.")
+            Text("Some episodes did not finish. Retry them here when the source becomes available again, or remove the items you no longer need.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Color.red.opacity(0.08))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.red.opacity(0.18), lineWidth: 1)
         )
     }
@@ -175,10 +176,7 @@ struct DownloadView: View {
         .foregroundColor(.secondary)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(
-            Capsule()
-                .fill(Color(.tertiarySystemBackground))
-        )
+        .background(Capsule().fill(Color(.tertiarySystemBackground)))
     }
 }
 
@@ -197,7 +195,7 @@ private struct AnimeDownloadGroup: Identifiable {
     }
 
     var failedCount: Int {
-        items.filter { $0.state == .failed }.count
+        items.filter { $0.state == .failed || $0.state == .cancelled }.count
     }
 
     var averageProgress: Double {
@@ -248,14 +246,14 @@ private struct DownloadGroupCard: View {
                 }
             }
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
     }
@@ -305,19 +303,14 @@ private struct DownloadAnimeDetailView: View {
                     .padding(.top, 24)
                 } else {
                     ForEach(items) { item in
-                        DownloadEpisodeRow(item: item, onAction: {
-                            if item.state == .queued || item.state == .downloading {
-                                manager.cancelDownload(item)
-                            } else {
-                                manager.removeDownload(item)
-                            }
-                        })
+                        DownloadEpisodeRow(item: item, manager: manager)
                     }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
         }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle(animeTitle)
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -325,22 +318,32 @@ private struct DownloadAnimeDetailView: View {
 
 private struct DownloadEpisodeRow: View {
     let item: HLSDownloadItem
-    let onAction: () -> Void
+    @ObservedObject var manager: HLSDownloadManager
 
     private var isActive: Bool {
         item.state == .queued || item.state == .downloading
     }
 
+    private var canRetry: Bool {
+        item.state == .failed || item.state == .cancelled
+    }
+
     private var actionLabel: String {
-        isActive ? "Stop" : "Remove"
+        if isActive { return "Stop" }
+        if canRetry { return "Retry" }
+        return "Remove"
     }
 
     private var actionRole: ButtonRole? {
-        isActive ? nil : .destructive
+        (!isActive && !canRetry) ? .destructive : nil
     }
 
     private var tintColor: Color {
-        item.state == .failed ? .red : .blue
+        switch item.state {
+        case .failed: return .red
+        case .cancelled: return .orange
+        default: return .blue
+        }
     }
 
     var body: some View {
@@ -361,27 +364,33 @@ private struct DownloadEpisodeRow: View {
                 Text(statusText)
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    .lineLimit(2)
+                    .lineLimit(3)
 
                 Spacer(minLength: 10)
 
                 Button(actionLabel, role: actionRole) {
-                    onAction()
+                    if isActive {
+                        manager.cancelDownload(item)
+                    } else if canRetry {
+                        _ = manager.retryDownload(item)
+                    } else {
+                        manager.removeDownload(item)
+                    }
                 }
                 .font(.caption.weight(.semibold))
                 .buttonStyle(.borderedProminent)
-                .tint(isActive ? .orange : .red)
+                .tint(buttonTint)
                 .controlSize(.small)
             }
         }
-        .padding(12)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Color(.secondarySystemBackground))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
     }
@@ -392,7 +401,7 @@ private struct DownloadEpisodeRow: View {
         case .downloading: return "Downloading"
         case .completed: return "Saved offline"
         case .failed: return "Failed"
-        case .cancelled: return "Cancelled"
+        case .cancelled: return "Stopped"
         }
     }
 
@@ -415,10 +424,16 @@ private struct DownloadEpisodeRow: View {
         case .completed:
             return "Saved offline and ready without internet"
         case .failed:
-            return item.errorMessage ?? "Needs internet to continue"
+            return item.errorMessage ?? "This episode could not be downloaded."
         case .cancelled:
-            return "Stopped before completion"
+            return item.errorMessage ?? "Stopped before completion"
         }
+    }
+
+    private var buttonTint: Color {
+        if isActive { return .orange }
+        if canRetry { return .blue }
+        return .red
     }
 }
 
@@ -432,10 +447,7 @@ private struct StateBadge: View {
             .foregroundColor(tint)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(
-                Capsule()
-                    .fill(tint.opacity(0.14))
-            )
+            .background(Capsule().fill(tint.opacity(0.14)))
     }
 }
 

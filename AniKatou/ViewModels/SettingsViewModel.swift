@@ -62,6 +62,14 @@ class SettingsViewModel: ObservableObject {
         didSet { AppSettings.shared.subtitleMaxLines = subtitleMaxLines }
     }
 
+    @Published var subtitleShadowOpacity: Double {
+        didSet { AppSettings.shared.subtitleShadowOpacity = subtitleShadowOpacity }
+    }
+
+    @Published var subtitleVerticalOffset: Double {
+        didSet { AppSettings.shared.subtitleVerticalOffset = subtitleVerticalOffset }
+    }
+
     @Published var cacheStatistics: (totalSize: Int64, animeCount: Int, imageCount: Int)?
 
     var availableServers: [(id: String, name: String)] { AppSettings.shared.availableServers }
@@ -80,18 +88,15 @@ class SettingsViewModel: ObservableObject {
         subtitlesEnabled = AppSettings.shared.subtitlesEnabled
         autoSkipIntro = AppSettings.shared.autoSkipIntro
         autoSkipOutro = AppSettings.shared.autoSkipOutro
-
-        let textSize = AppSettings.shared.subtitleTextSize > 0 ? AppSettings.shared.subtitleTextSize : AppSettings.defaultSubtitleTextSize
-        let bgOpacity = AppSettings.shared.subtitleBackgroundOpacity > 0 ? AppSettings.shared.subtitleBackgroundOpacity : AppSettings.defaultSubtitleBackgroundOpacity
-        let maxLines = AppSettings.shared.subtitleMaxLines > 0 ? AppSettings.shared.subtitleMaxLines : AppSettings.defaultSubtitleMaxLines
-
-        subtitleTextSize = textSize
-        subtitleBackgroundOpacity = bgOpacity
+        subtitleTextSize = AppSettings.shared.subtitleTextSize
+        subtitleBackgroundOpacity = AppSettings.shared.subtitleBackgroundOpacity
         subtitleTextColor = AppSettings.shared.subtitleTextColor
         subtitleShowBackground = AppSettings.shared.subtitleShowBackground
         subtitlePosition = AppSettings.shared.subtitlePosition
         subtitleFontWeight = AppSettings.shared.subtitleFontWeight
-        subtitleMaxLines = maxLines
+        subtitleMaxLines = AppSettings.shared.subtitleMaxLines
+        subtitleShadowOpacity = AppSettings.shared.subtitleShadowOpacity
+        subtitleVerticalOffset = AppSettings.shared.subtitleVerticalOffset
 
         refreshCacheStatistics()
     }

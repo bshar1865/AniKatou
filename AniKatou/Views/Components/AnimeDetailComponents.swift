@@ -8,7 +8,7 @@ struct AnimeDetailHeroSection: View {
     var body: some View {
         VStack(spacing: 18) {
             ZStack(alignment: .bottomLeading) {
-                AsyncImage(url: URL(string: details.image)) { image in
+                CachedAsyncImage(url: URL(string: details.image), maxPixelSize: 1400) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
@@ -16,18 +16,18 @@ struct AnimeDetailHeroSection: View {
                     LinearGradient(colors: [Color.gray.opacity(0.28), Color.gray.opacity(0.12)], startPoint: .top, endPoint: .bottom)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 290)
+                .frame(height: 296)
                 .clipped()
                 .overlay(
                     LinearGradient(
-                        colors: [Color.black.opacity(0.05), Color.black.opacity(0.28), Color.black.opacity(0.68)],
+                        colors: [Color.black.opacity(0.05), Color.black.opacity(0.28), Color.black.opacity(0.7)],
                         startPoint: .top,
                         endPoint: .bottom
                     )
                 )
 
                 HStack(alignment: .bottom, spacing: 16) {
-                    AsyncImage(url: URL(string: details.image)) { image in
+                    CachedAsyncImage(url: URL(string: details.image), maxPixelSize: 700) { image in
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -216,8 +216,11 @@ struct AnimeEpisodeSectionHeader: View {
     let showsGroupMenu: Bool
     let groups: [EpisodeGroup]
     let isSelecting: Bool
+    let showsOfflineFilter: Bool
+    let isOfflineFilterEnabled: Bool
     let onSelectGroup: (Int) -> Void
     let onToggleSelection: () -> Void
+    let onToggleOfflineFilter: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -225,7 +228,7 @@ struct AnimeEpisodeSectionHeader: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.title3.weight(.bold))
-                    Text(isSelecting ? "Tap episodes to build your queue" : "Quick download or select multiple episodes")
+                    Text(isSelecting ? "Tap episodes to build your queue" : "Open an episode or queue multiple for offline use")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -240,30 +243,48 @@ struct AnimeEpisodeSectionHeader: View {
                     .background(.ultraThinMaterial, in: Capsule())
             }
 
-            if showsGroupMenu {
-                Menu {
-                    ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
-                        Button(group.title) {
-                            onSelectGroup(index)
+            HStack(spacing: 10) {
+                if showsGroupMenu {
+                    Menu {
+                        ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
+                            Button(group.title) {
+                                onSelectGroup(index)
+                            }
                         }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "square.stack.3d.up.fill")
+                                .font(.caption)
+                            Text(currentGroupTitle)
+                                .font(.subheadline.weight(.semibold))
+                            Image(systemName: "chevron.down")
+                                .font(.caption2.weight(.bold))
+                        }
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(.thinMaterial, in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                        )
                     }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "square.stack.3d.up.fill")
-                            .font(.caption)
-                        Text(currentGroupTitle)
-                            .font(.subheadline.weight(.semibold))
-                        Image(systemName: "chevron.down")
-                            .font(.caption2.weight(.bold))
+                }
+
+                if showsOfflineFilter {
+                    Button(action: onToggleOfflineFilter) {
+                        Label(isOfflineFilterEnabled ? "Offline Only" : "All Episodes", systemImage: isOfflineFilterEnabled ? "tray.and.arrow.down.fill" : "tray.and.arrow.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(isOfflineFilterEnabled ? .blue : .primary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(.thinMaterial, in: Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(isOfflineFilterEnabled ? Color.blue.opacity(0.35) : Color.white.opacity(0.18), lineWidth: 1)
+                            )
                     }
-                    .foregroundColor(.primary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(.thinMaterial, in: Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                    )
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -371,7 +392,7 @@ struct AnimeEpisodeCard: View {
         case .failed:
             return "Failed"
         case .cancelled:
-            return "Cancelled"
+            return "Stopped"
         }
     }
 

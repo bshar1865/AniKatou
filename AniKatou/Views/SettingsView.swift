@@ -5,181 +5,131 @@ struct SettingsView: View {
     @State private var showCacheAlert = false
     @State private var showClearCacheAlert = false
 
-    private var setupItems: [(String, String, Bool)] {
-        [
-            ("API server", APIConfig.isConfigured ? "Configured" : "Required", APIConfig.isConfigured),
-            ("Preferred server", viewModel.availableServers.first(where: { $0.id == viewModel.preferredServer })?.name ?? viewModel.preferredServer, true),
-            ("Audio language", viewModel.availableLanguages.first(where: { $0.id == viewModel.preferredLanguage })?.name ?? viewModel.preferredLanguage, true),
-            ("Subtitles", viewModel.subtitlesEnabled ? "Enabled" : "Disabled", viewModel.subtitlesEnabled)
-        ]
-    }
-
     var body: some View {
-        NavigationView {
-            List {
-                Section("Setup Checklist") {
-                    ForEach(setupItems, id: \.0) { item in
-                        HStack(spacing: 12) {
-                            Image(systemName: item.2 ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(item.2 ? .green : .orange)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(item.0)
-                                Text(item.1)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-
-                    Text("AniKatou now uses one playback path for both streaming and offline episodes. This keeps playback, subtitles, and auto-skip behavior consistent.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Section("API Configuration") {
-                    NavigationLink(destination: APIConfigView()) {
-                        HStack {
-                            Image(systemName: "server.rack")
-                                .foregroundColor(.blue)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Server Settings")
-                                    .font(.headline)
-                                Text("Configure your AniWatch API endpoint")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
+        List {
+            Section("Playback") {
+                Picker("Preferred Server", selection: $viewModel.preferredServer) {
+                    ForEach(viewModel.availableServers, id: \.id) { server in
+                        Text(server.name).tag(server.id)
                     }
                 }
 
-                Section("Playback") {
-                    Picker("Preferred Server", selection: $viewModel.preferredServer) {
-                        ForEach(viewModel.availableServers, id: \.id) { server in
-                            Text(server.name).tag(server.id)
-                        }
-                    }
-
-                    Picker("Audio Language", selection: $viewModel.preferredLanguage) {
-                        ForEach(viewModel.availableLanguages, id: \.id) { language in
-                            Text(language.name).tag(language.id)
-                        }
-                    }
-
-                    Picker("Video Quality", selection: $viewModel.preferredQuality) {
-                        ForEach(viewModel.availableQualities, id: \.id) { quality in
-                            Text(quality.name).tag(quality.id)
-                        }
+                Picker("Audio Language", selection: $viewModel.preferredLanguage) {
+                    ForEach(viewModel.availableLanguages, id: \.id) { language in
+                        Text(language.name).tag(language.id)
                     }
                 }
 
-                Section("Subtitles") {
-                    NavigationLink(destination: SubtitleSettingsView(viewModel: viewModel)) {
-                        HStack {
-                            Image(systemName: "text.bubble")
-                                .foregroundColor(.green)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Subtitle Preferences")
-                                    .font(.headline)
-                                Text("Customize subtitle appearance and behavior")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
+                Picker("Video Quality", selection: $viewModel.preferredQuality) {
+                    ForEach(viewModel.availableQualities, id: \.id) { quality in
+                        Text(quality.name).tag(quality.id)
                     }
-
-                    Toggle("Enable Subtitles", isOn: $viewModel.subtitlesEnabled)
                 }
 
-                Section("Auto-Skip") {
-                    Toggle("Skip Intros Automatically", isOn: $viewModel.autoSkipIntro)
-                    Toggle("Skip Outros Automatically", isOn: $viewModel.autoSkipOutro)
-                }
+                Toggle("Enable Subtitles", isOn: $viewModel.subtitlesEnabled)
+                Toggle("Skip Intros Automatically", isOn: $viewModel.autoSkipIntro)
+                Toggle("Skip Outros Automatically", isOn: $viewModel.autoSkipOutro)
+            }
 
-                Section("Downloads") {
-                    NavigationLink(destination: DownloadView()) {
-                        HStack {
-                            Image(systemName: "arrow.down.circle")
-                                .foregroundColor(.blue)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Download Queue")
-                                    .font(.headline)
-                                Text("View active and completed downloads")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
+            Section("Subtitles") {
+                NavigationLink(destination: SubtitleSettingsView(viewModel: viewModel)) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "captions.bubble.fill")
+                            .foregroundColor(.accentColor)
+                            .frame(width: 28)
 
-                    Stepper(value: $viewModel.concurrentDownloadsLimit, in: 1...3) {
-                        HStack {
-                            Text("Simultaneous Downloads")
-                            Spacer()
-                            Text("\(viewModel.concurrentDownloadsLimit)")
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Subtitle Style")
+                                .font(.headline)
+                            Text("Text size, color, shade, and screen position")
+                                .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                     }
-
-                    Text("Choose how many episodes may download at the same time. Additional episodes will stay queued.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Section("Offline Storage") {
-                    Button("Manage Cache") {
-                        showCacheAlert = true
-                    }
-
-                    if let stats = viewModel.cacheStatistics {
-                        HStack {
-                            Text("Storage Used")
-                            Spacer()
-                            Text(formatFileSize(stats.totalSize))
-                                .foregroundColor(.secondary)
-                        }
-                        HStack {
-                            Text("Cached Anime")
-                            Spacer()
-                            Text("\(stats.animeCount)")
-                                .foregroundColor(.secondary)
-                        }
-                    }
-
-                    Button(role: .destructive) {
-                        showClearCacheAlert = true
-                    } label: {
-                        Text("Clear All Cache")
-                    }
-                }
-
-                Section("Community & Support") {
-                    Button(action: {
-                        if let url = URL(string: "https://discord.gg/UkfKR7wNhF") {
-                            UIApplication.shared.open(url)
-                        }
-                    }) {
-                        Text("Join Discord Community")
-                    }
-
-                    NavigationLink(destination: AboutView()) {
-                        Text("About")
-                    }
+                    .padding(.vertical, 4)
                 }
             }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.large)
+
+            Section("Downloads") {
+                NavigationLink(destination: DownloadView()) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .foregroundColor(.blue)
+                            .frame(width: 28)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Download Queue")
+                                .font(.headline)
+                            Text("Manage active, failed, and saved offline episodes")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                Stepper(value: $viewModel.concurrentDownloadsLimit, in: 1...3) {
+                    HStack {
+                        Text("Simultaneous Downloads")
+                        Spacer()
+                        Text("\(viewModel.concurrentDownloadsLimit)")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            } footer: {
+                Text("Additional episodes stay queued until a slot opens.")
+            }
+
+            Section("Storage") {
+                Button("Manage Cache") {
+                    showCacheAlert = true
+                }
+
+                if let stats = viewModel.cacheStatistics {
+                    LabeledContent("Storage Used", value: formatFileSize(stats.totalSize))
+                    LabeledContent("Cached Anime", value: "\(stats.animeCount)")
+                    LabeledContent("Cached Images", value: "\(stats.imageCount)")
+                }
+
+                Button("Clear All Cache", role: .destructive) {
+                    showClearCacheAlert = true
+                }
+            }
+
+            Section("General") {
+                NavigationLink(destination: APIConfigView()) {
+                    Label("Server Settings", systemImage: "server.rack")
+                }
+
+                NavigationLink(destination: AboutView()) {
+                    Label("About", systemImage: "info.circle")
+                }
+            }
         }
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.large)
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(
+            LinearGradient(
+                colors: [Color(.systemGroupedBackground), Color(.secondarySystemGroupedBackground)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
         .alert("Cache Management", isPresented: $showCacheAlert) {
             Button("Clear Old Cache") { Task { await viewModel.clearOldCache() } }
             Button("View Statistics") { viewModel.refreshCacheStatistics() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Choose an action to manage your offline cache.")
+            Text("Choose an action to manage offline cache and artwork.")
         }
         .alert("Clear All Cache", isPresented: $showClearCacheAlert) {
             Button("Clear All", role: .destructive) { viewModel.clearAllCache() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will remove all cached anime details, images, and offline data.")
+            Text("This removes cached anime details, images, and offline metadata.")
         }
         .onAppear {
             viewModel.refreshCacheStatistics()
@@ -195,6 +145,7 @@ struct SettingsView: View {
 }
 
 #Preview {
-    SettingsView()
+    NavigationStack {
+        SettingsView()
+    }
 }
-

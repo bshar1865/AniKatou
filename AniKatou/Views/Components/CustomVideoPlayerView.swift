@@ -45,61 +45,68 @@ struct CustomVideoPlayerView: View {
                         .ignoresSafeArea()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
+                    LinearGradient(
+                        colors: [Color.black.opacity(showControls ? 0.22 : 0.08), .clear, Color.black.opacity(showControls ? 0.32 : 0.16)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+
                     if isBuffering {
-                        VStack(spacing: 16) {
+                        VStack(spacing: 14) {
                             ProgressView()
-                                .scaleEffect(1.5)
+                                .scaleEffect(1.4)
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
 
-                            Text("Loading...")
+                            Text("Loading video")
                                 .font(.headline)
                                 .foregroundColor(.white)
                         }
-                        .frame(width: 120, height: 120)
-                        .background(Color.black.opacity(0.7))
-                        .cornerRadius(16)
+                        .frame(width: 138, height: 118)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                        )
                         .transition(.opacity)
                     }
                 }
 
                 VStack {
-                    HStack {
+                    HStack(spacing: 12) {
                         Button(action: {
                             withAnimation(.spring()) {
                                 onDismiss()
                             }
                         }) {
                             Image(systemName: "chevron.left")
-                                .font(.system(size: 20, weight: .semibold))
+                                .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
-                                .frame(width: 44, height: 44)
-                                .background(Color.black.opacity(0.6))
-                                .clipShape(Circle())
-                                .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
+                                .frame(width: 42, height: 42)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay(Circle().stroke(Color.white.opacity(0.12), lineWidth: 1))
                         }
 
-                        Spacer()
-
-                        VStack(alignment: .trailing, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 2) {
                             Text(animeTitle)
-                                .font(.headline)
-                                .fontWeight(.semibold)
+                                .font(.headline.weight(.semibold))
                                 .foregroundColor(.white)
                                 .lineLimit(1)
 
-                            Text("Episode \(episodeNumber)")
+                            Text(episodeTitle?.isEmpty == false ? "Episode \(episodeNumber) • \(episodeTitle!)" : "Episode \(episodeNumber)")
                                 .font(.subheadline)
                                 .foregroundColor(.white.opacity(0.8))
+                                .lineLimit(1)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.black.opacity(0.6))
-                        .cornerRadius(12)
-                        .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
 
                         Spacer()
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, 20)
                     .padding(.top, 8)
 
                     Spacer()
@@ -108,17 +115,12 @@ struct CustomVideoPlayerView: View {
                 .animation(.easeInOut(duration: 0.3), value: showControls)
 
                 if showControls {
-                    HStack(spacing: 25) {
-                        Button(action: {
+                    HStack(spacing: 24) {
+                        playerControlButton(symbol: "gobackward.5") {
                             let newTime = max(0, currentTime - 5)
                             let seekTime = CMTime(seconds: newTime, preferredTimescale: 600)
                             player.seek(to: seekTime)
                             autoHideControls()
-                        }) {
-                            Image(systemName: "gobackward.5")
-                                .font(.system(size: 30, weight: .semibold))
-                                .foregroundColor(.white)
-                                .frame(width: 60, height: 60)
                         }
 
                         Button(action: {
@@ -133,23 +135,20 @@ struct CustomVideoPlayerView: View {
                             autoHideControls()
                         }) {
                             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                .font(.system(size: 50, weight: .bold))
+                                .font(.system(size: 34, weight: .bold))
                                 .foregroundColor(.white)
-                                .frame(width: 80, height: 80)
+                                .frame(width: 86, height: 86)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay(Circle().stroke(Color.white.opacity(0.16), lineWidth: 1))
                         }
-                        .scaleEffect(isPlaying ? 1 : 1.1)
+                        .scaleEffect(isPlaying ? 1 : 1.07)
                         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPlaying)
 
-                        Button(action: {
+                        playerControlButton(symbol: "goforward.5") {
                             let newTime = min(duration, currentTime + 5)
                             let seekTime = CMTime(seconds: newTime, preferredTimescale: 600)
                             player.seek(to: seekTime)
                             autoHideControls()
-                        }) {
-                            Image(systemName: "goforward.5")
-                                .font(.system(size: 30, weight: .semibold))
-                                .foregroundColor(.white)
-                                .frame(width: 60, height: 60)
                         }
                     }
                 }
@@ -157,25 +156,22 @@ struct CustomVideoPlayerView: View {
                 VStack {
                     Spacer()
 
-                    VStack(spacing: 8) {
+                    VStack(spacing: 10) {
                         VStack(spacing: 4) {
                             GeometryReader { barGeometry in
                                 ZStack(alignment: .leading) {
-                                    Rectangle()
-                                        .fill(Color.white.opacity(0.3))
-                                        .frame(height: 4)
-                                        .cornerRadius(2)
+                                    Capsule()
+                                        .fill(Color.white.opacity(0.22))
+                                        .frame(height: 5)
 
-                                    Rectangle()
-                                        .fill(Color.white.opacity(0.5))
-                                        .frame(width: barGeometry.size.width * bufferingProgress, height: 4)
-                                        .cornerRadius(2)
+                                    Capsule()
+                                        .fill(Color.white.opacity(0.35))
+                                        .frame(width: barGeometry.size.width * bufferingProgress, height: 5)
 
-                                    Rectangle()
-                                        .fill(Color.white)
-                                        .frame(width: barGeometry.size.width * (currentTime / max(duration, 1)), height: 4)
-                                        .cornerRadius(2)
-                                        .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 0)
+                                    Capsule()
+                                        .fill(.white)
+                                        .frame(width: barGeometry.size.width * (currentTime / max(duration, 1)), height: 5)
+                                        .shadow(color: .white.opacity(0.45), radius: 2, x: 0, y: 0)
 
                                     Circle()
                                         .fill(Color.white)
@@ -209,17 +205,25 @@ struct CustomVideoPlayerView: View {
                         HStack {
                             Text(formatTime(currentTime))
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.9))
+                                .foregroundColor(.white.opacity(0.92))
 
                             Spacer()
 
                             Text(formatTime(duration))
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.9))
+                                .foregroundColor(.white.opacity(0.92))
                         }
                         .padding(.horizontal, 28)
-                        .padding(.bottom, 40)
                     }
+                    .padding(.top, 14)
+                    .padding(.bottom, 28)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    )
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, max(geometry.safeAreaInsets.bottom, 10))
                     .opacity(showControls ? 1 : 0)
                     .animation(.easeInOut(duration: 0.3), value: showControls)
                 }
@@ -243,8 +247,8 @@ struct CustomVideoPlayerView: View {
                         .padding(.vertical, 12)
                         .background(
                             Capsule()
-                                .fill(Color.black.opacity(0.8))
-                                .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
+                                .fill(.ultraThinMaterial)
+                                .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
                         )
                         .transition(.scale.combined(with: .opacity))
 
@@ -266,6 +270,17 @@ struct CustomVideoPlayerView: View {
             }
         }
         .statusBarHidden(true)
+    }
+
+    private func playerControlButton(symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 64, height: 64)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().stroke(Color.white.opacity(0.12), lineWidth: 1))
+        }
     }
 
     private func setupPlayer() {

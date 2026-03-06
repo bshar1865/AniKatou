@@ -10,11 +10,11 @@ import SwiftUI
 @main
 struct AniKatouApp: App {
     @AppStorage(APIConfig.apiConfigKey) private var apiBaseURL: String?
-    
+
     var body: some Scene {
         WindowGroup {
             if apiBaseURL == nil {
-                NavigationView {
+                NavigationStack {
                     APIConfigView(isInitialSetup: true)
                 }
                 .preferredColorScheme(.dark)
