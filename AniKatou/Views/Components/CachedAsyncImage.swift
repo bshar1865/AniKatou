@@ -2,6 +2,17 @@ import SwiftUI
 import UIKit
 import ImageIO
 
+private enum CachedImageLoader {
+    static let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 15
+        config.requestCachePolicy = .returnCacheDataElseLoad
+        config.urlCache = URLCache(memoryCapacity: 20 * 1024 * 1024, diskCapacity: 100 * 1024 * 1024)
+        return URLSession(configuration: config)
+    }()
+}
+
 final class ImageCache {
     static let shared = ImageCache()
 
@@ -43,15 +54,6 @@ final class ImageCache {
 }
 
 struct CachedAsyncImage<Content: View, Placeholder: View>: View {
-    private static let imageSession: URLSession = {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15
-        config.timeoutIntervalForResource = 15
-        config.requestCachePolicy = .returnCacheDataElseLoad
-        config.urlCache = URLCache(memoryCapacity: 20 * 1024 * 1024, diskCapacity: 100 * 1024 * 1024)
-        return URLSession(configuration: config)
-    }()
-
     private let url: URL?
     private let content: (Image) -> Content
     private let placeholder: () -> Placeholder
@@ -130,7 +132,7 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     }
     
     private func loadImageFromURL(_ url: URL) async throws -> UIImage {
-        let (data, response) = try await Self.imageSession.data(from: url)
+        let (data, response) = try await CachedImageLoader.session.data(from: url)
             
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
