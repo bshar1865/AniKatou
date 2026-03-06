@@ -267,10 +267,16 @@ struct AnimeEpisodeCard: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Episode \(episode.number)")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
+                    HStack(spacing: 8) {
+                        Text("Episode \(episode.number)")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+
+                        if let isFiller = episode.isFiller, isFiller {
+                            AnimeEpisodeBadge(text: "Filler", tint: .orange)
+                        }
+                    }
 
                     if let title = episode.title, !title.isEmpty {
                         Text(title)
@@ -280,9 +286,6 @@ struct AnimeEpisodeCard: View {
                     }
 
                     HStack(spacing: 8) {
-                        if let isFiller = episode.isFiller, isFiller {
-                            AnimeEpisodeBadge(text: "Filler", tint: .orange)
-                        }
                         statusBadge
                     }
                 }
@@ -460,5 +463,3 @@ private struct AnimeEpisodeProgressBar: View {
         }
     }
 }
-
-

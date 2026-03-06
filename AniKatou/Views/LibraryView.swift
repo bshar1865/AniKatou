@@ -15,6 +15,12 @@ struct LibraryView: View {
         downloadManager.downloads.filter { $0.state == .completed }.count
     }
 
+    private var libraryOfflineCount: Int {
+        viewModel.libraryItems.reduce(0) { partialResult, anime in
+            partialResult + downloadManager.downloadedEpisodeCount(for: anime.id)
+        }
+    }
+
     private func reloadWatchHistory() {
         WatchProgressManager.shared.cleanupFinishedEpisodes()
         watchHistory = WatchProgressManager.shared.getWatchHistory()
@@ -144,6 +150,10 @@ struct LibraryView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 6)
             } else {
+                if libraryOfflineCount == 0 {
+                    offlineTipCard
+                }
+
                 LazyVStack(spacing: 10) {
                     ForEach(viewModel.libraryItems.prefix(12)) { anime in
                         NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
@@ -154,6 +164,28 @@ struct LibraryView: View {
                 }
             }
         }
+    }
+
+    private var offlineTipCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("No Offline Episodes Yet", systemImage: "wifi.slash")
+                .font(.headline)
+                .foregroundColor(.orange)
+
+            Text("Your library is saved, but no episodes are available offline yet. Download episodes from anime details if you want them to work without internet.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.orange.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.orange.opacity(0.18), lineWidth: 1)
+        )
     }
 
     private func sectionHeader(title: String, symbol: String) -> some View {
@@ -208,8 +240,10 @@ private struct ContinueWatchingCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack(alignment: .bottomLeading) {
-                CachedAsyncImage(url: URL(string: coverURL ?? "")) { image in
-                    image.resizable().aspectRatio(contentMode: .fill)
+                CachedAsyncImage(url: URL(string: coverURL ?? ""), maxPixelSize: 600) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
                 } placeholder: {
                     Color.gray.overlay(Image(systemName: "play.rectangle.fill").foregroundColor(.white))
                 }
@@ -280,7 +314,7 @@ private struct LibraryRowCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            CachedAsyncImage(url: URL(string: anime.image)) { image in
+            CachedAsyncImage(url: URL(string: anime.image), maxPixelSize: 500) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
                 Color.gray.overlay(ProgressView())

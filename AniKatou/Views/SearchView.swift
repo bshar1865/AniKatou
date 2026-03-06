@@ -9,7 +9,35 @@ struct SearchView: View {
         ScrollView {
             VStack(spacing: 16) {
                 if searchText.isEmpty {
-                    // Search History
+                    searchHomeContent
+                } else {
+                    searchResultsContent
+                }
+            }
+            .padding(.vertical)
+        }
+        .refreshable {
+            if !searchText.isEmpty {
+                handleSearchTextChange(searchText)
+            } else {
+                await viewModel.loadPopularAnime()
+            }
+        }
+        .navigationTitle("Search")
+        .searchable(text: $searchText, prompt: "Search anime...")
+        .onChange(of: searchText) { _, newValue in
+            handleSearchTextChange(newValue)
+        }
+        .onDisappear {
+            cancelCurrentSearch()
+        }
+        .task {
+            await viewModel.loadPopularAnime()
+        }
+    }
+
+    @ViewBuilder
+    private var searchHomeContent: some View {
                     if !viewModel.searchHistory.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
@@ -19,22 +47,20 @@ struct SearchView: View {
                                 
                                 Spacer()
                                 
-                                Button(action: {
+                    Button("Clear") {
                                     viewModel.clearSearchHistory()
-                                }) {
-                                    Text("Clear")
+                    }
                                         .foregroundColor(.blue)
-                                }
                             }
                             .padding(.horizontal)
                             
                             VStack(spacing: 8) {
                                 ForEach(viewModel.searchHistory, id: \.self) { query in
                                     HStack {
-                                        Button(action: {
+                            Button {
                                             searchText = query
                                             handleSearchTextChange(query)
-                                        }) {
+                            } label: {
                                             HStack {
                                                 Image(systemName: "clock")
                                                     .foregroundColor(.secondary)
@@ -44,9 +70,9 @@ struct SearchView: View {
                                             }
                                         }
                                         
-                                        Button(action: {
+                            Button {
                                             viewModel.removeFromSearchHistory(query)
-                                        }) {
+                            } label: {
                                             Image(systemName: "xmark")
                                                 .foregroundColor(.secondary)
                                         }
@@ -60,7 +86,6 @@ struct SearchView: View {
                             .padding(.vertical)
                     }
                     
-                    // Show popular anime when no search
                     if !viewModel.popularAnimes.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Popular Anime")
@@ -80,9 +105,28 @@ struct SearchView: View {
                             }
                             .padding(.horizontal)
                         }
-                    }
-                } else {
-                    // Search Results
+        } else if viewModel.isLoading {
+            ProgressView()
+                .frame(maxWidth: .infinity, minHeight: 220)
+        } else if let error = viewModel.errorMessage {
+            ContentUnavailableView(
+                "Popular Anime Unavailable",
+                systemImage: "wifi.slash",
+                description: Text(error)
+            )
+            .frame(maxWidth: .infinity, minHeight: 220)
+        } else {
+            ContentUnavailableView(
+                "Popular Anime Unavailable",
+                systemImage: "wifi.slash",
+                description: Text("An internet connection is required to load popular anime on this screen.")
+            )
+            .frame(maxWidth: .infinity, minHeight: 220)
+        }
+    }
+
+    @ViewBuilder
+    private var searchResultsContent: some View {
                     VStack(spacing: 16) {
                         if viewModel.isLoading {
                             VStack(spacing: 12) {
@@ -93,7 +137,6 @@ struct SearchView: View {
                             .frame(maxWidth: .infinity, minHeight: 200)
                         } else if let error = viewModel.errorMessage {
                             if error == APIError.searchQueryTooShort.message {
-                                // Show minimum character requirement
                                 VStack(spacing: 12) {
                                     Image(systemName: "character.cursor.ibeam")
                                         .font(.system(size: 48))
@@ -107,13 +150,13 @@ struct SearchView: View {
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 200)
                             } else {
-                                // Show error with retry button
                                 VStack(spacing: 12) {
                                     Image(systemName: "exclamationmark.triangle")
                                         .font(.system(size: 48))
                                         .foregroundColor(.red)
                                     Text(error)
                                         .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
                                     Button("Retry") {
                                         handleSearchTextChange(searchText)
                                     }
@@ -122,7 +165,6 @@ struct SearchView: View {
                                 .frame(maxWidth: .infinity, minHeight: 200)
                             }
                         } else if viewModel.searchResults.isEmpty && searchText.count >= 3 {
-                            // No results found (only show when query is valid)
                             VStack(spacing: 12) {
                                 Image(systemName: "magnifyingglass")
                                     .font(.system(size: 48))
@@ -136,7 +178,6 @@ struct SearchView: View {
                             }
                             .frame(maxWidth: .infinity, minHeight: 200)
                         } else {
-                            // Search results grid
                             LazyVGrid(columns: [
                                 GridItem(.flexible(), spacing: 16),
                                 GridItem(.flexible(), spacing: 16)
@@ -149,28 +190,6 @@ struct SearchView: View {
                             }
                             .padding(.horizontal)
                         }
-                    }
-                }
-            }
-            .padding(.vertical)
-        }
-        .refreshable {
-            if !searchText.isEmpty {
-                handleSearchTextChange(searchText)
-            } else {
-                await viewModel.loadPopularAnime()
-            }
-        }
-        .navigationTitle("Search")
-        .searchable(text: $searchText, prompt: "Search anime...")
-        .onChange(of: searchText) { oldValue, newValue in
-            handleSearchTextChange(newValue)
-        }
-        .onDisappear {
-            cancelCurrentSearch()
-        }
-        .task {
-            await viewModel.loadPopularAnime()
         }
     }
     
@@ -184,7 +203,6 @@ struct SearchView: View {
     }
     
     private func handleSearchTextChange(_ newValue: String) {
-        // Cancel previous search task
         searchTask?.cancel()
         searchTask = nil
         
@@ -195,16 +213,15 @@ struct SearchView: View {
             return
         }
         
-        // Create new search task with shorter debounce
         searchTask = Task { @MainActor [weak viewModel] in
             guard let viewModel = viewModel else { return }
             
             do {
-                try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds debounce
+                try await Task.sleep(nanoseconds: 500_000_000)
                 if !Task.isCancelled {
                     await viewModel.search(query: newValue)
                 }
-            } catch { }
+            } catch {
             }
         }
     }

@@ -73,7 +73,7 @@ struct SettingsView: View {
                 }
 
                 Section("Subtitles") {
-                    NavigationLink(destination: SubtitleSettingsView()) {
+                    NavigationLink(destination: SubtitleSettingsView(viewModel: viewModel)) {
                         HStack {
                             Image(systemName: "text.bubble")
                                 .foregroundColor(.green)
@@ -168,3 +168,4 @@ struct SettingsView: View {
 #Preview {
     SettingsView()
 }
+
