@@ -2,7 +2,7 @@ import Foundation
 
 enum UserMessage {
     static let noInternet = "No internet connection. Please connect to the internet and try again."
-    static let homeOffline = "No internet connection. Please connect to the internet to load Home."
+    static let homeOffline = "An internet connection is required to load Home."
     static let homeLoadFailed = "Unable to load Home at this time. Please try again."
     static let searchUnavailable = "Unable to complete the search right now. Please try again."
     static let popularUnavailable = "Unable to load popular anime at this time. Please try again."
@@ -22,6 +22,7 @@ enum UserMessage {
     static let playbackNeedsDownload = "This episode is not available right now. Connect to the internet or download it first."
     static let noDownloadableStream = "No downloadable stream was found for this episode."
     static let downloadStarted = "The download has started."
+    static let downloadQueued = "The episode was added to your downloads."
     static let downloadStartFailed = "Unable to start the download at this time. Please try again."
     static let selectEpisodeToDownload = "Please select at least one episode to download."
     static let apiURLRequired = "Please enter an API server URL."
@@ -40,10 +41,13 @@ enum UserMessage {
     }
 
     static func downloadStarted(forEpisode number: Int) -> String {
-        "The download has started for episode \(number)."
+        "Episode \(number) was added to your downloads."
     }
 
-    static func bulkDownloadStarted(_ count: Int) -> String {
-        "Download started for \(count) episode(s)."
+    static func bulkDownloadQueued(_ count: Int, concurrentLimit: Int) -> String {
+        if count == 1 {
+            return "1 episode was added to your downloads. Up to \(concurrentLimit) will download at the same time."
+        }
+        return "\(count) episodes were added to your downloads. Up to \(concurrentLimit) will download at the same time."
     }
 }

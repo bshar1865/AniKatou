@@ -273,22 +273,16 @@ private struct ContinueWatchingCard: View {
                 .lineLimit(2)
                 .foregroundColor(.primary)
 
-            HStack(spacing: 8) {
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Color.primary.opacity(0.12))
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Color.blue)
-                            .frame(width: geo.size.width * clampedProgress)
-                    }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.primary.opacity(0.12))
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.blue)
+                        .frame(width: geo.size.width * clampedProgress)
                 }
-                .frame(height: 6)
-
-                Text("\(Int(clampedProgress * 100))%")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
             }
+            .frame(height: 6)
 
             Text(progress.formattedTimestamp)
                 .font(.caption2)
@@ -370,3 +364,4 @@ private struct LibraryRowCard: View {
         )
     }
 }
+

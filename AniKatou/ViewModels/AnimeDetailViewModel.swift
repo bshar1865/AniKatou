@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 @MainActor
 class AnimeDetailViewModel: ObservableObject {
@@ -135,6 +136,10 @@ class AnimeDetailViewModel: ObservableObject {
         return episodeGroups[selectedGroupIndex].episodes
     }
 
+    var totalEpisodeCount: Int {
+        episodeGroups.reduce(0) { $0 + $1.episodes.count }
+    }
+
     func selectGroup(_ index: Int) {
         guard episodeGroups.indices.contains(index) else { return }
         selectedGroupIndex = index
@@ -142,37 +147,12 @@ class AnimeDetailViewModel: ObservableObject {
 
     func downloadEpisode(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async {
         do {
-            addToLibraryIfNeeded(anime)
-
-            if let details = animeDetails?.data.anime.info {
-                await OfflineManager.shared.cacheAnimeDetails(details, episodes: episodesToCache, thumbnails: [:])
+            let queued = try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode)
+            if queued {
+                downloadMessage = UserMessage.downloadStarted(forEpisode: episode.number)
+            } else {
+                downloadMessage = UserMessage.downloadStartFailed
             }
-
-            let stream = try await APIService.shared.getStreamingSources(
-                episodeId: episode.id,
-                category: AppSettings.shared.preferredLanguage,
-                server: AppSettings.shared.preferredServer
-            )
-
-            guard let source = stream.data.sources.first(where: { ($0.isM3U8 ?? false) || $0.url.contains(".m3u8") }),
-                  let url = URL(string: source.url) else {
-                downloadMessage = UserMessage.noDownloadableStream
-                return
-            }
-
-            HLSDownloadManager.shared.startDownload(
-                streamURL: url,
-                animeId: anime.id,
-                episodeId: episode.id,
-                animeTitle: anime.title,
-                episodeNumber: "\(episode.number)",
-                headers: stream.data.headers,
-                subtitleTracks: stream.data.tracks,
-                intro: stream.data.intro,
-                outro: stream.data.outro
-            )
-
-            downloadMessage = UserMessage.downloadStarted(forEpisode: episode.number)
         } catch {
             downloadMessage = UserMessage.downloadStartFailed
         }
@@ -184,14 +164,20 @@ class AnimeDetailViewModel: ObservableObject {
             return
         }
 
-        var started = 0
+        var queuedCount = 0
         for episode in selectedEpisodes {
-            await downloadEpisode(anime: anime, episodesToCache: episodesToCache, episode: episode)
-            if HLSDownloadManager.shared.isEpisodeDownloaded(episode.id) || HLSDownloadManager.shared.downloads.contains(where: { $0.episodeId == episode.id }) {
-                started += 1
+            do {
+                if try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode) {
+                    queuedCount += 1
+                }
+            } catch {
+                continue
             }
         }
-        downloadMessage = started > 0 ? UserMessage.bulkDownloadStarted(started) : "No downloads were started."
+
+        downloadMessage = queuedCount > 0
+            ? UserMessage.bulkDownloadQueued(queuedCount, concurrentLimit: AppSettings.shared.concurrentDownloadsLimit)
+            : UserMessage.downloadStartFailed
     }
 
     deinit {
@@ -206,5 +192,37 @@ class AnimeDetailViewModel: ObservableObject {
         LibraryManager.shared.toggle(anime)
         isInLibrary = true
         NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
+    }
+
+    private func queueEpisodeDownload(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async throws -> Bool {
+        addToLibraryIfNeeded(anime)
+
+        if let details = animeDetails?.data.anime.info {
+            await OfflineManager.shared.cacheAnimeDetails(details, episodes: episodesToCache, thumbnails: [:])
+        }
+
+        let stream = try await APIService.shared.getStreamingSources(
+            episodeId: episode.id,
+            category: AppSettings.shared.preferredLanguage,
+            server: AppSettings.shared.preferredServer
+        )
+
+        guard let source = stream.data.sources.first(where: { ($0.isM3U8 ?? false) || $0.url.contains(".m3u8") }),
+              let url = URL(string: source.url) else {
+            downloadMessage = UserMessage.noDownloadableStream
+            return false
+        }
+
+        return HLSDownloadManager.shared.startDownload(
+            streamURL: url,
+            animeId: anime.id,
+            episodeId: episode.id,
+            animeTitle: anime.title,
+            episodeNumber: "\(episode.number)",
+            headers: stream.data.headers,
+            subtitleTracks: stream.data.tracks,
+            intro: stream.data.intro,
+            outro: stream.data.outro
+        )
     }
 }

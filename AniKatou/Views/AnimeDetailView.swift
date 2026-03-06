@@ -65,20 +65,21 @@ struct AnimeDetailView: View {
             ProgressView()
                 .padding(.top, 40)
         } else if let error = viewModel.errorMessage {
-            Text(error)
-                .foregroundColor(.red)
-                .multilineTextAlignment(.center)
-                .padding()
+            ContentUnavailableView(
+                "Anime Unavailable",
+                systemImage: "wifi.slash",
+                description: Text(error)
+            )
+            .padding(.top, 40)
         } else if let details = resolvedDetails {
             AnimeDetailHeroSection(
                 details: details,
                 isInLibrary: viewModel.isInLibrary,
-                isOfflineMode: viewModel.isOfflineMode,
                 toggleLibrary: { viewModel.toggleLibrary() }
             )
 
             if let description = details.description {
-                AnimeSynopsisCard(
+                AnimeDescriptionCard(
                     description: normalizedDescription(description),
                     isExpanded: isDescriptionExpanded,
                     toggleExpanded: {
@@ -90,7 +91,7 @@ struct AnimeDetailView: View {
                 .padding(.horizontal)
             }
 
-            AnimeMetadataCard(details: details)
+            AnimeMetadataCard(details: details, totalEpisodes: viewModel.totalEpisodeCount)
                 .padding(.horizontal)
 
             episodesSection(details)
@@ -145,7 +146,7 @@ struct AnimeDetailView: View {
                             }
                             .buttonStyle(.plain)
                         } else {
-                            HStack(spacing: 10) {
+                            ZStack(alignment: .topTrailing) {
                                 NavigationLink(destination: EpisodeView(
                                     episodeId: episode.id,
                                     animeId: animeId,
@@ -157,7 +158,8 @@ struct AnimeDetailView: View {
                                     AnimeEpisodeCard(
                                         episode: episode,
                                         isDownloaded: isDownloaded,
-                                        downloadItem: downloadItem
+                                        downloadItem: downloadItem,
+                                        reservesTrailingAccessorySpace: true
                                     )
                                 }
                                 .buttonStyle(.plain)
@@ -174,6 +176,8 @@ struct AnimeDetailView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .disabled(isDownloadButtonDisabled(isDownloaded: isDownloaded, item: downloadItem))
+                                .padding(.top, 16)
+                                .padding(.trailing, 16)
                             }
                         }
                     }
@@ -236,22 +240,25 @@ struct AnimeDetailView: View {
         if isDownloaded { return "checkmark.circle.fill" }
         if let item {
             switch item.state {
-            case .queued, .downloading:
+            case .queued:
+                return "clock"
+            case .downloading:
                 return "hourglass"
             case .failed:
-                return "arrow.clockwise.circle"
+                return "arrow.clockwise"
             case .cancelled:
-                return "arrow.down.circle"
+                return "arrow.down"
             case .completed:
                 return "checkmark.circle.fill"
             }
         }
-        return "arrow.down.circle"
+        return "arrow.down"
     }
 
     private func downloadButtonColor(isDownloaded: Bool, item: HLSDownloadItem?) -> Color {
         if isDownloaded { return .green }
         if let item, item.state == .failed { return .red }
+        if let item, item.state == .queued { return .orange }
         return .accentColor
     }
 }

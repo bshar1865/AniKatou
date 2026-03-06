@@ -15,6 +15,13 @@ class SettingsViewModel: ObservableObject {
         didSet { AppSettings.shared.preferredQuality = preferredQuality }
     }
 
+    @Published var concurrentDownloadsLimit: Int {
+        didSet {
+            AppSettings.shared.concurrentDownloadsLimit = concurrentDownloadsLimit
+            HLSDownloadManager.shared.refreshDownloadQueue()
+        }
+    }
+
     @Published var subtitlesEnabled: Bool {
         didSet { AppSettings.shared.subtitlesEnabled = subtitlesEnabled }
     }
@@ -69,6 +76,7 @@ class SettingsViewModel: ObservableObject {
         preferredServer = AppSettings.shared.preferredServer
         preferredLanguage = AppSettings.shared.preferredLanguage
         preferredQuality = AppSettings.shared.preferredQuality
+        concurrentDownloadsLimit = AppSettings.shared.concurrentDownloadsLimit
         subtitlesEnabled = AppSettings.shared.subtitlesEnabled
         autoSkipIntro = AppSettings.shared.autoSkipIntro
         autoSkipOutro = AppSettings.shared.autoSkipOutro

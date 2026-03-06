@@ -95,6 +95,21 @@ struct SettingsView: View {
                     Toggle("Skip Outros Automatically", isOn: $viewModel.autoSkipOutro)
                 }
 
+                Section("Downloads") {
+                    Stepper(value: $viewModel.concurrentDownloadsLimit, in: 1...3) {
+                        HStack {
+                            Text("Simultaneous Downloads")
+                            Spacer()
+                            Text("\(viewModel.concurrentDownloadsLimit)")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Text("Choose how many episodes may download at the same time. Additional episodes will stay queued.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
                 Section("Offline Storage") {
                     Button("Manage Cache") {
                         showCacheAlert = true
@@ -168,4 +183,3 @@ struct SettingsView: View {
 #Preview {
     SettingsView()
 }
-

@@ -10,6 +10,7 @@ class AppSettings {
     private let subtitlesKey = "subtitles_enabled"
     private let autoSkipIntroKey = "auto_skip_intro"
     private let autoSkipOutroKey = "auto_skip_outro"
+    private let concurrentDownloadsKey = "concurrent_downloads_limit"
 
     private init() {}
 
@@ -108,5 +109,15 @@ class AppSettings {
     var autoSkipOutro: Bool {
         get { defaults.bool(forKey: autoSkipOutroKey) }
         set { defaults.set(newValue, forKey: autoSkipOutroKey) }
+    }
+
+    var concurrentDownloadsLimit: Int {
+        get {
+            let value = defaults.integer(forKey: concurrentDownloadsKey)
+            return max(1, min(value == 0 ? 2 : value, 3))
+        }
+        set {
+            defaults.set(max(1, min(newValue, 3)), forKey: concurrentDownloadsKey)
+        }
     }
 }

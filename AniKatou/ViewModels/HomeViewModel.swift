@@ -17,8 +17,21 @@ class HomeViewModel: ObservableObject {
         animes.filter { !$0.containsNSFWContent }
     }
 
+    private var hasContent: Bool {
+        !trendingAnimes.isEmpty ||
+        !latestEpisodeAnimes.isEmpty ||
+        !topUpcomingAnimes.isEmpty ||
+        !topAiringAnimes.isEmpty ||
+        !mostPopularAnimes.isEmpty ||
+        !latestCompletedAnimes.isEmpty ||
+        !top10Today.isEmpty
+    }
+
     func loadHomeData() async {
-        isLoading = true
+        let hadContent = hasContent
+        if !hadContent {
+            isLoading = true
+        }
         errorMessage = nil
 
         do {
@@ -30,15 +43,15 @@ class HomeViewModel: ObservableObject {
             mostPopularAnimes = filterNSFWContent(data.mostPopularAnimes)
             latestCompletedAnimes = filterNSFWContent(data.latestCompletedAnimes)
             top10Today = filterNSFWContent(data.top10Animes.today)
+            errorMessage = nil
         } catch let error as APIError {
-            switch error {
-            case .networkError:
+            if !hadContent, case .networkError = error {
                 errorMessage = UserMessage.homeOffline
-            default:
-                errorMessage = error.message
             }
         } catch {
-            errorMessage = OfflineManager.shared.isOfflineMode ? UserMessage.homeOffline : UserMessage.homeLoadFailed
+            if !hadContent, OfflineManager.shared.isOfflineMode {
+                errorMessage = UserMessage.homeOffline
+            }
         }
 
         isLoading = false

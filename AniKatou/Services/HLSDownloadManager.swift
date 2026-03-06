@@ -46,6 +46,7 @@ final class HLSDownloadManager: NSObject, ObservableObject {
 
     private var taskMap: [Int: UUID] = [:]
     private var activeTasks: [UUID: AVAssetDownloadTask] = [:]
+    private var pendingTasks: [UUID: AVAssetDownloadTask] = [:]
     private let storageURL: URL
 
     private override init() {
@@ -55,6 +56,11 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         loadStoredDownloads()
     }
 
+    private var concurrentDownloadLimit: Int {
+        AppSettings.shared.concurrentDownloadsLimit
+    }
+
+    @discardableResult
     func startDownload(
         streamURL: URL,
         animeId: String,
@@ -65,16 +71,16 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         subtitleTracks: [SubtitleTrack]? = nil,
         intro: IntroOutro? = nil,
         outro: IntroOutro? = nil
-    ) {
+    ) -> Bool {
         if let existingIndex = downloads.firstIndex(where: { $0.episodeId == episodeId }) {
             let existingState = downloads[existingIndex].state
             switch existingState {
             case .queued, .downloading:
-                return
+                return false
             case .completed:
                 if let path = downloads[existingIndex].localPath,
                    FileManager.default.fileExists(atPath: path) {
-                    return
+                    return false
                 }
                 downloads.remove(at: existingIndex)
                 persist()
@@ -93,7 +99,7 @@ final class HLSDownloadManager: NSObject, ObservableObject {
             assetArtworkData: nil,
             options: nil
         ) else {
-            return
+            return false
         }
 
         let item = HLSDownloadItem(
@@ -117,26 +123,36 @@ final class HLSDownloadManager: NSObject, ObservableObject {
 
         downloads.insert(item, at: 0)
         taskMap[task.taskIdentifier] = item.id
-        activeTasks[item.id] = task
-        setState(for: item.id, state: .downloading)
+        pendingTasks[item.id] = task
         persist()
-        task.resume()
+        refreshDownloadQueue()
 
         if let subtitleTracks, !subtitleTracks.isEmpty {
             Task { [weak self] in
                 await self?.cacheSubtitleFiles(forEpisodeId: episodeId, tracks: subtitleTracks, headers: headers)
             }
         }
+
+        return true
     }
 
     func cancelDownload(_ item: HLSDownloadItem) {
-        activeTasks[item.id]?.cancel()
-        setState(for: item.id, state: .cancelled)
+        if let task = activeTasks[item.id] {
+            task.cancel()
+        } else if let task = pendingTasks[item.id] {
+            task.cancel()
+            pendingTasks.removeValue(forKey: item.id)
+            setState(for: item.id, state: .cancelled)
+            refreshDownloadQueue()
+        }
     }
 
     func removeDownload(_ item: HLSDownloadItem) {
-        if item.state == .queued || item.state == .downloading {
-            activeTasks[item.id]?.cancel()
+        if let task = activeTasks[item.id] {
+            task.cancel()
+        }
+        if let task = pendingTasks[item.id] {
+            task.cancel()
         }
 
         if let localPath = item.localPath {
@@ -150,8 +166,10 @@ final class HLSDownloadManager: NSObject, ObservableObject {
 
         downloads.removeAll { $0.id == item.id }
         activeTasks.removeValue(forKey: item.id)
+        pendingTasks.removeValue(forKey: item.id)
         taskMap = taskMap.filter { $0.value != item.id }
         persist()
+        refreshDownloadQueue()
     }
 
     func removeDownloads(for animeId: String) {
@@ -201,6 +219,20 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         return (item.intro, item.outro)
     }
 
+    func refreshDownloadQueue() {
+        while activeTasks.count < concurrentDownloadLimit,
+              let nextItem = downloads
+                .filter({ $0.state == .queued && pendingTasks[$0.id] != nil })
+                .sorted(by: { $0.createdAt < $1.createdAt })
+                .first,
+              let task = pendingTasks[nextItem.id] {
+            pendingTasks.removeValue(forKey: nextItem.id)
+            activeTasks[nextItem.id] = task
+            setState(for: nextItem.id, state: .downloading)
+            task.resume()
+        }
+    }
+
     private func setState(for id: UUID, state: HLSDownloadItem.State, error: String? = nil) {
         guard let index = downloads.firstIndex(where: { $0.id == id }) else { return }
         downloads[index].state = state
@@ -219,6 +251,7 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         downloads[index].localPath = path
         downloads[index].progress = 1
         downloads[index].state = .completed
+        downloads[index].errorMessage = nil
         persist()
     }
 
@@ -254,7 +287,15 @@ final class HLSDownloadManager: NSObject, ObservableObject {
             downloads = []
             return
         }
-        downloads = saved
+
+        downloads = saved.map { item in
+            var restored = item
+            if restored.state == .queued || restored.state == .downloading {
+                restored.state = .cancelled
+                restored.errorMessage = "Download was interrupted. Please start it again."
+            }
+            return restored
+        }
     }
 
     private func cacheSubtitleFiles(forEpisodeId episodeId: String, tracks: [SubtitleTrack], headers: [String: String]?) async {
@@ -301,16 +342,20 @@ extension HLSDownloadManager: AVAssetDownloadDelegate {
         defer {
             taskMap.removeValue(forKey: task.taskIdentifier)
             activeTasks.removeValue(forKey: id)
+            pendingTasks.removeValue(forKey: id)
+            refreshDownloadQueue()
         }
 
         if let error = error {
             let nsError = error as NSError
             if nsError.code == NSURLErrorCancelled {
-                setState(for: id, state: .cancelled)
+                if downloads.contains(where: { $0.id == id }) {
+                    setState(for: id, state: .cancelled)
+                }
             } else {
                 setState(for: id, state: .failed, error: friendlyDownloadErrorMessage(for: nsError))
             }
-        } else {
+        } else if downloads.contains(where: { $0.id == id }) {
             setState(for: id, state: .completed)
         }
     }

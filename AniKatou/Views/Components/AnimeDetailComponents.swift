@@ -3,7 +3,6 @@ import SwiftUI
 struct AnimeDetailHeroSection: View {
     let details: AnimeDetails
     let isInLibrary: Bool
-    let isOfflineMode: Bool
     let toggleLibrary: () -> Void
 
     var body: some View {
@@ -45,15 +44,6 @@ struct AnimeDetailHeroSection: View {
                     .shadow(color: .black.opacity(0.24), radius: 18, x: 0, y: 10)
 
                     VStack(alignment: .leading, spacing: 10) {
-                        if isOfflineMode {
-                            Label("Offline Cache", systemImage: "wifi.slash")
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color.white.opacity(0.16), in: Capsule())
-                        }
-
                         Text(details.title)
                             .font(.title2.weight(.bold))
                             .foregroundColor(.white)
@@ -100,7 +90,7 @@ struct AnimeDetailHeroSection: View {
     }
 }
 
-struct AnimeSynopsisCard: View {
+struct AnimeDescriptionCard: View {
     let description: String
     let isExpanded: Bool
     let toggleExpanded: () -> Void
@@ -112,7 +102,7 @@ struct AnimeSynopsisCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Synopsis", systemImage: "text.alignleft")
+            Label("Description", systemImage: "text.alignleft")
                 .font(.headline)
 
             Text(isExpanded ? description : shortDescription)
@@ -141,10 +131,15 @@ struct AnimeSynopsisCard: View {
 
 struct AnimeMetadataCard: View {
     let details: AnimeDetails
+    let totalEpisodes: Int
 
     private var metadataItems: [(String, String)] {
         var items: [(String, String)] = []
 
+        let episodeText = details.stats?.episodes ?? (totalEpisodes > 0 ? "\(totalEpisodes)" : nil)
+        if let episodeText, !episodeText.isEmpty {
+            items.append(("Episodes", episodeText))
+        }
         if let genres = details.moreInfo?.genres, !genres.isEmpty {
             items.append(("Genres", genres.joined(separator: ", ")))
         }
@@ -252,46 +247,34 @@ struct AnimeEpisodeCard: View {
     let episode: EpisodeInfo
     let isDownloaded: Bool
     let downloadItem: HLSDownloadItem?
+    let reservesTrailingAccessorySpace: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(LinearGradient(colors: [Color.blue.opacity(0.16), Color.cyan.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .frame(width: 58, height: 58)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Text("Episode \(episode.number)")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
 
-                    Text("\(episode.number)")
-                        .font(.headline.weight(.bold))
-                        .foregroundColor(.accentColor)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Text("Episode \(episode.number)")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-
-                        if let isFiller = episode.isFiller, isFiller {
-                            AnimeEpisodeBadge(text: "Filler", tint: .orange)
-                        }
-                    }
-
-                    if let title = episode.title, !title.isEmpty {
-                        Text(title)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
-                    }
-
-                    HStack(spacing: 8) {
-                        statusBadge
+                    if let isFiller = episode.isFiller, isFiller {
+                        AnimeEpisodeBadge(text: "Filler", tint: .orange)
                     }
                 }
 
-                Spacer(minLength: 0)
+                if let title = episode.title, !title.isEmpty {
+                    Text(title)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+
+                HStack(spacing: 8) {
+                    statusBadge
+                }
             }
+            .padding(.trailing, reservesTrailingAccessorySpace ? 48 : 0)
 
             if let item = downloadItem,
                item.state == .queued || item.state == .downloading {
@@ -365,7 +348,8 @@ struct AnimeEpisodeSelectableRow: View {
             AnimeEpisodeCard(
                 episode: episode,
                 isDownloaded: isDownloaded,
-                downloadItem: downloadItem
+                downloadItem: downloadItem,
+                reservesTrailingAccessorySpace: false
             )
         }
     }
@@ -377,12 +361,12 @@ struct AnimeEpisodeDownloadButton: View {
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.title3.weight(.semibold))
+            .font(.subheadline.weight(.semibold))
             .foregroundColor(tint)
-            .frame(width: 48, height: 48)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .frame(width: 38, height: 38)
+            .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(Color.primary.opacity(0.06), lineWidth: 1)
             )
     }
@@ -397,7 +381,7 @@ struct AnimeEpisodeSelectionButton: View {
             HStack(spacing: 10) {
                 Image(systemName: "arrow.down.circle.fill")
                     .font(.headline)
-                Text("Download \(count)")
+                Text("Queue \(count)")
                     .font(.subheadline.weight(.semibold))
             }
             .foregroundColor(.white)
