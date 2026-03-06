@@ -240,6 +240,30 @@ struct StreamingData: Codable, Equatable {
     let outro: IntroOutro?
     let anilistID: Int?
     let malID: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case headers
+        case sources
+        case tracks
+        case subtitles
+        case intro
+        case outro
+        case anilistID
+        case malID
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        headers = try container.decodeIfPresent([String: String].self, forKey: .headers)
+        sources = try container.decode([StreamSource].self, forKey: .sources)
+        tracks =
+            try container.decodeIfPresent([SubtitleTrack].self, forKey: .tracks)
+            ?? container.decodeIfPresent([SubtitleTrack].self, forKey: .subtitles)
+        intro = try container.decodeIfPresent(IntroOutro.self, forKey: .intro)
+        outro = try container.decodeIfPresent(IntroOutro.self, forKey: .outro)
+        anilistID = try container.decodeIfPresent(Int.self, forKey: .anilistID)
+        malID = try container.decodeIfPresent(Int.self, forKey: .malID)
+    }
 }
 
 struct StreamSource: Codable, Equatable {
