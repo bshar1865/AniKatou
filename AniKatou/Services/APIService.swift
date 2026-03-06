@@ -156,7 +156,7 @@ class APIService {
             }
         }
 
-        if let lastError as? APIError {
+        if let lastError = lastError as? APIError {
             throw lastError
         }
         throw lastError ?? APIError.serverError(503, UserMessage.streamingUnavailable)
@@ -298,3 +298,4 @@ class APIService {
         }
     }
 }
+
