@@ -219,9 +219,15 @@ struct AnimeDetailView: View {
     }
 
     private var selectionDragGesture: some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .named("episodeSelectionList"))
+        LongPressGesture(minimumDuration: 0.12)
+            .sequenced(before: DragGesture(minimumDistance: 8, coordinateSpace: .named("episodeSelectionList")))
             .onChanged { value in
-                selectEpisode(at: value.location)
+                switch value {
+                case .second(true, let drag?):
+                    selectEpisode(at: drag.location)
+                default:
+                    break
+                }
             }
     }
 

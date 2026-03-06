@@ -83,15 +83,12 @@ struct EpisodeView: View {
             ProgressView("Preparing playback...")
                 .foregroundColor(.white)
         } else if let error = viewModel.errorMessage {
+            VStack {
+                Spacer()
+
             VStack(spacing: 16) {
                 Text(error)
                     .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
-
-                Text("Try again with internet access, or download this episode from Anime Details for offline playback.")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.72))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 20)
 
@@ -105,6 +102,10 @@ struct EpisodeView: View {
                 .padding(.vertical, 12)
                 .background(Color.blue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
+
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 

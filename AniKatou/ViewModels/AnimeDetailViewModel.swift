@@ -153,14 +153,9 @@ class AnimeDetailViewModel: ObservableObject {
     }
 
     func downloadEpisode(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async {
-        do {
-            let queued = try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode)
-            if queued {
+        if await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode) {
                 downloadMessage = UserMessage.downloadStarted(forEpisode: episode.number)
             } else {
-                downloadMessage = UserMessage.downloadStartFailed
-            }
-        } catch {
             downloadMessage = UserMessage.downloadStartFailed
         }
     }
