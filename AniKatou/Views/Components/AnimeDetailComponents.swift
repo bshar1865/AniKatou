@@ -133,11 +133,26 @@ struct AnimeMetadataCard: View {
     let details: AnimeDetails
     let totalEpisodes: Int
 
+    private var formattedEpisodeText: String? {
+        if let episodes = details.stats?.episodes {
+            if let sub = episodes.sub, let dub = episodes.dub {
+                return "Sub \(sub) / Dub \(dub)"
+            }
+            if let sub = episodes.sub {
+                return "\(sub)"
+            }
+            if let dub = episodes.dub {
+                return "Dub \(dub)"
+            }
+        }
+
+        return totalEpisodes > 0 ? "\(totalEpisodes)" : nil
+    }
+
     private var metadataItems: [(String, String)] {
         var items: [(String, String)] = []
 
-        let episodeText = details.stats?.episodes ?? (totalEpisodes > 0 ? "\(totalEpisodes)" : nil)
-        if let episodeText, !episodeText.isEmpty {
+        if let episodeText = formattedEpisodeText {
             items.append(("Episodes", episodeText))
         }
         if let genres = details.moreInfo?.genres, !genres.isEmpty {
@@ -447,3 +462,4 @@ private struct AnimeEpisodeProgressBar: View {
         }
     }
 }
+
