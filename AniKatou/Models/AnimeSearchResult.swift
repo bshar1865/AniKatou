@@ -215,6 +215,32 @@ struct NextEpisodeSchedule: Codable {
     let secondsUntilAiring: Int?
 }
 
+struct EpisodeServersResult: Codable {
+    let status: Int
+    let data: EpisodeServersData
+}
+
+struct EpisodeServersData: Codable {
+    let episodeId: String
+    let episodeNo: Int?
+    let sub: [EpisodeServer]?
+    let dub: [EpisodeServer]?
+    let raw: [EpisodeServer]?
+}
+
+struct EpisodeServer: Codable, Identifiable, Hashable {
+    let serverId: Int?
+    let serverName: String
+
+    var id: String { serverName }
+}
+
+struct ResolvedStreamingSource {
+    let result: StreamingResult
+    let server: String
+    let didFallback: Bool
+}
+
 // Episodes Response
 struct EpisodesResponse: Codable {
     let status: Int

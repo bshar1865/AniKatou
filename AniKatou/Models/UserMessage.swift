@@ -41,8 +41,15 @@ enum UserMessage {
         "The server returned an unexpected status (\(code))."
     }
 
-    static func downloadStarted(forEpisode number: Int) -> String {
-        "Episode \(number) was added to your downloads."
+    static func switchedServer(_ server: String) -> String {
+        "Preferred server unavailable. Switched to \(server)."
+    }
+
+    static func downloadStarted(forEpisode number: Int, server: String? = nil) -> String {
+        if let server, !server.isEmpty {
+            return "Episode \(number) was added to your downloads using \(server)."
+        }
+        return "Episode \(number) was added to your downloads."
     }
 
     static func bulkDownloadQueued(_ count: Int, concurrentLimit: Int) -> String {

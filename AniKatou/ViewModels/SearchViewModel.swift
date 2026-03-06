@@ -6,7 +6,7 @@ class SearchViewModel: ObservableObject {
     @Published var searchResults: [AnimeItem] = []
     @Published var popularAnimes: [AnimeItem] = []
     @Published var suggestions: [SearchSuggestionItem] = []
-    @Published var availableGenres: [String] = []
+    @Published var availableGenres: [String] = ["All"]
     @Published var selectedGenre: String = "All"
     @Published var selectedSort: SearchSortOption = .relevance
     @Published var isLoading = false
@@ -20,7 +20,9 @@ class SearchViewModel: ObservableObject {
     }
 
     func loadPopularAnime() async {
-        guard popularAnimes.isEmpty else { return }
+        if !popularAnimes.isEmpty && availableGenres.count > 1 {
+            return
+        }
 
         isLoading = true
         errorMessage = nil
@@ -31,12 +33,14 @@ class SearchViewModel: ObservableObject {
             let popular = try await popularTask
             let home = try await homeTask
             popularAnimes = filterNSFWContent(popular)
-            availableGenres = ["All"] + home.genres.sorted()
+            let safeGenres = home.genres.filter { genre in
+                let lower = genre.lowercased()
+                return !lower.contains("hentai") && !lower.contains("adult")
+            }
+            availableGenres = ["All"] + safeGenres.sorted()
         } catch let error as APIError {
             if case .serverError(404, _) = error {
                 popularAnimes = []
-            } else if case .networkError = error {
-                errorMessage = UserMessage.noInternet
             } else {
                 errorMessage = error.message
             }
@@ -44,6 +48,9 @@ class SearchViewModel: ObservableObject {
             errorMessage = OfflineManager.shared.isOfflineMode ? UserMessage.noInternet : UserMessage.popularUnavailable
         }
 
+        if availableGenres.isEmpty {
+            availableGenres = ["All"]
+        }
         isLoading = false
     }
 

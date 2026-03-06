@@ -113,6 +113,55 @@ class APIService {
         return result.data
     }
 
+    func getEpisodeServers(episodeId: String) async throws -> EpisodeServersData {
+        let result: EpisodeServersResult = try await fetch(
+            "episode/servers",
+            queryItems: [
+                URLQueryItem(name: "animeEpisodeId", value: episodeId),
+                URLQueryItem(name: "nsfw", value: "false")
+            ]
+        )
+        return result.data
+    }
+
+    func resolveStreamingSources(episodeId: String, category: String = "sub", preferredServer: String = "hd-1") async throws -> ResolvedStreamingSource {
+        var candidateServers = [preferredServer]
+
+        if let serversData = try? await getEpisodeServers(episodeId: episodeId) {
+            let categoryServers: [EpisodeServer]
+            switch category.lowercased() {
+            case "dub":
+                categoryServers = serversData.dub ?? []
+            case "raw":
+                categoryServers = serversData.raw ?? []
+            default:
+                categoryServers = serversData.sub ?? []
+            }
+
+            for server in categoryServers.map(\.serverName) where !candidateServers.contains(server) {
+                candidateServers.append(server)
+            }
+        }
+
+        var lastError: Error?
+
+        for server in candidateServers {
+            do {
+                let result = try await getStreamingSources(episodeId: episodeId, category: category, server: server)
+                if !result.data.sources.isEmpty {
+                    return ResolvedStreamingSource(result: result, server: server, didFallback: server != preferredServer)
+                }
+            } catch {
+                lastError = error
+            }
+        }
+
+        if let lastError as? APIError {
+            throw lastError
+        }
+        throw lastError ?? APIError.serverError(503, UserMessage.streamingUnavailable)
+    }
+
     func getStreamingSources(episodeId: String, category: String = "sub", server: String = "hd-1") async throws -> StreamingResult {
         guard episodeId.contains("?ep=") else {
             throw APIError.invalidEpisodeId
@@ -196,6 +245,9 @@ class APIService {
             throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
         }
         if let result = response as? NextEpisodeScheduleResult, result.status != 200 {
+            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
+        }
+        if let result = response as? EpisodeServersResult, result.status != 200 {
             throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
         }
         if let result = response as? EpisodesResponse, result.status != 200 {

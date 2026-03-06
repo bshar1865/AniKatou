@@ -170,8 +170,8 @@ class AnimeDetailViewModel: ObservableObject {
     }
 
     func downloadEpisode(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async {
-        if await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode) {
-            downloadMessage = UserMessage.downloadStarted(forEpisode: episode.number)
+        if let resolvedServer = await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode) {
+            downloadMessage = UserMessage.downloadStarted(forEpisode: episode.number, server: resolvedServer)
         } else {
             downloadMessage = UserMessage.downloadStartFailed
         }
@@ -185,7 +185,7 @@ class AnimeDetailViewModel: ObservableObject {
 
         var queuedCount = 0
         for episode in selectedEpisodes {
-            if await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode) {
+            if await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode) != nil {
                 queuedCount += 1
             }
         }
@@ -213,42 +213,48 @@ class AnimeDetailViewModel: ObservableObject {
         }
     }
 
-    private func queueEpisodeDownload(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async throws -> Bool {
+    private func queueEpisodeDownload(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async throws -> String? {
         addToLibraryIfNeeded(anime)
 
         if let details = animeDetails?.data.anime.info {
             await OfflineManager.shared.cacheAnimeDetails(details, episodes: episodesToCache, thumbnails: [:])
         }
 
-        let stream = try await APIService.shared.getStreamingSources(
+        let resolved = try await APIService.shared.resolveStreamingSources(
             episodeId: episode.id,
             category: AppSettings.shared.preferredLanguage,
-            server: AppSettings.shared.preferredServer
+            preferredServer: AppSettings.shared.preferredServer
         )
 
-        guard let source = stream.data.sources.first(where: { ($0.isM3U8 ?? false) || $0.url.contains(".m3u8") }),
+        guard let source = resolved.result.data.sources.first(where: { ($0.isM3U8 ?? false) || $0.url.contains(".m3u8") }),
               let url = URL(string: source.url) else {
             downloadMessage = UserMessage.noDownloadableStream
-            return false
+            return nil
         }
 
-        return HLSDownloadManager.shared.startDownload(
+        let started = HLSDownloadManager.shared.startDownload(
             streamURL: url,
             animeId: anime.id,
             episodeId: episode.id,
             animeTitle: anime.title,
             episodeNumber: "\(episode.number)",
-            headers: stream.data.headers,
-            subtitleTracks: stream.data.tracks,
-            intro: stream.data.intro,
-            outro: stream.data.outro
+            headers: resolved.result.data.headers,
+            subtitleTracks: resolved.result.data.tracks,
+            intro: resolved.result.data.intro,
+            outro: resolved.result.data.outro
         )
+
+        guard started else { return nil }
+        return resolved.didFallback ? displayName(for: resolved.server) : nil
     }
 
-    private func queueEpisodeDownloadWithRetry(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async -> Bool {
+    private func queueEpisodeDownloadWithRetry(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async -> String? {
         do {
-            if try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode) {
-                return true
+            if let serverName = try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode) {
+                return serverName
+            }
+            if HLSDownloadManager.shared.downloads.contains(where: { $0.episodeId == episode.id }) {
+                return nil
             }
         } catch {
         }
@@ -258,7 +264,7 @@ class AnimeDetailViewModel: ObservableObject {
         do {
             return try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode)
         } catch {
-            return false
+            return nil
         }
     }
 
@@ -271,5 +277,9 @@ class AnimeDetailViewModel: ObservableObject {
         if let offlineDetails = offlineAnimeDetails {
             await OfflineManager.shared.cacheImage(from: offlineDetails.image)
         }
+    }
+
+    private func displayName(for server: String) -> String {
+        AppSettings.shared.availableServers.first(where: { $0.id == server })?.name ?? server
     }
 }
