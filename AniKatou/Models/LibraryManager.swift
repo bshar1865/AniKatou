@@ -1,6 +1,10 @@
 import Foundation
 
-class LibraryManager {
+extension Notification.Name {
+    static let libraryDidChange = Notification.Name("LibraryDidChange")
+}
+
+final class LibraryManager {
     static let shared = LibraryManager()
 
     private let libraryKey = "library_animes"
@@ -18,11 +22,10 @@ class LibraryManager {
             return
         }
 
-        // Migrate old bookmarks key if present.
         if let data = UserDefaults.standard.data(forKey: legacyBookmarksKey),
            let items = try? JSONDecoder().decode([AnimeItem].self, from: data) {
             cachedItems = items
-            saveLibrary()
+            saveLibrary(notify: false)
             UserDefaults.standard.removeObject(forKey: legacyBookmarksKey)
             return
         }
@@ -30,9 +33,12 @@ class LibraryManager {
         cachedItems = []
     }
 
-    private func saveLibrary() {
+    private func saveLibrary(notify: Bool = true) {
         if let data = try? JSONEncoder().encode(cachedItems) {
             UserDefaults.standard.set(data, forKey: libraryKey)
+        }
+        if notify {
+            NotificationCenter.default.post(name: .libraryDidChange, object: nil)
         }
     }
 
@@ -54,6 +60,12 @@ class LibraryManager {
         } else {
             cachedItems.append(anime)
         }
+        saveLibrary()
+    }
+
+    func add(_ anime: AnimeItem) {
+        guard !contains(anime) else { return }
+        cachedItems.append(anime)
         saveLibrary()
     }
 

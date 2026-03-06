@@ -14,7 +14,7 @@ struct CustomVideoPlayerView: View {
     let episodeTitle: String?
     let thumbnailURL: String?
     let onDismiss: () -> Void
-    
+
     @State private var player: AVPlayer = AVPlayer()
     @State private var isPlaying = true
     @State private var duration: Double = 0
@@ -33,24 +33,24 @@ struct CustomVideoPlayerView: View {
     @State private var showAutoSkipNotification = false
     @State private var autoSkipMessage = ""
     @State private var isAutoSkipping = false
-    
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 Color.black
                     .ignoresSafeArea()
-                
+
                 ZStack {
                     VideoPlayerContainer(player: player)
                         .ignoresSafeArea()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    
+
                     if isBuffering {
                         VStack(spacing: 16) {
                             ProgressView()
                                 .scaleEffect(1.5)
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            
+
                             Text("Loading...")
                                 .font(.headline)
                                 .foregroundColor(.white)
@@ -61,7 +61,7 @@ struct CustomVideoPlayerView: View {
                         .transition(.opacity)
                     }
                 }
-                
+
                 VStack {
                     HStack {
                         Button(action: {
@@ -77,16 +77,16 @@ struct CustomVideoPlayerView: View {
                                 .clipShape(Circle())
                                 .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
                         }
-                        
+
                         Spacer()
-                        
+
                         VStack(alignment: .trailing, spacing: 2) {
                             Text(animeTitle)
                                 .font(.headline)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.white)
                                 .lineLimit(1)
-                            
+
                             Text("Episode \(episodeNumber)")
                                 .font(.subheadline)
                                 .foregroundColor(.white.opacity(0.8))
@@ -96,17 +96,17 @@ struct CustomVideoPlayerView: View {
                         .background(Color.black.opacity(0.6))
                         .cornerRadius(12)
                         .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
-                        
+
                         Spacer()
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 8)
-                    
+
                     Spacer()
                 }
                 .opacity(showControls ? 1 : 0)
                 .animation(.easeInOut(duration: 0.3), value: showControls)
-                
+
                 if showControls {
                     HStack(spacing: 25) {
                         Button(action: {
@@ -120,7 +120,7 @@ struct CustomVideoPlayerView: View {
                                 .foregroundColor(.white)
                                 .frame(width: 60, height: 60)
                         }
-                        
+
                         Button(action: {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                 if isPlaying {
@@ -139,7 +139,7 @@ struct CustomVideoPlayerView: View {
                         }
                         .scaleEffect(isPlaying ? 1 : 1.1)
                         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPlaying)
-                        
+
                         Button(action: {
                             let newTime = min(duration, currentTime + 5)
                             let seekTime = CMTime(seconds: newTime, preferredTimescale: 600)
@@ -153,10 +153,10 @@ struct CustomVideoPlayerView: View {
                         }
                     }
                 }
-                
+
                 VStack {
                     Spacer()
-                    
+
                     VStack(spacing: 8) {
                         VStack(spacing: 4) {
                             GeometryReader { barGeometry in
@@ -165,18 +165,18 @@ struct CustomVideoPlayerView: View {
                                         .fill(Color.white.opacity(0.3))
                                         .frame(height: 4)
                                         .cornerRadius(2)
-                                    
+
                                     Rectangle()
                                         .fill(Color.white.opacity(0.5))
                                         .frame(width: barGeometry.size.width * bufferingProgress, height: 4)
                                         .cornerRadius(2)
-                                    
+
                                     Rectangle()
                                         .fill(Color.white)
                                         .frame(width: barGeometry.size.width * (currentTime / max(duration, 1)), height: 4)
                                         .cornerRadius(2)
                                         .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 0)
-                                    
+
                                     Circle()
                                         .fill(Color.white)
                                         .frame(width: 16, height: 16)
@@ -205,14 +205,14 @@ struct CustomVideoPlayerView: View {
                             )
                         }
                         .padding(.horizontal, 24)
-                        
+
                         HStack {
                             Text(formatTime(currentTime))
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.white.opacity(0.9))
-                            
+
                             Spacer()
-                            
+
                             Text(formatTime(duration))
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.white.opacity(0.9))
@@ -223,15 +223,15 @@ struct CustomVideoPlayerView: View {
                     .opacity(showControls ? 1 : 0)
                     .animation(.easeInOut(duration: 0.3), value: showControls)
                 }
-                
+
                 if AppSettings.shared.subtitlesEnabled, !currentSubtitle.isEmpty {
-                    subtitleOverlay(geometry: geometry)
+                    subtitleOverlay(geometry: geometry, currentSubtitle: currentSubtitle)
                 }
-                
+
                 if showAutoSkipNotification {
                     VStack {
                         Spacer()
-                        
+
                         HStack {
                             Image(systemName: "forward.fill")
                                 .font(.system(size: 16, weight: .semibold))
@@ -247,19 +247,15 @@ struct CustomVideoPlayerView: View {
                                 .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
                         )
                         .transition(.scale.combined(with: .opacity))
-                        
+
                         Spacer()
                     }
                     .animation(.easeInOut(duration: 0.3), value: showAutoSkipNotification)
                 }
             }
         }
-        .onAppear {
-            setupPlayer()
-        }
-        .onDisappear {
-            cleanupPlayer()
-        }
+        .onAppear(perform: setupPlayer)
+        .onDisappear(perform: cleanupPlayer)
         .contentShape(Rectangle())
         .onTapGesture {
             withAnimation(.easeInOut(duration: 0.3)) {
@@ -271,38 +267,36 @@ struct CustomVideoPlayerView: View {
         }
         .statusBarHidden(true)
     }
-    
+
     private func setupPlayer() {
         let asset: AVURLAsset
         if let headers = headers {
-            asset = AVURLAsset(url: videoURL, options: [
-                "AVURLAssetHTTPHeaderFieldsKey": headers
-            ])
+            asset = AVURLAsset(url: videoURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
         } else {
             asset = AVURLAsset(url: videoURL)
         }
-        
+
         let item = AVPlayerItem(asset: asset)
         player.replaceCurrentItem(with: item)
-        
+
         hasSkippedIntro = false
         hasSkippedOutro = false
         isAutoSkipping = false
-        
+
         updateDuration()
         observePlayer()
         loadSubtitles()
         startProgressSaving()
-        
+
         if let existingProgress = WatchProgressManager.shared.getProgress(for: animeId, episodeID: episodeId) {
             let seekTime = CMTime(seconds: existingProgress.timestamp, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
             player.seek(to: seekTime)
         }
-        
+
         player.play()
         isPlaying = true
     }
-    
+
     private func cleanupPlayer() {
         saveWatchProgress()
         player.pause()
@@ -322,7 +316,7 @@ struct CustomVideoPlayerView: View {
             subtitleTimeObserver = nil
         }
     }
-    
+
     private func observePlayer() {
         if let observer = playbackTimeObserver {
             player.removeTimeObserver(observer)
@@ -333,7 +327,7 @@ struct CustomVideoPlayerView: View {
             if !isSeeking && !isAutoSkipping {
                 currentTime = time.seconds
             }
-            
+
             if let intro = intro, AppSettings.shared.autoSkipIntro, !hasSkippedIntro, !isAutoSkipping, !isSeeking {
                 let introStart = Double(intro.start)
                 let introEnd = Double(intro.end)
@@ -347,18 +341,10 @@ struct CustomVideoPlayerView: View {
                         }
                     }
                     hasSkippedIntro = true
-                    autoSkipMessage = "Skipped Intro"
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        showAutoSkipNotification = true
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showAutoSkipNotification = false
-                        }
-                    }
+                    showAutoSkip(message: "Skipped Intro")
                 }
             }
-            
+
             if let outro = outro, AppSettings.shared.autoSkipOutro, !hasSkippedOutro, !isAutoSkipping, !isSeeking {
                 let outroStart = Double(outro.start)
                 let outroEnd = Double(outro.end)
@@ -372,18 +358,10 @@ struct CustomVideoPlayerView: View {
                         }
                     }
                     hasSkippedOutro = true
-                    autoSkipMessage = "Skipped Outro"
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        showAutoSkipNotification = true
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showAutoSkipNotification = false
-                        }
-                    }
+                    showAutoSkip(message: "Skipped Outro")
                 }
             }
-            
+
             if let item = player.currentItem {
                 let loadedRanges = item.loadedTimeRanges
                 if let timeRange = loadedRanges.first?.timeRangeValue {
@@ -399,26 +377,38 @@ struct CustomVideoPlayerView: View {
         autoHideControls()
     }
 
+    private func showAutoSkip(message: String) {
+        autoSkipMessage = message
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showAutoSkipNotification = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showAutoSkipNotification = false
+            }
+        }
+    }
+
     private func updateDuration() {
         guard let item = player.currentItem else {
             duration = 0
             return
         }
 
-                if #available(iOS 16.0, *) {
-                    Task {
-                        do {
-                            let loadedDuration = try await item.asset.load(.duration)
-                            await MainActor.run { duration = loadedDuration.seconds }
-                        } catch {
-                            await MainActor.run { duration = 0 }
-                        }
-                    }
-                } else {
-                    duration = item.asset.duration.seconds
+        if #available(iOS 16.0, *) {
+            Task {
+                do {
+                    let loadedDuration = try await item.asset.load(.duration)
+                    await MainActor.run { duration = loadedDuration.seconds }
+                } catch {
+                    await MainActor.run { duration = 0 }
                 }
+            }
+        } else {
+            duration = item.asset.duration.seconds
+        }
     }
-    
+
     private func autoHideControls() {
         hideControlsWorkItem?.cancel()
         let workItem = DispatchWorkItem {
@@ -429,32 +419,24 @@ struct CustomVideoPlayerView: View {
         hideControlsWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: workItem)
     }
-    
-    private func formatTime(_ seconds: Double) -> String {
-        guard !seconds.isNaN && !seconds.isInfinite else { return "00:00" }
-        let totalSeconds = Int(seconds)
-        let minutes = totalSeconds / 60
-        let secs = totalSeconds % 60
-        return String(format: "%02d:%02d", minutes, secs)
-    }
-    
+
     private func loadSubtitles() {
         guard AppSettings.shared.subtitlesEnabled,
               let tracks = subtitleTracks?.filter({ !$0.lang.lowercased().contains("thumbnail") }) else {
             return
         }
-        
+
         let selectedSubtitle = tracks.first { track in
             let langParts = track.lang.components(separatedBy: " - ")
             let mainLang = langParts[0].lowercased()
             return mainLang.contains("english")
         }
-        
+
         guard let subtitle = selectedSubtitle,
               let subtitleURL = URL(string: subtitle.url) else {
             return
         }
-        
+
         Task {
             do {
                 let cues = try await SubtitleManager.shared.loadSubtitles(from: subtitleURL, headers: headers)
@@ -470,20 +452,19 @@ struct CustomVideoPlayerView: View {
                     }
                 }
             } catch {
-                // Subtitle loading failed silently
             }
         }
     }
-    
+
     private func startProgressSaving() {
         progressSaveTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
             saveWatchProgress()
         }
     }
-    
+
     private func saveWatchProgress() {
         guard currentTime > 0 && duration > 0 else { return }
-        
+
         WatchProgressManager.shared.saveProgress(
             animeID: animeId,
             episodeID: episodeId,
@@ -495,117 +476,3 @@ struct CustomVideoPlayerView: View {
         )
     }
 }
-
-struct VideoPlayerContainer: UIViewRepresentable {
-    let player: AVPlayer
-    
-    func makeUIView(context: Context) -> PlayerView {
-        let view = PlayerView()
-        view.player = player
-        return view
-    }
-    
-    func updateUIView(_ uiView: PlayerView, context: Context) {
-        uiView.player = player
-    }
-}
-
-class PlayerView: UIView {
-    override static var layerClass: AnyClass {
-        AVPlayerLayer.self
-    }
-    
-    var playerLayer: AVPlayerLayer {
-        layer as! AVPlayerLayer
-    }
-    
-    var player: AVPlayer? {
-        get { playerLayer.player }
-        set {
-            playerLayer.player = newValue
-            playerLayer.videoGravity = .resizeAspect
-        }
-    }
-    
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        playerLayer.frame = bounds
-    }
-}
-
-private extension CustomVideoPlayerView {
-    @ViewBuilder
-    func subtitleOverlay(geometry: GeometryProxy) -> some View {
-        let textSize = AppSettings.shared.subtitleTextSize > 0 ? AppSettings.shared.subtitleTextSize : AppSettings.defaultSubtitleTextSize
-        let bgOpacity = AppSettings.shared.subtitleBackgroundOpacity > 0 ? AppSettings.shared.subtitleBackgroundOpacity : AppSettings.defaultSubtitleBackgroundOpacity
-        let textColor = colorFromString(AppSettings.shared.subtitleTextColor)
-        let showBg = AppSettings.shared.subtitleShowBackground
-        let fontWeight = fontWeightFromString(AppSettings.shared.subtitleFontWeight)
-        let maxLines = AppSettings.shared.subtitleMaxLines > 0 ? AppSettings.shared.subtitleMaxLines : AppSettings.defaultSubtitleMaxLines
-        let position = AppSettings.shared.subtitlePosition
-        
-        let subtitleView = HStack {
-            Spacer()
-            Text(currentSubtitle)
-                .font(.system(size: textSize, weight: fontWeight))
-                .foregroundColor(textColor)
-                .multilineTextAlignment(.center)
-                .lineLimit(maxLines)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
-                .background(
-                    Group {
-                        if showBg {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.black.opacity(bgOpacity))
-                        }
-                    }
-                )
-                .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
-            Spacer()
-        }
-        .transition(.opacity)
-        
-        switch position {
-        case "center":
-            VStack {
-                Spacer()
-                subtitleView
-                Spacer()
-            }
-        case "middleBottom":
-            VStack {
-                Spacer()
-                subtitleView
-                    .padding(.bottom, geometry.size.height * 0.18)
-            }
-        default:
-            VStack {
-                Spacer()
-                subtitleView
-                    .padding(.bottom, geometry.size.height * 0.08)
-            }
-        }
-    }
-    
-    func colorFromString(_ str: String) -> Color {
-        switch str {
-        case "yellow": return .yellow
-        case "cyan": return .cyan
-        case "green": return .green
-        case "orange": return .orange
-        default: return .white
-        }
-    }
-    
-    func fontWeightFromString(_ str: String) -> Font.Weight {
-        switch str {
-        case "light": return .light
-        case "regular": return .regular
-        case "medium": return .medium
-        case "semibold": return .semibold
-        case "bold": return .bold
-        default: return .medium
-        }
-    }
-} 

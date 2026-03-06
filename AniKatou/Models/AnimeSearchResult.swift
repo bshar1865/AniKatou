@@ -1,6 +1,5 @@
 import Foundation
 
-// Search Results
 struct AnimeSearchResult: Codable {
     let status: Int
     let data: AnimeSearchData
@@ -22,33 +21,17 @@ struct AnimeItem: Codable, Identifiable {
     let isNSFW: Bool?
     let genres: [String]?
     let anilistId: Int?
-    
-    // Map the API fields to our model
+
     var title: String { name }
     var image: String { poster }
-    
-    // Helper function to check if content is NSFW
+
     var containsNSFWContent: Bool {
-        if let isNSFW = isNSFW, isNSFW {
-            return true
-        }
-        
-        // Check for NSFW genres
-        let nsfwGenres = ["Hentai", "Ecchi", "Adult", "Mature"]
-        if let genres = genres {
-            return genres.contains { genre in
-                nsfwGenres.contains { nsfwGenre in
-                    genre.lowercased().contains(nsfwGenre.lowercased())
-                }
-            }
-        }
-        
-        // Check for NSFW keywords in title
-        let nsfwKeywords = ["hentai", "ecchi", "adult", "nsfw", "xxx"]
-        let titleLowercased = name.lowercased()
-        return nsfwKeywords.contains { keyword in
-            titleLowercased.contains(keyword)
-        }
+        ContentSafety.containsAdultContent(
+            title: name,
+            genres: genres,
+            rating: rating,
+            isNSFW: isNSFW
+        )
     }
 }
 
@@ -57,7 +40,6 @@ struct EpisodeCount: Codable {
     let dub: Int?
 }
 
-// Anime Details
 struct AnimeDetailsResult: Codable {
     let status: Int
     let data: AnimeDetailsData
@@ -79,8 +61,7 @@ struct AnimeDetails: Codable {
     let stats: AnimeStats?
     let moreInfo: AnimeMoreInfo?
     let anilistId: Int?
-    
-    // Map the API fields to our model
+
     var title: String { name }
     var image: String { poster }
     var type: String? { stats?.type }
@@ -88,6 +69,15 @@ struct AnimeDetails: Codable {
     var releaseDate: String? { moreInfo?.aired }
     var genres: [String]? { moreInfo?.genres }
     var rating: String? { stats?.rating }
+
+    var containsNSFWContent: Bool {
+        ContentSafety.containsAdultContent(
+            title: name,
+            description: description,
+            genres: genres,
+            rating: rating
+        )
+    }
 }
 
 struct AnimeStats: Codable {
@@ -110,7 +100,76 @@ struct AnimeMoreInfo: Codable {
     let producers: [String]?
 }
 
-// Episodes Response
+struct AnimeQtipResult: Codable {
+    let status: Int
+    let data: AnimeQtipData
+}
+
+struct AnimeQtipData: Codable {
+    let anime: AnimeQtipInfo
+}
+
+struct AnimeQtipInfo: Codable {
+    let id: String
+    let name: String
+    let malscore: String?
+    let quality: String?
+    let episodes: EpisodeCount?
+    let type: String?
+    let description: String?
+    let jname: String?
+    let synonyms: String?
+    let aired: String?
+    let status: String?
+    let genres: [String]?
+
+    var containsNSFWContent: Bool {
+        ContentSafety.containsAdultContent(
+            title: name,
+            description: description,
+            synonyms: synonyms,
+            genres: genres
+        )
+    }
+}
+
+struct NextEpisodeScheduleResult: Codable {
+    let status: Int
+    let data: NextEpisodeSchedule
+}
+
+struct NextEpisodeSchedule: Codable {
+    let airingISOTimestamp: String?
+    let airingTimestamp: Int?
+    let secondsUntilAiring: Int?
+}
+
+struct EpisodeServersResult: Codable {
+    let status: Int
+    let data: EpisodeServersData
+}
+
+struct EpisodeServersData: Codable {
+    let episodeId: String
+    let episodeNo: Int?
+    let sub: [EpisodeServer]?
+    let dub: [EpisodeServer]?
+    let raw: [EpisodeServer]?
+}
+
+struct EpisodeServer: Codable, Identifiable, Hashable {
+    let serverId: Int?
+    let serverName: String
+
+    var id: String { serverName }
+}
+
+struct ResolvedStreamingSource {
+    let result: StreamingResult
+    let server: String
+    let didFallback: Bool
+}
+
 struct EpisodesResponse: Codable {
     let status: Int
     let data: EpisodesData
@@ -126,11 +185,10 @@ struct EpisodeInfo: Codable, Identifiable {
     let episodeId: String
     let number: Int
     let isFiller: Bool?
-    
+
     var id: String { episodeId }
 }
 
-// Streaming
 struct StreamingResult: Codable, Equatable {
     let status: Int
     let data: StreamingData
@@ -144,6 +202,41 @@ struct StreamingData: Codable, Equatable {
     let outro: IntroOutro?
     let anilistID: Int?
     let malID: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case headers
+        case sources
+        case tracks
+        case subtitles
+        case intro
+        case outro
+        case anilistID
+        case malID
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        headers = try container.decodeIfPresent([String: String].self, forKey: .headers)
+        sources = try container.decode([StreamSource].self, forKey: .sources)
+        tracks =
+            try container.decodeIfPresent([SubtitleTrack].self, forKey: .tracks)
+            ?? container.decodeIfPresent([SubtitleTrack].self, forKey: .subtitles)
+        intro = try container.decodeIfPresent(IntroOutro.self, forKey: .intro)
+        outro = try container.decodeIfPresent(IntroOutro.self, forKey: .outro)
+        anilistID = try container.decodeIfPresent(Int.self, forKey: .anilistID)
+        malID = try container.decodeIfPresent(Int.self, forKey: .malID)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(headers, forKey: .headers)
+        try container.encode(sources, forKey: .sources)
+        try container.encodeIfPresent(tracks, forKey: .tracks)
+        try container.encodeIfPresent(intro, forKey: .intro)
+        try container.encodeIfPresent(outro, forKey: .outro)
+        try container.encodeIfPresent(anilistID, forKey: .anilistID)
+        try container.encodeIfPresent(malID, forKey: .malID)
+    }
 }
 
 struct StreamSource: Codable, Equatable {
@@ -161,4 +254,4 @@ struct SubtitleTrack: Codable, Equatable {
 struct IntroOutro: Codable, Equatable {
     let start: Int
     let end: Int
-} 
+}

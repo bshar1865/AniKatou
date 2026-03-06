@@ -48,26 +48,8 @@ class APIConfigViewModel: ObservableObject {
         }
 
         do {
-            let config = URLSessionConfiguration.default
-            config.timeoutIntervalForRequest = 15
-            let session = URLSession(configuration: config)
-            var request = URLRequest(url: homeURL)
-            request.setValue("AniKatou/1.0", forHTTPHeaderField: "User-Agent")
-            request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-            let (data, response) = try await session.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse else {
-                errorMessage = UserMessage.invalidServerResponse
-                return false
-            }
-
-            guard httpResponse.statusCode == 200 else {
-                errorMessage = UserMessage.serverError(httpResponse.statusCode)
-                return false
-            }
-
-            let homeResult = try? JSONDecoder().decode(HomePageResult.self, from: data)
-            guard homeResult?.status == 200 else {
+            let homeResult = try await validateHomeEndpoint(url: homeURL)
+            guard homeResult.status == 200 else {
                 errorMessage = UserMessage.apiUnexpectedResponse
                 return false
             }
@@ -100,5 +82,41 @@ class APIConfigViewModel: ObservableObject {
         apiURL = ""
         isConfigured = false
         errorMessage = nil
+    }
+
+    private func validateHomeEndpoint(url: URL) async throws -> HomePageResult {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 5
+        config.timeoutIntervalForResource = 5
+        let session = URLSession(configuration: config)
+
+        let deadline = Date().addingTimeInterval(5)
+        var lastError: Error?
+
+        while Date() < deadline {
+            do {
+                var request = URLRequest(url: url)
+                request.setValue("AniKatou/1.0", forHTTPHeaderField: "User-Agent")
+                request.setValue("application/json", forHTTPHeaderField: "Accept")
+                request.timeoutInterval = 5
+
+                let (data, response) = try await session.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw URLError(.badServerResponse)
+                }
+                guard httpResponse.statusCode == 200 else {
+                    throw APIError.serverError(httpResponse.statusCode, UserMessage.serverError(httpResponse.statusCode))
+                }
+                guard let homeResult = try? JSONDecoder().decode(HomePageResult.self, from: data) else {
+                    throw APIError.invalidResponse
+                }
+                return homeResult
+            } catch {
+                lastError = error
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
+        }
+
+        throw lastError ?? URLError(.timedOut)
     }
 }

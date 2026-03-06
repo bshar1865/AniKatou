@@ -19,7 +19,7 @@ class LibraryCollectionViewModel: ObservableObject {
 
     private func setupNotificationObserver() {
         notificationObserver = NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("LibraryDidChange"),
+            forName: .libraryDidChange,
             object: nil,
             queue: .main
         ) { [weak self] _ in

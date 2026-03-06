@@ -12,6 +12,7 @@ class AnimeDetailViewModel: ObservableObject {
     @Published var isOfflineMode = false
     @Published var offlineAnimeDetails: OfflineAnimeDetails?
     @Published var downloadMessage: String?
+    @Published var nextEpisodeSchedule: NextEpisodeSchedule?
 
     private var loadTask: Task<Void, Never>?
 
@@ -21,6 +22,7 @@ class AnimeDetailViewModel: ObservableObject {
         episodeGroups = []
         animeDetails = nil
         offlineAnimeDetails = nil
+        nextEpisodeSchedule = nil
 
         loadTask = Task {
             isLoading = true
@@ -53,8 +55,23 @@ class AnimeDetailViewModel: ObservableObject {
 
     private func loadOnlineAnimeDetails(animeId: String) async {
         do {
-            let detailsResult = try await APIService.shared.getAnimeDetails(id: animeId)
-            let episodes = try await APIService.shared.getAnimeEpisodes(id: animeId)
+            async let detailsTask = APIService.shared.getAnimeDetails(id: animeId)
+            async let episodesTask = APIService.shared.getAnimeEpisodes(id: animeId)
+            let qtipTask = Task { try? await APIService.shared.getAnimeQtipInfo(id: animeId) }
+            let scheduleTask = Task { try? await APIService.shared.getNextEpisodeSchedule(id: animeId) }
+
+            let detailsResult = try await detailsTask
+            let episodes = try await episodesTask
+            let qtipResult = await qtipTask.value
+            nextEpisodeSchedule = await scheduleTask.value
+
+            if detailsResult.data.anime.info.containsNSFWContent || qtipResult?.data.anime.containsNSFWContent == true {
+                errorMessage = "This app does not support hentai shows."
+                animeDetails = nil
+                episodeGroups = []
+                return
+            }
+
             animeDetails = detailsResult
             episodeGroups = EpisodeGroup.createGroups(from: episodes)
             refreshLibraryState()
@@ -116,13 +133,12 @@ class AnimeDetailViewModel: ObservableObject {
         if currentlyInLibrary {
             LibraryManager.shared.remove(anime)
         } else {
-            LibraryManager.shared.toggle(anime)
+            LibraryManager.shared.add(anime)
             Task {
                 await cacheCurrentAnimeForOffline()
             }
         }
         isInLibrary = !currentlyInLibrary
-        NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
     }
 
     func refreshLibraryState() {
@@ -153,9 +169,10 @@ class AnimeDetailViewModel: ObservableObject {
     }
 
     func downloadEpisode(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async {
-        if await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode) {
-                downloadMessage = UserMessage.downloadStarted(forEpisode: episode.number)
-            } else {
+        let result = await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode)
+        if result.queued {
+            downloadMessage = UserMessage.downloadStarted(forEpisode: episode.number, server: result.serverName)
+        } else {
             downloadMessage = UserMessage.downloadStartFailed
         }
     }
@@ -168,7 +185,8 @@ class AnimeDetailViewModel: ObservableObject {
 
         var queuedCount = 0
         for episode in selectedEpisodes {
-            if await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode) {
+            let result = await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode)
+            if result.queued {
                 queuedCount += 1
             }
         }
@@ -187,51 +205,54 @@ class AnimeDetailViewModel: ObservableObject {
             isInLibrary = true
             return
         }
-        LibraryManager.shared.toggle(anime)
+        LibraryManager.shared.add(anime)
         isInLibrary = true
-        NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
 
         Task {
             await cacheCurrentAnimeForOffline()
         }
     }
 
-    private func queueEpisodeDownload(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async throws -> Bool {
+    private func queueEpisodeDownload(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async throws -> (queued: Bool, serverName: String?) {
         addToLibraryIfNeeded(anime)
 
         if let details = animeDetails?.data.anime.info {
             await OfflineManager.shared.cacheAnimeDetails(details, episodes: episodesToCache, thumbnails: [:])
         }
 
-        let stream = try await APIService.shared.getStreamingSources(
+        let resolved = try await APIService.shared.resolveStreamingSources(
             episodeId: episode.id,
             category: AppSettings.shared.preferredLanguage,
-            server: AppSettings.shared.preferredServer
+            preferredServer: AppSettings.shared.preferredServer
         )
 
-        guard let source = stream.data.sources.first(where: { ($0.isM3U8 ?? false) || $0.url.contains(".m3u8") }),
+        guard let source = resolved.result.data.sources.first(where: { ($0.isM3U8 ?? false) || $0.url.contains(".m3u8") }),
               let url = URL(string: source.url) else {
             downloadMessage = UserMessage.noDownloadableStream
-            return false
+            return (false, nil)
         }
 
-        return HLSDownloadManager.shared.startDownload(
+        let started = HLSDownloadManager.shared.startDownload(
             streamURL: url,
             animeId: anime.id,
             episodeId: episode.id,
             animeTitle: anime.title,
             episodeNumber: "\(episode.number)",
-            headers: stream.data.headers,
-            subtitleTracks: stream.data.tracks,
-            intro: stream.data.intro,
-            outro: stream.data.outro
+            headers: resolved.result.data.headers,
+            subtitleTracks: resolved.result.data.tracks,
+            intro: resolved.result.data.intro,
+            outro: resolved.result.data.outro
         )
+
+        guard started else { return (false, nil) }
+        return (true, resolved.didFallback ? displayName(for: resolved.server) : nil)
     }
 
-    private func queueEpisodeDownloadWithRetry(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async -> Bool {
+    private func queueEpisodeDownloadWithRetry(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async -> (queued: Bool, serverName: String?) {
         do {
-            if try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode) {
-                return true
+            let result = try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode)
+            if result.queued || HLSDownloadManager.shared.downloads.contains(where: { $0.episodeId == episode.id }) {
+                return result.queued ? result : (true, nil)
             }
         } catch {
         }
@@ -239,10 +260,14 @@ class AnimeDetailViewModel: ObservableObject {
         try? await Task.sleep(nanoseconds: 500_000_000)
 
         do {
-            return try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode)
+            let result = try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode)
+            if result.queued || HLSDownloadManager.shared.downloads.contains(where: { $0.episodeId == episode.id }) {
+                return result.queued ? result : (true, nil)
+            }
         } catch {
-            return false
         }
+
+        return (false, nil)
     }
 
     private func cacheCurrentAnimeForOffline() async {
@@ -254,5 +279,9 @@ class AnimeDetailViewModel: ObservableObject {
         if let offlineDetails = offlineAnimeDetails {
             await OfflineManager.shared.cacheImage(from: offlineDetails.image)
         }
+    }
+
+    private func displayName(for server: String) -> String {
+        AppSettings.shared.availableServers.first(where: { $0.id == server })?.name ?? server
     }
 }

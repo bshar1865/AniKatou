@@ -67,11 +67,12 @@ class APIService {
             throw APIError.searchQueryTooShort
         }
 
-        let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
         let queryItems = [
-            URLQueryItem(name: "q", value: encodedQuery),
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "page", value: "1"),
             URLQueryItem(name: "nsfw", value: "false")
         ]
+
         let result: AnimeSearchResult = try await fetch("search", queryItems: queryItems)
         return result.data.animes
     }
@@ -80,9 +81,67 @@ class APIService {
         try await fetch("anime/\(id)", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
     }
 
+    func getAnimeQtipInfo(id: String) async throws -> AnimeQtipResult {
+        try await fetch("qtip/\(id)", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
+    }
+
     func getAnimeEpisodes(id: String) async throws -> [EpisodeInfo] {
         let result: EpisodesResponse = try await fetch("anime/\(id)/episodes", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
         return result.data.episodes
+    }
+
+    func getNextEpisodeSchedule(id: String) async throws -> NextEpisodeSchedule {
+        let result: NextEpisodeScheduleResult = try await fetch("anime/\(id)/next-episode-schedule", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
+        return result.data
+    }
+
+    func getEpisodeServers(episodeId: String) async throws -> EpisodeServersData {
+        let result: EpisodeServersResult = try await fetch(
+            "episode/servers",
+            queryItems: [
+                URLQueryItem(name: "animeEpisodeId", value: episodeId),
+                URLQueryItem(name: "nsfw", value: "false")
+            ]
+        )
+        return result.data
+    }
+
+    func resolveStreamingSources(episodeId: String, category: String = "sub", preferredServer: String = "hd-1") async throws -> ResolvedStreamingSource {
+        var candidateServers = [preferredServer]
+
+        if let serversData = try? await getEpisodeServers(episodeId: episodeId) {
+            let categoryServers: [EpisodeServer]
+            switch category.lowercased() {
+            case "dub":
+                categoryServers = serversData.dub ?? []
+            case "raw":
+                categoryServers = serversData.raw ?? []
+            default:
+                categoryServers = serversData.sub ?? []
+            }
+
+            for server in categoryServers.map(\.serverName) where !candidateServers.contains(server) {
+                candidateServers.append(server)
+            }
+        }
+
+        var lastError: Error?
+
+        for server in candidateServers {
+            do {
+                let result = try await getStreamingSources(episodeId: episodeId, category: category, server: server)
+                if !result.data.sources.isEmpty {
+                    return ResolvedStreamingSource(result: result, server: server, didFallback: server != preferredServer)
+                }
+            } catch {
+                lastError = error
+            }
+        }
+
+        if let lastError = lastError as? APIError {
+            throw lastError
+        }
+        throw lastError ?? APIError.serverError(503, UserMessage.streamingUnavailable)
     }
 
     func getStreamingSources(episodeId: String, category: String = "sub", server: String = "hd-1") async throws -> StreamingResult {
@@ -110,6 +169,7 @@ class APIService {
         let result: AnimeSearchResult = try await fetch("popular", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
         return result.data.animes
     }
+
     private func performWithRetryWindow<T>(_ operation: @escaping () async throws -> T) async throws -> T {
         let deadline = Date().addingTimeInterval(5)
         var lastError: Error?
@@ -160,6 +220,15 @@ class APIService {
         if let result = response as? AnimeDetailsResult, result.status != 200 {
             throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
         }
+        if let result = response as? AnimeQtipResult, result.status != 200 {
+            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
+        }
+        if let result = response as? NextEpisodeScheduleResult, result.status != 200 {
+            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
+        }
+        if let result = response as? EpisodeServersResult, result.status != 200 {
+            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
+        }
         if let result = response as? EpisodesResponse, result.status != 200 {
             throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
         }
@@ -208,5 +277,3 @@ class APIService {
         }
     }
 }
-
-

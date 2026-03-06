@@ -48,6 +48,7 @@ final class HLSDownloadManager: NSObject, ObservableObject {
     private var activeTasks: [UUID: AVAssetDownloadTask] = [:]
     private var pendingTasks: [UUID: AVAssetDownloadTask] = [:]
     private let storageURL: URL
+    private var persistWorkItem: DispatchWorkItem?
 
     private override init() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -243,7 +244,7 @@ final class HLSDownloadManager: NSObject, ObservableObject {
     private func updateProgress(for id: UUID, progress: Double) {
         guard let index = downloads.firstIndex(where: { $0.id == id }) else { return }
         downloads[index].progress = max(0, min(progress, 1))
-        persist()
+        persist(after: 1)
     }
 
     private func setLocalPath(for id: UUID, path: String) {
@@ -259,7 +260,7 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         guard let itemIndex = downloads.firstIndex(where: { $0.episodeId == episodeId }) else { return }
         guard let trackIndex = downloads[itemIndex].subtitleTracks.firstIndex(where: { $0.remoteURL == remoteURL }) else { return }
         downloads[itemIndex].subtitleTracks[trackIndex].localPath = localPath
-        persist()
+        persist(after: 1)
     }
 
     private func friendlyDownloadErrorMessage(for error: NSError) -> String {
@@ -275,9 +276,21 @@ final class HLSDownloadManager: NSObject, ObservableObject {
         }
     }
 
-    private func persist() {
-        if let data = try? JSONEncoder().encode(downloads) {
-            try? data.write(to: storageURL)
+    private func persist(after delay: TimeInterval = 0) {
+        persistWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self,
+                  let data = try? JSONEncoder().encode(self.downloads) else { return }
+            try? data.write(to: self.storageURL)
+        }
+
+        persistWorkItem = workItem
+
+        if delay <= 0 {
+            workItem.perform()
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
         }
     }
 

@@ -120,7 +120,7 @@ struct AnimeDescriptionCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
+                .fill(.ultraThinMaterial)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -132,6 +132,7 @@ struct AnimeDescriptionCard: View {
 struct AnimeMetadataCard: View {
     let details: AnimeDetails
     let totalEpisodes: Int
+    let nextEpisodeText: String?
 
     private var formattedEpisodeText: String? {
         if let episodes = details.stats?.episodes {
@@ -154,6 +155,9 @@ struct AnimeMetadataCard: View {
 
         if let episodeText = formattedEpisodeText {
             items.append(("Episodes", episodeText))
+        }
+        if let nextEpisodeText, !nextEpisodeText.isEmpty {
+            items.append(("Next Episode", nextEpisodeText))
         }
         if let genres = details.moreInfo?.genres, !genres.isEmpty {
             items.append(("Genres", genres.joined(separator: ", ")))
@@ -182,7 +186,7 @@ struct AnimeMetadataCard: View {
                             Text(item.0)
                                 .font(.caption.weight(.semibold))
                                 .foregroundColor(.secondary)
-                                .frame(width: 68, alignment: .leading)
+                                .frame(width: 88, alignment: .leading)
 
                             Text(item.1)
                                 .font(.subheadline)
@@ -196,11 +200,11 @@ struct AnimeMetadataCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(Color(.secondarySystemGroupedBackground))
+                    .fill(.ultraThinMaterial)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
             )
         }
     }
@@ -216,16 +220,24 @@ struct AnimeEpisodeSectionHeader: View {
     let onToggleSelection: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(title)
-                    .font(.title3.weight(.bold))
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.title3.weight(.bold))
+                    Text(isSelecting ? "Tap episodes to build your queue" : "Quick download or select multiple episodes")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
 
                 Spacer()
 
                 Button(isSelecting ? "Done" : "Select", action: onToggleSelection)
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(.accentColor)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.ultraThinMaterial, in: Capsule())
             }
 
             if showsGroupMenu {
@@ -247,10 +259,10 @@ struct AnimeEpisodeSectionHeader: View {
                     .foregroundColor(.primary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .background(Color(.secondarySystemGroupedBackground), in: Capsule())
+                    .background(.thinMaterial, in: Capsule())
                     .overlay(
                         Capsule()
-                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
                     )
                 }
             }
@@ -265,49 +277,65 @@ struct AnimeEpisodeCard: View {
     let reservesTrailingAccessorySpace: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    Text("Episode \(episode.number)")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                Text("EP \(episode.number)")
+                    .font(.caption2.weight(.bold))
+                    .foregroundColor(.primary.opacity(0.72))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(.ultraThinMaterial, in: Capsule())
 
-                    if let isFiller = episode.isFiller, isFiller {
-                        AnimeEpisodeBadge(text: "Filler", tint: .orange)
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(spacing: 6) {
+                        if let title = episode.title, !title.isEmpty {
+                            Text(title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.primary)
+                                .lineLimit(2)
+                        } else {
+                            Text("Episode \(episode.number)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.primary)
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+
+                    HStack(spacing: 6) {
+                        statusBadge
+                        if let isFiller = episode.isFiller, isFiller {
+                            AnimeEpisodeBadge(text: "Filler", tint: .orange)
+                        }
                     }
                 }
-
-                if let title = episode.title, !title.isEmpty {
-                    Text(title)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .lineLimit(2)
-                }
-
-                HStack(spacing: 8) {
-                    statusBadge
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.trailing, reservesTrailingAccessorySpace ? 48 : 0)
+            .padding(.trailing, reservesTrailingAccessorySpace ? 42 : 0)
 
             if let item = downloadItem,
                item.state == .queued || item.state == .downloading {
-                AnimeEpisodeProgressBar(progress: item.progress)
-                    .frame(height: 6)
+                VStack(alignment: .leading, spacing: 5) {
+                    AnimeEpisodeProgressBar(progress: item.progress)
+                        .frame(height: 5)
+                    Text(progressLabel(for: item))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
             }
         }
-        .padding(16)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.primary.opacity(0.055), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
+        .shadow(color: .black.opacity(0.06), radius: 14, x: 0, y: 8)
     }
 
     @ViewBuilder
@@ -316,6 +344,19 @@ struct AnimeEpisodeCard: View {
             AnimeEpisodeBadge(text: "Downloaded", tint: .green)
         } else if let item = downloadItem {
             AnimeEpisodeBadge(text: stateText(for: item), tint: stateColor(for: item))
+        } else {
+            AnimeEpisodeBadge(text: "Ready", tint: .secondary)
+        }
+    }
+
+    private func progressLabel(for item: HLSDownloadItem) -> String {
+        switch item.state {
+        case .queued:
+            return "Preparing for offline playback"
+        case .downloading:
+            return "Downloading \(Int(item.progress * 100))%"
+        default:
+            return ""
         }
     }
 
@@ -324,7 +365,7 @@ struct AnimeEpisodeCard: View {
         case .queued:
             return "Queued"
         case .downloading:
-            return "Downloading \(Int(item.progress * 100))%"
+            return "Downloading"
         case .completed:
             return "Downloaded"
         case .failed:
@@ -366,6 +407,10 @@ struct AnimeEpisodeSelectableRow: View {
                 downloadItem: downloadItem,
                 reservesTrailingAccessorySpace: false
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(isSelected ? Color.accentColor.opacity(0.38) : Color.clear, lineWidth: 1.5)
+            )
         }
     }
 }
@@ -376,14 +421,15 @@ struct AnimeEpisodeDownloadButton: View {
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.subheadline.weight(.semibold))
+            .font(.caption2.weight(.bold))
             .foregroundColor(tint)
-            .frame(width: 38, height: 38)
-            .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .frame(width: 34, height: 34)
+            .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.white.opacity(0.16), lineWidth: 1)
             )
+            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
     }
 }
 
@@ -462,4 +508,3 @@ private struct AnimeEpisodeProgressBar: View {
         }
     }
 }
-

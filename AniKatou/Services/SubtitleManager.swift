@@ -28,15 +28,7 @@ class SubtitleManager {
                 throw SubtitleError.fileReadError
             }
         } else {
-            var request = URLRequest(url: url)
-            headers?.forEach { request.setValue($1, forHTTPHeaderField: $0) }
-            let (remoteData, response) = try await URLSession.shared.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode) else {
-                throw SubtitleError.networkError
-            }
-            data = remoteData
+            data = try await loadRemoteSubtitleData(from: url, headers: headers)
         }
 
         guard let content = String(data: data, encoding: .utf8) else {
@@ -105,6 +97,35 @@ class SubtitleManager {
         }
 
         return cues
+    }
+
+    private func loadRemoteSubtitleData(from url: URL, headers: [String: String]?) async throws -> Data {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 5
+        config.timeoutIntervalForResource = 5
+        let session = URLSession(configuration: config)
+        let deadline = Date().addingTimeInterval(5)
+        var lastError: Error?
+
+        while Date() < deadline {
+            do {
+                var request = URLRequest(url: url)
+                request.timeoutInterval = 5
+                headers?.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+                let (remoteData, response) = try await session.data(for: request)
+
+                guard let httpResponse = response as? HTTPURLResponse,
+                      (200...299).contains(httpResponse.statusCode) else {
+                    throw SubtitleError.networkError
+                }
+                return remoteData
+            } catch {
+                lastError = error
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
+        }
+
+        throw lastError ?? SubtitleError.networkError
     }
 
     private func parseVTTTime(_ timeString: String) -> Double {

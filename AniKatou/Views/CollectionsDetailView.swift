@@ -74,7 +74,6 @@ struct CollectionsDetailView: View {
             Button("Remove", role: .destructive) {
                 if let anime = itemToRemove {
                     LibraryManager.shared.remove(anime)
-                    NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
                 }
                 itemToRemove = nil
             }

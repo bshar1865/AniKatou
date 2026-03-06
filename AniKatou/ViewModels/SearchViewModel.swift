@@ -16,19 +16,19 @@ class SearchViewModel: ObservableObject {
     }
 
     func loadPopularAnime() async {
-        guard popularAnimes.isEmpty else { return }
+        if !popularAnimes.isEmpty {
+            return
+        }
 
         isLoading = true
         errorMessage = nil
 
         do {
-            let results = try await APIService.shared.getPopularAnime()
-            popularAnimes = filterNSFWContent(results)
+            let popular = try await APIService.shared.getPopularAnime()
+            popularAnimes = filterNSFWContent(popular)
         } catch let error as APIError {
             if case .serverError(404, _) = error {
                 popularAnimes = []
-            } else if case .networkError = error {
-                errorMessage = UserMessage.noInternet
             } else {
                 errorMessage = error.message
             }
@@ -44,7 +44,8 @@ class SearchViewModel: ObservableObject {
     }
 
     func search(query: String) async {
-        guard !query.isEmpty else {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
             await clearResults()
             return
         }
@@ -53,12 +54,12 @@ class SearchViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let results = try await APIService.shared.searchAnime(query: query)
+            let results = try await APIService.shared.searchAnime(query: trimmed)
             guard !Task.isCancelled else { return }
             searchResults = filterNSFWContent(results)
 
             if !searchResults.isEmpty {
-                addToSearchHistory(query)
+                addToSearchHistory(trimmed)
             }
         } catch let error as APIError {
             guard !Task.isCancelled else { return }
@@ -69,13 +70,13 @@ class SearchViewModel: ObservableObject {
             case .serverError(404, _):
                 searchResults = []
             default:
-                if query.count >= 3 {
+                if trimmed.count >= 3 {
                     errorMessage = error.message
                 }
             }
         } catch {
             guard !Task.isCancelled else { return }
-            if query.count >= 3 {
+            if trimmed.count >= 3 {
                 errorMessage = OfflineManager.shared.isOfflineMode ? UserMessage.noInternet : UserMessage.searchUnavailable
             }
         }
@@ -98,11 +99,10 @@ class SearchViewModel: ObservableObject {
     }
 
     private func addToSearchHistory(_ query: String) {
-        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedQuery.isEmpty else { return }
+        guard !query.isEmpty else { return }
 
-        searchHistory.removeAll { $0.lowercased() == trimmedQuery.lowercased() }
-        searchHistory.insert(trimmedQuery, at: 0)
+        searchHistory.removeAll { $0.lowercased() == query.lowercased() }
+        searchHistory.insert(query, at: 0)
 
         if searchHistory.count > maxHistoryItems {
             searchHistory = Array(searchHistory.prefix(maxHistoryItems))
@@ -131,4 +131,3 @@ class SearchViewModel: ObservableObject {
         errorMessage = nil
     }
 }
-
