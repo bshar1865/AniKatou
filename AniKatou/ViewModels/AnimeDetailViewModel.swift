@@ -12,6 +12,7 @@ class AnimeDetailViewModel: ObservableObject {
     @Published var isOfflineMode = false
     @Published var offlineAnimeDetails: OfflineAnimeDetails?
     @Published var downloadMessage: String?
+    @Published var nextEpisodeSchedule: NextEpisodeSchedule?
 
     private var loadTask: Task<Void, Never>?
 
@@ -21,6 +22,7 @@ class AnimeDetailViewModel: ObservableObject {
         episodeGroups = []
         animeDetails = nil
         offlineAnimeDetails = nil
+        nextEpisodeSchedule = nil
 
         loadTask = Task {
             isLoading = true
@@ -53,8 +55,23 @@ class AnimeDetailViewModel: ObservableObject {
 
     private func loadOnlineAnimeDetails(animeId: String) async {
         do {
-            let detailsResult = try await APIService.shared.getAnimeDetails(id: animeId)
-            let episodes = try await APIService.shared.getAnimeEpisodes(id: animeId)
+            async let detailsTask = APIService.shared.getAnimeDetails(id: animeId)
+            async let episodesTask = APIService.shared.getAnimeEpisodes(id: animeId)
+            let qtipTask = Task { try? await APIService.shared.getAnimeQtipInfo(id: animeId) }
+            let scheduleTask = Task { try? await APIService.shared.getNextEpisodeSchedule(id: animeId) }
+
+            let detailsResult = try await detailsTask
+            let episodes = try await episodesTask
+            let qtipResult = await qtipTask.value
+            nextEpisodeSchedule = await scheduleTask.value
+
+            if detailsResult.data.anime.info.containsNSFWContent || qtipResult?.data.anime.containsNSFWContent == true {
+                errorMessage = "This title is unavailable in AniKatou."
+                animeDetails = nil
+                episodeGroups = []
+                return
+            }
+
             animeDetails = detailsResult
             episodeGroups = EpisodeGroup.createGroups(from: episodes)
             refreshLibraryState()
@@ -154,8 +171,8 @@ class AnimeDetailViewModel: ObservableObject {
 
     func downloadEpisode(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async {
         if await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode) {
-                downloadMessage = UserMessage.downloadStarted(forEpisode: episode.number)
-            } else {
+            downloadMessage = UserMessage.downloadStarted(forEpisode: episode.number)
+        } else {
             downloadMessage = UserMessage.downloadStartFailed
         }
     }

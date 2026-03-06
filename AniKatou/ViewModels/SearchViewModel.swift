@@ -5,6 +5,10 @@ import SwiftUI
 class SearchViewModel: ObservableObject {
     @Published var searchResults: [AnimeItem] = []
     @Published var popularAnimes: [AnimeItem] = []
+    @Published var suggestions: [SearchSuggestionItem] = []
+    @Published var availableGenres: [String] = []
+    @Published var selectedGenre: String = "All"
+    @Published var selectedSort: SearchSortOption = .relevance
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var searchHistory: [String] = []
@@ -22,8 +26,12 @@ class SearchViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let results = try await APIService.shared.getPopularAnime()
-            popularAnimes = filterNSFWContent(results)
+            async let popularTask = APIService.shared.getPopularAnime()
+            async let homeTask = APIService.shared.getHomePage()
+            let popular = try await popularTask
+            let home = try await homeTask
+            popularAnimes = filterNSFWContent(popular)
+            availableGenres = ["All"] + home.genres.sorted()
         } catch let error as APIError {
             if case .serverError(404, _) = error {
                 popularAnimes = []
@@ -43,8 +51,26 @@ class SearchViewModel: ObservableObject {
         animes.filter { !$0.containsNSFWContent }
     }
 
+    func updateSuggestions(for query: String) async {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2 else {
+            suggestions = []
+            return
+        }
+
+        do {
+            let results = try await APIService.shared.getSearchSuggestions(query: trimmed)
+            guard !Task.isCancelled else { return }
+            suggestions = results.filter { !$0.name.lowercased().contains("hentai") && !$0.name.lowercased().contains("adult") }
+        } catch {
+            guard !Task.isCancelled else { return }
+            suggestions = []
+        }
+    }
+
     func search(query: String) async {
-        guard !query.isEmpty else {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
             await clearResults()
             return
         }
@@ -53,12 +79,12 @@ class SearchViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let results = try await APIService.shared.searchAnime(query: query)
+            let results = try await APIService.shared.searchAnime(query: trimmed, genre: selectedGenre, sort: selectedSort)
             guard !Task.isCancelled else { return }
             searchResults = filterNSFWContent(results)
 
             if !searchResults.isEmpty {
-                addToSearchHistory(query)
+                addToSearchHistory(trimmed)
             }
         } catch let error as APIError {
             guard !Task.isCancelled else { return }
@@ -69,13 +95,13 @@ class SearchViewModel: ObservableObject {
             case .serverError(404, _):
                 searchResults = []
             default:
-                if query.count >= 3 {
+                if trimmed.count >= 3 {
                     errorMessage = error.message
                 }
             }
         } catch {
             guard !Task.isCancelled else { return }
-            if query.count >= 3 {
+            if trimmed.count >= 3 {
                 errorMessage = OfflineManager.shared.isOfflineMode ? UserMessage.noInternet : UserMessage.searchUnavailable
             }
         }
@@ -98,11 +124,10 @@ class SearchViewModel: ObservableObject {
     }
 
     private func addToSearchHistory(_ query: String) {
-        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedQuery.isEmpty else { return }
+        guard !query.isEmpty else { return }
 
-        searchHistory.removeAll { $0.lowercased() == trimmedQuery.lowercased() }
-        searchHistory.insert(trimmedQuery, at: 0)
+        searchHistory.removeAll { $0.lowercased() == query.lowercased() }
+        searchHistory.insert(query, at: 0)
 
         if searchHistory.count > maxHistoryItems {
             searchHistory = Array(searchHistory.prefix(maxHistoryItems))
@@ -128,7 +153,7 @@ class SearchViewModel: ObservableObject {
     func clearResults() async {
         isLoading = false
         searchResults = []
+        suggestions = []
         errorMessage = nil
     }
 }
-

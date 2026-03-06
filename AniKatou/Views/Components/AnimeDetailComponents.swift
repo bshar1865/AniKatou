@@ -132,6 +132,7 @@ struct AnimeDescriptionCard: View {
 struct AnimeMetadataCard: View {
     let details: AnimeDetails
     let totalEpisodes: Int
+    let nextEpisodeText: String?
 
     private var formattedEpisodeText: String? {
         if let episodes = details.stats?.episodes {
@@ -154,6 +155,9 @@ struct AnimeMetadataCard: View {
 
         if let episodeText = formattedEpisodeText {
             items.append(("Episodes", episodeText))
+        }
+        if let nextEpisodeText, !nextEpisodeText.isEmpty {
+            items.append(("Next Episode", nextEpisodeText))
         }
         if let genres = details.moreInfo?.genres, !genres.isEmpty {
             items.append(("Genres", genres.joined(separator: ", ")))
@@ -182,7 +186,7 @@ struct AnimeMetadataCard: View {
                             Text(item.0)
                                 .font(.caption.weight(.semibold))
                                 .foregroundColor(.secondary)
-                                .frame(width: 68, alignment: .leading)
+                                .frame(width: 88, alignment: .leading)
 
                             Text(item.1)
                                 .font(.subheadline)
@@ -462,4 +466,3 @@ private struct AnimeEpisodeProgressBar: View {
         }
     }
 }
-

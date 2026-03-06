@@ -108,8 +108,12 @@ struct AnimeDetailView: View {
                 .padding(.horizontal)
             }
 
-            AnimeMetadataCard(details: details, totalEpisodes: viewModel.totalEpisodeCount)
-                .padding(.horizontal)
+            AnimeMetadataCard(
+                details: details,
+                totalEpisodes: viewModel.totalEpisodeCount,
+                nextEpisodeText: formattedNextEpisodeText
+            )
+            .padding(.horizontal)
 
             episodesSection(details)
         }
@@ -214,6 +218,22 @@ struct AnimeDetailView: View {
                 .padding(.horizontal)
             }
         }
+    }
+
+    private var formattedNextEpisodeText: String? {
+        guard let schedule = viewModel.nextEpisodeSchedule else { return nil }
+        if let seconds = schedule.secondsUntilAiring, seconds > 0 {
+            let days = seconds / 86400
+            if days > 0 {
+                return "In \(days) day\(days == 1 ? "" : "s")"
+            }
+            let hours = max(1, seconds / 3600)
+            return "In \(hours) hour\(hours == 1 ? "" : "s")"
+        }
+        if let iso = schedule.airingISOTimestamp, let date = ISO8601DateFormatter().date(from: iso) {
+            return date.formatted(date: .abbreviated, time: .shortened)
+        }
+        return nil
     }
 
     private func toggleSelection(for episodeID: String) {

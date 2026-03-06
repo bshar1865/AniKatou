@@ -4,6 +4,12 @@ struct SearchView: View {
     @StateObject private var viewModel = SearchViewModel()
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
+    @State private var suggestionTask: Task<Void, Never>?
+
+    private let gridColumns = [
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16)
+    ]
 
     var body: some View {
         ScrollView {
@@ -42,8 +48,7 @@ struct SearchView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text("Recent Searches")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                        .font(.title2.weight(.bold))
 
                     Spacer()
 
@@ -89,14 +94,10 @@ struct SearchView: View {
         if !viewModel.popularAnimes.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Popular Anime")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(.title2.weight(.bold))
                     .padding(.horizontal)
 
-                LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 16),
-                    GridItem(.flexible(), spacing: 16)
-                ], spacing: 16) {
+                LazyVGrid(columns: gridColumns, spacing: 16) {
                     ForEach(viewModel.popularAnimes) { anime in
                         NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
                             AnimeCard(anime: anime)
@@ -113,7 +114,13 @@ struct SearchView: View {
 
     @ViewBuilder
     private var searchResultsContent: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 14) {
+            searchFilters
+
+            if !viewModel.suggestions.isEmpty {
+                suggestionSection
+            }
+
             if viewModel.isLoading {
                 VStack(spacing: 12) {
                     ProgressView()
@@ -158,16 +165,13 @@ struct SearchView: View {
                     Text("No results found")
                         .font(.headline)
                         .foregroundColor(.secondary)
-                    Text("Try different keywords")
+                    Text("Try a different title, genre, or sort order")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 200)
             } else {
-                LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 16),
-                    GridItem(.flexible(), spacing: 16)
-                ], spacing: 16) {
+                LazyVGrid(columns: gridColumns, spacing: 16) {
                     ForEach(viewModel.searchResults) { anime in
                         NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
                             AnimeCard(anime: anime)
@@ -179,9 +183,97 @@ struct SearchView: View {
         }
     }
 
+    private var searchFilters: some View {
+        HStack(spacing: 10) {
+            Menu {
+                ForEach(viewModel.availableGenres, id: \.self) { genre in
+                    Button(genre) {
+                        viewModel.selectedGenre = genre
+                        if searchText.count >= 3 {
+                            handleSearchTextChange(searchText)
+                        }
+                    }
+                }
+            } label: {
+                filterChip(title: "Genre", value: viewModel.selectedGenre)
+            }
+
+            Menu {
+                ForEach(SearchSortOption.allCases) { option in
+                    Button(option.title) {
+                        viewModel.selectedSort = option
+                        if searchText.count >= 3 {
+                            handleSearchTextChange(searchText)
+                        }
+                    }
+                }
+            } label: {
+                filterChip(title: "Sort", value: viewModel.selectedSort.title)
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private var suggestionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Suggestions")
+                .font(.headline)
+                .padding(.horizontal)
+
+            VStack(spacing: 8) {
+                ForEach(viewModel.suggestions.prefix(6)) { suggestion in
+                    Button {
+                        searchText = suggestion.name
+                        handleSearchTextChange(suggestion.name)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundColor(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(suggestion.name)
+                                    .foregroundColor(.primary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                if let subtitle = suggestion.moreInfo?.first {
+                                    Text(subtitle)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        .padding(.vertical, 10)
+                    }
+                }
+            }
+        }
+    }
+
+    private func filterChip(title: String, value: String) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .foregroundColor(.secondary)
+            Text(value)
+                .foregroundColor(.primary)
+            Image(systemName: "chevron.down")
+                .font(.caption2.weight(.bold))
+                .foregroundColor(.secondary)
+        }
+        .font(.subheadline.weight(.semibold))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(.secondarySystemGroupedBackground), in: Capsule())
+        .overlay(
+            Capsule()
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+
     private func cancelCurrentSearch() {
         searchTask?.cancel()
         searchTask = nil
+        suggestionTask?.cancel()
+        suggestionTask = nil
 
         Task { @MainActor [weak viewModel] in
             await viewModel?.cleanupSearch()
@@ -191,6 +283,8 @@ struct SearchView: View {
     private func handleSearchTextChange(_ newValue: String) {
         searchTask?.cancel()
         searchTask = nil
+        suggestionTask?.cancel()
+        suggestionTask = nil
 
         guard !newValue.isEmpty else {
             Task { @MainActor [weak viewModel] in
@@ -199,8 +293,12 @@ struct SearchView: View {
             return
         }
 
+        suggestionTask = Task { @MainActor [weak viewModel] in
+            await viewModel?.updateSuggestions(for: newValue)
+        }
+
         searchTask = Task { @MainActor [weak viewModel] in
-            guard let viewModel = viewModel else { return }
+            guard let viewModel else { return }
 
             do {
                 try await Task.sleep(nanoseconds: 500_000_000)

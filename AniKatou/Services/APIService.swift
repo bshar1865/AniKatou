@@ -62,27 +62,55 @@ class APIService {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
     }
 
-    func searchAnime(query: String) async throws -> [AnimeItem] {
+    func searchAnime(query: String, genre: String? = nil, sort: SearchSortOption = .relevance) async throws -> [AnimeItem] {
         guard query.count >= 3 else {
             throw APIError.searchQueryTooShort
         }
 
-        let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        let queryItems = [
-            URLQueryItem(name: "q", value: encodedQuery),
+        var queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "page", value: "1"),
             URLQueryItem(name: "nsfw", value: "false")
         ]
+
+        if let genre, !genre.isEmpty, genre != "All" {
+            queryItems.append(URLQueryItem(name: "genres", value: genre.lowercased()))
+        }
+        if sort != .relevance {
+            queryItems.append(URLQueryItem(name: "sort", value: sort.rawValue))
+        }
+
         let result: AnimeSearchResult = try await fetch("search", queryItems: queryItems)
         return result.data.animes
+    }
+
+    func getSearchSuggestions(query: String) async throws -> [SearchSuggestionItem] {
+        let result: SearchSuggestionResult = try await fetch(
+            "search/suggestion",
+            queryItems: [
+                URLQueryItem(name: "q", value: query),
+                URLQueryItem(name: "nsfw", value: "false")
+            ]
+        )
+        return result.data.suggestions
     }
 
     func getAnimeDetails(id: String) async throws -> AnimeDetailsResult {
         try await fetch("anime/\(id)", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
     }
 
+    func getAnimeQtipInfo(id: String) async throws -> AnimeQtipResult {
+        try await fetch("qtip/\(id)", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
+    }
+
     func getAnimeEpisodes(id: String) async throws -> [EpisodeInfo] {
         let result: EpisodesResponse = try await fetch("anime/\(id)/episodes", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
         return result.data.episodes
+    }
+
+    func getNextEpisodeSchedule(id: String) async throws -> NextEpisodeSchedule {
+        let result: NextEpisodeScheduleResult = try await fetch("anime/\(id)/next-episode-schedule", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
+        return result.data
     }
 
     func getStreamingSources(episodeId: String, category: String = "sub", server: String = "hd-1") async throws -> StreamingResult {
@@ -110,6 +138,7 @@ class APIService {
         let result: AnimeSearchResult = try await fetch("popular", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
         return result.data.animes
     }
+
     private func performWithRetryWindow<T>(_ operation: @escaping () async throws -> T) async throws -> T {
         let deadline = Date().addingTimeInterval(5)
         var lastError: Error?
@@ -160,6 +189,15 @@ class APIService {
         if let result = response as? AnimeDetailsResult, result.status != 200 {
             throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
         }
+        if let result = response as? AnimeQtipResult, result.status != 200 {
+            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
+        }
+        if let result = response as? SearchSuggestionResult, result.status != 200 {
+            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
+        }
+        if let result = response as? NextEpisodeScheduleResult, result.status != 200 {
+            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
+        }
         if let result = response as? EpisodesResponse, result.status != 200 {
             throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
         }
@@ -208,5 +246,3 @@ class APIService {
         }
     }
 }
-
-

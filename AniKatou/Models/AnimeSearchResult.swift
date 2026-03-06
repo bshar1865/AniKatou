@@ -22,29 +22,27 @@ struct AnimeItem: Codable, Identifiable {
     let isNSFW: Bool?
     let genres: [String]?
     let anilistId: Int?
-    
-    // Map the API fields to our model
+
     var title: String { name }
     var image: String { poster }
-    
-    // Helper function to check if content is NSFW
+
     var containsNSFWContent: Bool {
-        if let isNSFW = isNSFW, isNSFW {
+        if let isNSFW, isNSFW {
             return true
         }
-        
-        // Check for NSFW genres
-        let nsfwGenres = ["Hentai", "Ecchi", "Adult", "Mature"]
-        if let genres = genres {
-            return genres.contains { genre in
-                nsfwGenres.contains { nsfwGenre in
-                    genre.lowercased().contains(nsfwGenre.lowercased())
+
+        let nsfwGenres = ["Hentai", "Adult"]
+        if let genres {
+            if genres.contains(where: { genre in
+                nsfwGenres.contains { blocked in
+                    genre.lowercased().contains(blocked.lowercased())
                 }
+            }) {
+                return true
             }
         }
-        
-        // Check for NSFW keywords in title
-        let nsfwKeywords = ["hentai", "ecchi", "adult", "nsfw", "xxx"]
+
+        let nsfwKeywords = ["hentai", "adult", "nsfw", "xxx"]
         let titleLowercased = name.lowercased()
         return nsfwKeywords.contains { keyword in
             titleLowercased.contains(keyword)
@@ -55,6 +53,45 @@ struct AnimeItem: Codable, Identifiable {
 struct EpisodeCount: Codable {
     let sub: Int?
     let dub: Int?
+}
+
+enum SearchSortOption: String, CaseIterable, Identifiable {
+    case relevance = "default"
+    case recentlyAdded = "recently-added"
+    case recentlyUpdated = "recently-updated"
+    case score = "score"
+    case nameAZ = "name-az"
+    case releasedDate = "released-date"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .relevance: return "Relevance"
+        case .recentlyAdded: return "Recently Added"
+        case .recentlyUpdated: return "Recently Updated"
+        case .score: return "Score"
+        case .nameAZ: return "A-Z"
+        case .releasedDate: return "Release Date"
+        }
+    }
+}
+
+struct SearchSuggestionResult: Codable {
+    let status: Int
+    let data: SearchSuggestionData
+}
+
+struct SearchSuggestionData: Codable {
+    let suggestions: [SearchSuggestionItem]
+}
+
+struct SearchSuggestionItem: Codable, Identifiable {
+    let id: String
+    let name: String
+    let poster: String?
+    let jname: String?
+    let moreInfo: [String]?
 }
 
 // Anime Details
@@ -79,8 +116,7 @@ struct AnimeDetails: Codable {
     let stats: AnimeStats?
     let moreInfo: AnimeMoreInfo?
     let anilistId: Int?
-    
-    // Map the API fields to our model
+
     var title: String { name }
     var image: String { poster }
     var type: String? { stats?.type }
@@ -88,6 +124,25 @@ struct AnimeDetails: Codable {
     var releaseDate: String? { moreInfo?.aired }
     var genres: [String]? { moreInfo?.genres }
     var rating: String? { stats?.rating }
+
+    var containsNSFWContent: Bool {
+        let genreNames = genres ?? []
+        let blockedGenres = ["hentai", "adult"]
+        if genreNames.contains(where: { genre in
+            blockedGenres.contains { blocked in
+                genre.lowercased().contains(blocked)
+            }
+        }) {
+            return true
+        }
+
+        let titleText = name.lowercased()
+        let descriptionText = (description ?? "").lowercased()
+        let blockedKeywords = ["hentai", "adult", "xxx"]
+        return blockedKeywords.contains { keyword in
+            titleText.contains(keyword) || descriptionText.contains(keyword)
+        }
+    }
 }
 
 struct AnimeStats: Codable {
@@ -110,6 +165,56 @@ struct AnimeMoreInfo: Codable {
     let producers: [String]?
 }
 
+struct AnimeQtipResult: Codable {
+    let status: Int
+    let data: AnimeQtipData
+}
+
+struct AnimeQtipData: Codable {
+    let anime: AnimeQtipInfo
+}
+
+struct AnimeQtipInfo: Codable {
+    let id: String
+    let name: String
+    let malscore: String?
+    let quality: String?
+    let episodes: EpisodeCount?
+    let type: String?
+    let description: String?
+    let jname: String?
+    let synonyms: String?
+    let aired: String?
+    let status: String?
+    let genres: [String]?
+
+    var containsNSFWContent: Bool {
+        let blockedGenres = ["hentai", "adult"]
+        if let genres, genres.contains(where: { genre in
+            blockedGenres.contains { blocked in
+                genre.lowercased().contains(blocked)
+            }
+        }) {
+            return true
+        }
+
+        let blockedKeywords = ["hentai", "adult", "xxx"]
+        let haystack = [name, description ?? "", synonyms ?? ""].joined(separator: " ").lowercased()
+        return blockedKeywords.contains { haystack.contains($0) }
+    }
+}
+
+struct NextEpisodeScheduleResult: Codable {
+    let status: Int
+    let data: NextEpisodeSchedule
+}
+
+struct NextEpisodeSchedule: Codable {
+    let airingISOTimestamp: String?
+    let airingTimestamp: Int?
+    let secondsUntilAiring: Int?
+}
+
 // Episodes Response
 struct EpisodesResponse: Codable {
     let status: Int
@@ -126,7 +231,7 @@ struct EpisodeInfo: Codable, Identifiable {
     let episodeId: String
     let number: Int
     let isFiller: Bool?
-    
+
     var id: String { episodeId }
 }
 
@@ -161,4 +266,4 @@ struct SubtitleTrack: Codable, Equatable {
 struct IntroOutro: Codable, Equatable {
     let start: Int
     let end: Int
-} 
+}
