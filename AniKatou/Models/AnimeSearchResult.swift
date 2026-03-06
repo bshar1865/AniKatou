@@ -264,6 +264,17 @@ struct StreamingData: Codable, Equatable {
         anilistID = try container.decodeIfPresent(Int.self, forKey: .anilistID)
         malID = try container.decodeIfPresent(Int.self, forKey: .malID)
     }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(headers, forKey: .headers)
+        try container.encode(sources, forKey: .sources)
+        try container.encodeIfPresent(tracks, forKey: .tracks)
+        try container.encodeIfPresent(intro, forKey: .intro)
+        try container.encodeIfPresent(outro, forKey: .outro)
+        try container.encodeIfPresent(anilistID, forKey: .anilistID)
+        try container.encodeIfPresent(malID, forKey: .malID)
+    }
 }
 
 struct StreamSource: Codable, Equatable {
