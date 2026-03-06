@@ -23,6 +23,11 @@ jobs:
         with:
           xcode-version: latest-stable
 
+      - name: Clean previous build artifacts
+        run: |
+          rm -rf build
+          xcodebuild -project AniKatou.xcodeproj -scheme AniKatou clean || true
+
       - name: Make build script executable
         run: chmod +x ./ipabuild.sh
 
