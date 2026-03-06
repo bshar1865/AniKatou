@@ -5,10 +5,8 @@ import SwiftUI
 class SearchViewModel: ObservableObject {
     @Published var searchResults: [AnimeItem] = []
     @Published var popularAnimes: [AnimeItem] = []
-    @Published var suggestions: [SearchSuggestionItem] = []
     @Published var availableGenres: [String] = ["All"]
     @Published var selectedGenre: String = "All"
-    @Published var selectedSort: SearchSortOption = .relevance
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var searchHistory: [String] = []
@@ -58,23 +56,6 @@ class SearchViewModel: ObservableObject {
         animes.filter { !$0.containsNSFWContent }
     }
 
-    func updateSuggestions(for query: String) async {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count >= 2 else {
-            suggestions = []
-            return
-        }
-
-        do {
-            let results = try await APIService.shared.getSearchSuggestions(query: trimmed)
-            guard !Task.isCancelled else { return }
-            suggestions = results.filter { !$0.name.lowercased().contains("hentai") && !$0.name.lowercased().contains("adult") }
-        } catch {
-            guard !Task.isCancelled else { return }
-            suggestions = []
-        }
-    }
-
     func search(query: String) async {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -86,7 +67,7 @@ class SearchViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let results = try await APIService.shared.searchAnime(query: trimmed, genre: selectedGenre, sort: selectedSort)
+            let results = try await APIService.shared.searchAnime(query: trimmed, genre: selectedGenre)
             guard !Task.isCancelled else { return }
             searchResults = filterNSFWContent(results)
 
@@ -160,7 +141,6 @@ class SearchViewModel: ObservableObject {
     func clearResults() async {
         isLoading = false
         searchResults = []
-        suggestions = []
         errorMessage = nil
     }
 }

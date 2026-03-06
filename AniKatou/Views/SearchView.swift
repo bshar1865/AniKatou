@@ -4,7 +4,6 @@ struct SearchView: View {
     @StateObject private var viewModel = SearchViewModel()
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
-    @State private var suggestionTask: Task<Void, Never>?
 
     private let gridColumns = [
         GridItem(.flexible(), spacing: 16),
@@ -117,10 +116,6 @@ struct SearchView: View {
         VStack(spacing: 14) {
             searchFilters
 
-            if !viewModel.suggestions.isEmpty {
-                suggestionSection
-            }
-
             if viewModel.isLoading {
                 VStack(spacing: 12) {
                     ProgressView()
@@ -165,7 +160,7 @@ struct SearchView: View {
                     Text("No results found")
                         .font(.headline)
                         .foregroundColor(.secondary)
-                    Text("Try a different title, genre, or sort order")
+                    Text("Try a different title or genre")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -197,56 +192,8 @@ struct SearchView: View {
             } label: {
                 filterChip(title: "Genre", value: viewModel.selectedGenre)
             }
-
-            Menu {
-                ForEach(SearchSortOption.allCases) { option in
-                    Button(option.title) {
-                        viewModel.selectedSort = option
-                        if searchText.count >= 3 {
-                            handleSearchTextChange(searchText)
-                        }
-                    }
-                }
-            } label: {
-                filterChip(title: "Sort", value: viewModel.selectedSort.title)
-            }
         }
         .padding(.horizontal)
-    }
-
-    private var suggestionSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Suggestions")
-                .font(.headline)
-                .padding(.horizontal)
-
-            VStack(spacing: 8) {
-                ForEach(viewModel.suggestions.prefix(6)) { suggestion in
-                    Button {
-                        searchText = suggestion.name
-                        handleSearchTextChange(suggestion.name)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(.secondary)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(suggestion.name)
-                                    .foregroundColor(.primary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                if let subtitle = suggestion.moreInfo?.first {
-                                    Text(subtitle)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                        .padding(.vertical, 10)
-                    }
-                }
-            }
-        }
     }
 
     private func filterChip(title: String, value: String) -> some View {
@@ -272,8 +219,6 @@ struct SearchView: View {
     private func cancelCurrentSearch() {
         searchTask?.cancel()
         searchTask = nil
-        suggestionTask?.cancel()
-        suggestionTask = nil
 
         Task { @MainActor [weak viewModel] in
             await viewModel?.cleanupSearch()
@@ -283,18 +228,12 @@ struct SearchView: View {
     private func handleSearchTextChange(_ newValue: String) {
         searchTask?.cancel()
         searchTask = nil
-        suggestionTask?.cancel()
-        suggestionTask = nil
 
         guard !newValue.isEmpty else {
             Task { @MainActor [weak viewModel] in
                 await viewModel?.clearResults()
             }
             return
-        }
-
-        suggestionTask = Task { @MainActor [weak viewModel] in
-            await viewModel?.updateSuggestions(for: newValue)
         }
 
         searchTask = Task { @MainActor [weak viewModel] in
