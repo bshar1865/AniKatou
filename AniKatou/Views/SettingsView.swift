@@ -5,9 +5,37 @@ struct SettingsView: View {
     @State private var showCacheAlert = false
     @State private var showClearCacheAlert = false
 
+    private var setupItems: [(String, String, Bool)] {
+        [
+            ("API server", APIConfig.isConfigured ? "Configured" : "Required", APIConfig.isConfigured),
+            ("Preferred server", viewModel.availableServers.first(where: { $0.id == viewModel.preferredServer })?.name ?? viewModel.preferredServer, true),
+            ("Audio language", viewModel.availableLanguages.first(where: { $0.id == viewModel.preferredLanguage })?.name ?? viewModel.preferredLanguage, true),
+            ("Subtitles", viewModel.subtitlesEnabled ? "Enabled" : "Disabled", viewModel.subtitlesEnabled)
+        ]
+    }
+
     var body: some View {
         NavigationView {
             List {
+                Section("Setup Checklist") {
+                    ForEach(setupItems, id: \.0) { item in
+                        HStack(spacing: 12) {
+                            Image(systemName: item.2 ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(item.2 ? .green : .orange)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(item.0)
+                                Text(item.1)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+
+                    Text("AniKatou now uses one playback path for both streaming and offline episodes. This keeps playback, subtitles, and auto-skip behavior consistent.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
                 Section("API Configuration") {
                     NavigationLink(destination: APIConfigView()) {
                         HStack {
@@ -24,7 +52,7 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("Video Playback") {
+                Section("Playback") {
                     Picker("Preferred Server", selection: $viewModel.preferredServer) {
                         ForEach(viewModel.availableServers, id: \.id) { server in
                             Text(server.name).tag(server.id)
@@ -42,15 +70,10 @@ struct SettingsView: View {
                             Text(quality.name).tag(quality.id)
                         }
                     }
-
-                    Picker("Video Player", selection: $viewModel.playerType) {
-                        Text("AniKatou Player").tag("custom")
-                        Text("Native Player").tag("ios")
-                    }
                 }
 
-                Section("Subtitle Settings") {
-                    NavigationLink(destination: SubtitleSettingsView()) {
+                Section("Subtitles") {
+                    NavigationLink(destination: SubtitleSettingsView(viewModel: viewModel)) {
                         HStack {
                             Image(systemName: "text.bubble")
                                 .foregroundColor(.green)
@@ -70,6 +93,21 @@ struct SettingsView: View {
                 Section("Auto-Skip") {
                     Toggle("Skip Intros Automatically", isOn: $viewModel.autoSkipIntro)
                     Toggle("Skip Outros Automatically", isOn: $viewModel.autoSkipOutro)
+                }
+
+                Section("Downloads") {
+                    Stepper(value: $viewModel.concurrentDownloadsLimit, in: 1...3) {
+                        HStack {
+                            Text("Simultaneous Downloads")
+                            Spacer()
+                            Text("\(viewModel.concurrentDownloadsLimit)")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Text("Choose how many episodes may download at the same time. Additional episodes will stay queued.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
 
                 Section("Offline Storage") {

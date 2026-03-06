@@ -3,32 +3,35 @@ import SwiftUI
 struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
 
+    private var hasContent: Bool {
+        !viewModel.trendingAnimes.isEmpty ||
+        !viewModel.latestEpisodeAnimes.isEmpty ||
+        !viewModel.topAiringAnimes.isEmpty ||
+        !viewModel.mostPopularAnimes.isEmpty ||
+        !viewModel.latestCompletedAnimes.isEmpty ||
+        !viewModel.top10Today.isEmpty
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                section(title: "Trending", animes: viewModel.trendingAnimes)
-                section(title: "Latest Episodes", animes: viewModel.latestEpisodeAnimes)
-                section(title: "Top Airing", animes: viewModel.topAiringAnimes)
-                section(title: "Most Popular", animes: viewModel.mostPopularAnimes)
-                section(title: "Latest Completed", animes: viewModel.latestCompletedAnimes)
-                section(title: "Top 10 Today", animes: viewModel.top10Today)
+                if hasContent {
+                    section(title: "Trending", animes: viewModel.trendingAnimes)
+                    section(title: "Latest Episodes", animes: viewModel.latestEpisodeAnimes)
+                    section(title: "Top Airing", animes: viewModel.topAiringAnimes)
+                    section(title: "Most Popular", animes: viewModel.mostPopularAnimes)
+                    section(title: "Latest Completed", animes: viewModel.latestCompletedAnimes)
+                    section(title: "Top 10 Today", animes: viewModel.top10Today)
+                } else if !viewModel.isLoading {
+                    homeEmptyState
+                }
             }
             .padding(.vertical)
         }
         .navigationTitle("Home")
         .overlay {
-            if viewModel.isLoading {
+            if viewModel.isLoading && !hasContent {
                 ProgressView("Loading...")
-            } else if let message = viewModel.errorMessage,
-                      viewModel.trendingAnimes.isEmpty &&
-                      viewModel.latestEpisodeAnimes.isEmpty &&
-                      viewModel.topAiringAnimes.isEmpty &&
-                      viewModel.mostPopularAnimes.isEmpty {
-                ContentUnavailableView(
-                    "Offline",
-                    systemImage: "wifi.slash",
-                    description: Text(message)
-                )
             }
         }
         .refreshable {
@@ -37,6 +40,15 @@ struct HomeView: View {
         .task {
             await viewModel.loadHomeData()
         }
+    }
+
+    private var homeEmptyState: some View {
+        ContentUnavailableView(
+            "Home Needs Internet",
+            systemImage: "wifi.slash",
+            description: Text(viewModel.errorMessage ?? "Connect to the internet to load the latest anime sections.")
+        )
+        .frame(maxWidth: .infinity, minHeight: 320)
     }
 
     @ViewBuilder

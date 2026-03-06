@@ -33,7 +33,6 @@ class LibraryManager {
     private func saveLibrary() {
         if let data = try? JSONEncoder().encode(cachedItems) {
             UserDefaults.standard.set(data, forKey: libraryKey)
-            UserDefaults.standard.synchronize()
         }
     }
 

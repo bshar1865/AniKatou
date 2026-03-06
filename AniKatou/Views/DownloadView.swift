@@ -1,29 +1,5 @@
 import SwiftUI
 
-private struct AnimeDownloadGroup: Identifiable {
-    let id: String
-    let animeId: String
-    let animeTitle: String
-    let items: [HLSDownloadItem]
-
-    var activeCount: Int {
-        items.filter { $0.state == .queued || $0.state == .downloading }.count
-    }
-
-    var completedCount: Int {
-        items.filter { $0.state == .completed }.count
-    }
-
-    var failedCount: Int {
-        items.filter { $0.state == .failed }.count
-    }
-
-    var averageProgress: Double {
-        guard !items.isEmpty else { return 0 }
-        return items.map(\.progress).reduce(0, +) / Double(items.count)
-    }
-}
-
 struct DownloadView: View {
     @StateObject private var manager = HLSDownloadManager.shared
 
@@ -51,6 +27,10 @@ struct DownloadView: View {
         manager.downloads.filter { $0.state == .failed }.count
     }
 
+    private var hasOnlyFailures: Bool {
+        failedCount > 0 && activeCount == 0 && completedCount == 0
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -65,6 +45,10 @@ struct DownloadView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 24)
                 } else {
+                    if hasOnlyFailures {
+                        failureOnlyState
+                    }
+
                     ForEach(groups) { group in
                         DownloadGroupCard(group: group, manager: manager)
                     }
@@ -102,6 +86,28 @@ struct DownloadView: View {
         )
     }
 
+    private var failureOnlyState: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Downloads Need Attention", systemImage: "exclamationmark.triangle.fill")
+                .font(.headline)
+                .foregroundColor(.red)
+
+            Text("Your recent downloads did not finish. Reconnect to the internet and retry, or remove failed items you no longer need.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.red.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.red.opacity(0.18), lineWidth: 1)
+        )
+    }
+
     private func downloadStatChip(title: String, value: String, tint: Color) -> some View {
         HStack(spacing: 6) {
             Circle()
@@ -119,6 +125,30 @@ struct DownloadView: View {
             Capsule()
                 .fill(Color(.tertiarySystemBackground))
         )
+    }
+}
+
+private struct AnimeDownloadGroup: Identifiable {
+    let id: String
+    let animeId: String
+    let animeTitle: String
+    let items: [HLSDownloadItem]
+
+    var activeCount: Int {
+        items.filter { $0.state == .queued || $0.state == .downloading }.count
+    }
+
+    var completedCount: Int {
+        items.filter { $0.state == .completed }.count
+    }
+
+    var failedCount: Int {
+        items.filter { $0.state == .failed }.count
+    }
+
+    var averageProgress: Double {
+        guard !items.isEmpty else { return 0 }
+        return items.map(\.progress).reduce(0, +) / Double(items.count)
     }
 }
 
@@ -247,7 +277,7 @@ private struct DownloadEpisodeRow: View {
     }
 
     private var actionLabel: String {
-        isActive ? "Cancel" : "Remove"
+        isActive ? "Stop" : "Remove"
     }
 
     private var actionRole: ButtonRole? {
@@ -303,9 +333,9 @@ private struct DownloadEpisodeRow: View {
 
     private var statusTitle: String {
         switch item.state {
-        case .queued: return "Queued"
+        case .queued: return "Preparing"
         case .downloading: return "Downloading"
-        case .completed: return "Completed"
+        case .completed: return "Saved offline"
         case .failed: return "Failed"
         case .cancelled: return "Cancelled"
         }
@@ -324,15 +354,15 @@ private struct DownloadEpisodeRow: View {
     private var statusText: String {
         switch item.state {
         case .queued:
-            return "Waiting to start"
+            return "Preparing this episode for offline playback"
         case .downloading:
             return "Downloading \(Int(item.progress * 100))%"
         case .completed:
-            return "Saved for offline playback"
+            return "Saved offline and ready without internet"
         case .failed:
-            return item.errorMessage ?? "Download failed"
+            return item.errorMessage ?? "Needs internet to continue"
         case .cancelled:
-            return "Cancelled by user"
+            return "Stopped before completion"
         }
     }
 }

@@ -1,5 +1,4 @@
 import Foundation
-import AVFoundation
 
 @MainActor
 class EpisodeViewModel: ObservableObject {
@@ -10,57 +9,47 @@ class EpisodeViewModel: ObservableObject {
     @Published var localOutro: IntroOutro?
     @Published var isLoading = false
     @Published var errorMessage: String?
-    var subtitleCues: [SubtitleManager.SubtitleCue]?
-    var timeObservers: [(player: AVPlayer, observer: Any)] = []
-    
-    deinit {
-        // Clean up time observers
-        timeObservers.forEach { playerAndObserver in
-            playerAndObserver.player.removeTimeObserver(playerAndObserver.observer)
-        }
-    }
-    
+    @Published var playbackNotice: String?
+
     func loadStreamingSources(episodeId: String) async {
         isLoading = true
         errorMessage = nil
+        playbackNotice = nil
         localPlaybackURL = nil
         localSubtitleTracks = nil
         localIntro = nil
         localOutro = nil
         streamingData = nil
 
-        let isOffline = OfflineManager.shared.isOfflineMode
-        if isOffline {
-            if !loadDownloadedEpisodeIfAvailable(episodeId: episodeId) {
-                errorMessage = "This episode is not available offline. Please download it while connected to the internet."
+        if OfflineManager.shared.isOfflineMode {
+            if !loadDownloadedEpisodeIfAvailable(episodeId: episodeId, notice: nil) {
+                errorMessage = UserMessage.episodeOfflineUnavailable
             }
             isLoading = false
             return
         }
-        
+
         do {
             streamingData = try await APIService.shared.getStreamingSources(
                 episodeId: episodeId,
                 category: AppSettings.shared.preferredLanguage,
                 server: AppSettings.shared.preferredServer
             )
-            
         } catch let error as APIError {
-            // If API fails, allow offline playback when this episode was downloaded.
-            if !loadDownloadedEpisodeIfAvailable(episodeId: episodeId) {
-                errorMessage = error.message
+            if !loadDownloadedEpisodeIfAvailable(episodeId: episodeId, notice: UserMessage.playbackOpeningOffline) {
+                errorMessage = error.message.isEmpty ? UserMessage.playbackNeedsDownload : error.message
             }
         } catch {
-            if !loadDownloadedEpisodeIfAvailable(episodeId: episodeId) {
-                errorMessage = "Unable to load streaming sources at this time. Please try again."
+            if !loadDownloadedEpisodeIfAvailable(episodeId: episodeId, notice: UserMessage.playbackOpeningOffline) {
+                errorMessage = UserMessage.playbackNeedsDownload
             }
         }
-        
+
         isLoading = false
     }
 
     @discardableResult
-    private func loadDownloadedEpisodeIfAvailable(episodeId: String) -> Bool {
+    private func loadDownloadedEpisodeIfAvailable(episodeId: String, notice: String?) -> Bool {
         guard let localURL = HLSDownloadManager.shared.localFileURL(for: episodeId) else {
             return false
         }
@@ -69,6 +58,7 @@ class EpisodeViewModel: ObservableObject {
         let introOutro = HLSDownloadManager.shared.introOutro(for: episodeId)
         localIntro = introOutro.intro
         localOutro = introOutro.outro
+        playbackNotice = notice
         return true
     }
 }

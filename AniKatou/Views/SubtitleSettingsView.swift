@@ -1,20 +1,18 @@
 import SwiftUI
 
 struct SubtitleSettingsView: View {
-    @StateObject private var viewModel = SettingsViewModel()
+    @ObservedObject var viewModel: SettingsViewModel
     @State private var previewText = "This is a preview of how your subtitles will look"
     
     var body: some View {
         List {
             Section {
-                // Preview
                 VStack(spacing: 16) {
                     Text("Preview")
                         .font(.headline)
                         .foregroundColor(.primary)
                     
                     ZStack {
-                        // Video background simulation
                         Rectangle()
                             .fill(
                                 LinearGradient(
@@ -26,7 +24,6 @@ struct SubtitleSettingsView: View {
                             .frame(height: 200)
                             .cornerRadius(12)
                         
-                        // Subtitle preview
                         VStack {
                             Spacer()
                             HStack {
@@ -38,14 +35,12 @@ struct SubtitleSettingsView: View {
                                     .lineLimit(viewModel.subtitleMaxLines)
                                     .padding(.horizontal, 24)
                                     .padding(.vertical, 12)
-                                    .background(
-                                        Group {
+                                    .background {
                                             if viewModel.subtitleShowBackground {
                                                 RoundedRectangle(cornerRadius: 12)
                                                     .fill(Color.black.opacity(viewModel.subtitleBackgroundOpacity))
                                             }
                                         }
-                                    )
                                     .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
                                 Spacer()
                             }
@@ -59,7 +54,6 @@ struct SubtitleSettingsView: View {
             }
             
             Section {
-                // Text Size
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("Text Size")
@@ -74,7 +68,6 @@ struct SubtitleSettingsView: View {
                         .accentColor(.blue)
                 }
                 
-                // Font Weight
                 Picker("Font Weight", selection: $viewModel.subtitleFontWeight) {
                     Text("Light").tag("light")
                     Text("Regular").tag("regular")
@@ -83,56 +76,22 @@ struct SubtitleSettingsView: View {
                     Text("Bold").tag("bold")
                 }
                 
-                // Text Color
                 Picker("Text Color", selection: $viewModel.subtitleTextColor) {
-                    HStack {
-                        Circle()
-                            .fill(Color.white)
-                            .frame(width: 20, height: 20)
-                            .overlay(Circle().stroke(Color.gray, lineWidth: 1))
                         Text("White").tag("white")
-                    }
-                    
-                    HStack {
-                        Circle()
-                            .fill(Color.yellow)
-                            .frame(width: 20, height: 20)
                         Text("Yellow").tag("yellow")
-                    }
-                    
-                    HStack {
-                        Circle()
-                            .fill(Color.cyan)
-                            .frame(width: 20, height: 20)
                         Text("Cyan").tag("cyan")
-                    }
-                    
-                    HStack {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 20, height: 20)
                         Text("Green").tag("green")
-                    }
-                    
-                    HStack {
-                        Circle()
-                            .fill(Color.orange)
-                            .frame(width: 20, height: 20)
                         Text("Orange").tag("orange")
-                    }
                 }
                 
-                // Max Lines
                 Stepper("Max Lines: \(viewModel.subtitleMaxLines)", value: $viewModel.subtitleMaxLines, in: 1...5)
             } header: {
                 Text("Text Appearance")
             }
             
             Section {
-                // Background Toggle
                 Toggle("Show Background", isOn: $viewModel.subtitleShowBackground)
                 
-                // Background Opacity (only show if background is enabled)
                 if viewModel.subtitleShowBackground {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
@@ -149,7 +108,6 @@ struct SubtitleSettingsView: View {
                     }
                 }
                 
-                // Position
                 Picker("Position", selection: $viewModel.subtitlePosition) {
                     Text("Bottom").tag("bottom")
                     Text("Middle Bottom").tag("middleBottom")
@@ -160,7 +118,6 @@ struct SubtitleSettingsView: View {
             }
             
             Section {
-                // Reset to Defaults
                 Button(action: resetToDefaults) {
                     HStack {
                         Image(systemName: "arrow.clockwise")

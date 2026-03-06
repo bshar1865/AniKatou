@@ -8,7 +8,6 @@ class HomeViewModel: ObservableObject {
     @Published var topUpcomingAnimes: [AnimeItem] = []
     @Published var topAiringAnimes: [AnimeItem] = []
     @Published var mostPopularAnimes: [AnimeItem] = []
-    @Published var mostFavoriteAnimes: [AnimeItem] = []
     @Published var latestCompletedAnimes: [AnimeItem] = []
     @Published var top10Today: [AnimeItem] = []
     @Published var isLoading = false
@@ -18,8 +17,21 @@ class HomeViewModel: ObservableObject {
         animes.filter { !$0.containsNSFWContent }
     }
 
+    private var hasContent: Bool {
+        !trendingAnimes.isEmpty ||
+        !latestEpisodeAnimes.isEmpty ||
+        !topUpcomingAnimes.isEmpty ||
+        !topAiringAnimes.isEmpty ||
+        !mostPopularAnimes.isEmpty ||
+        !latestCompletedAnimes.isEmpty ||
+        !top10Today.isEmpty
+    }
+
     func loadHomeData() async {
-        isLoading = true
+        let hadContent = hasContent
+        if !hadContent {
+            isLoading = true
+        }
         errorMessage = nil
 
         do {
@@ -29,21 +41,16 @@ class HomeViewModel: ObservableObject {
             topUpcomingAnimes = filterNSFWContent(data.topUpcomingAnimes)
             topAiringAnimes = filterNSFWContent(data.topAiringAnimes)
             mostPopularAnimes = filterNSFWContent(data.mostPopularAnimes)
-            mostFavoriteAnimes = filterNSFWContent(data.mostFavoriteAnimes)
             latestCompletedAnimes = filterNSFWContent(data.latestCompletedAnimes)
             top10Today = filterNSFWContent(data.top10Animes.today)
+            errorMessage = nil
         } catch let error as APIError {
-            switch error {
-            case .networkError:
-                errorMessage = "No internet connection. Please connect to the internet to load Home."
-            default:
-                errorMessage = error.message
+            if !hadContent, case .networkError = error {
+                errorMessage = UserMessage.homeOffline
             }
         } catch {
-            if OfflineManager.shared.isOfflineMode {
-                errorMessage = "No internet connection. Please connect to the internet to load Home."
-            } else {
-                errorMessage = "Unable to load Home at this time. Please try again."
+            if !hadContent, OfflineManager.shared.isOfflineMode {
+                errorMessage = UserMessage.homeOffline
             }
         }
 

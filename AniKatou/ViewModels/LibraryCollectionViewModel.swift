@@ -7,7 +7,7 @@ class LibraryCollectionViewModel: ObservableObject {
     private var notificationObserver: NSObjectProtocol?
 
     init() {
-        loadLibrary()
+        refreshLibrary()
         setupNotificationObserver()
     }
 
@@ -23,11 +23,13 @@ class LibraryCollectionViewModel: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.loadLibrary()
+            Task { @MainActor in
+                self?.refreshLibrary()
+            }
         }
     }
 
-    private func loadLibrary() {
+    private func refreshLibrary() {
         withAnimation {
             libraryItems = LibraryManager.shared.libraryItems
         }
