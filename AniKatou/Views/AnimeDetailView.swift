@@ -129,8 +129,11 @@ struct AnimeDetailView: View {
                         let isDownloaded = downloadManager.isEpisodeDownloaded(episode.id)
                         let anime = animeItem(from: details)
 
+                        let isSelectableForDownload = !isDownloaded && downloadItem?.state != .queued && downloadItem?.state != .downloading
+
                         if isSelectingEpisodes {
                             Button {
+                                guard isSelectableForDownload else { return }
                                 if selectedEpisodeIDs.contains(episode.id) {
                                     selectedEpisodeIDs.remove(episode.id)
                                 } else {
@@ -143,8 +146,10 @@ struct AnimeDetailView: View {
                                     isDownloaded: isDownloaded,
                                     downloadItem: downloadItem
                                 )
+                                .opacity(isSelectableForDownload ? 1 : 0.6)
                             }
                             .buttonStyle(.plain)
+                            .disabled(!isSelectableForDownload)
                         } else {
                             ZStack(alignment: .topTrailing) {
                                 NavigationLink(destination: EpisodeView(
@@ -262,3 +267,4 @@ struct AnimeDetailView: View {
         return .accentColor
     }
 }
+

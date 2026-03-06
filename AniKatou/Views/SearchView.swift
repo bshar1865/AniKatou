@@ -108,13 +108,6 @@ struct SearchView: View {
         } else if viewModel.isLoading {
             ProgressView()
                 .frame(maxWidth: .infinity, minHeight: 220)
-        } else {
-            ContentUnavailableView(
-                "Search Anime",
-                systemImage: "magnifyingglass",
-                description: Text("Popular anime appears here when the app is online. You can still use the search bar anytime.")
-            )
-            .frame(maxWidth: .infinity, minHeight: 220)
         }
     }
 
