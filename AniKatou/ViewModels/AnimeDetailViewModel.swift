@@ -117,6 +117,9 @@ class AnimeDetailViewModel: ObservableObject {
             LibraryManager.shared.remove(anime)
         } else {
             LibraryManager.shared.toggle(anime)
+            Task {
+                await cacheCurrentAnimeForOffline()
+            }
         }
         isInLibrary = !currentlyInLibrary
         NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
@@ -136,8 +139,12 @@ class AnimeDetailViewModel: ObservableObject {
         return episodeGroups[selectedGroupIndex].episodes
     }
 
+    var allEpisodes: [EpisodeInfo] {
+        episodeGroups.flatMap(\.episodes)
+    }
+
     var totalEpisodeCount: Int {
-        episodeGroups.reduce(0) { $0 + $1.episodes.count }
+        allEpisodes.count
     }
 
     func selectGroup(_ index: Int) {
@@ -146,14 +153,9 @@ class AnimeDetailViewModel: ObservableObject {
     }
 
     func downloadEpisode(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async {
-        do {
-            let queued = try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode)
-            if queued {
+        if await queueEpisodeDownloadWithRetry(anime: anime, episodesToCache: episodesToCache, episode: episode) {
                 downloadMessage = UserMessage.downloadStarted(forEpisode: episode.number)
             } else {
-                downloadMessage = UserMessage.downloadStartFailed
-            }
-        } catch {
             downloadMessage = UserMessage.downloadStartFailed
         }
     }
@@ -188,6 +190,10 @@ class AnimeDetailViewModel: ObservableObject {
         LibraryManager.shared.toggle(anime)
         isInLibrary = true
         NotificationCenter.default.post(name: NSNotification.Name("LibraryDidChange"), object: nil)
+
+        Task {
+            await cacheCurrentAnimeForOffline()
+        }
     }
 
     private func queueEpisodeDownload(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async throws -> Bool {
@@ -236,6 +242,17 @@ class AnimeDetailViewModel: ObservableObject {
             return try await queueEpisodeDownload(anime: anime, episodesToCache: episodesToCache, episode: episode)
         } catch {
             return false
+        }
+    }
+
+    private func cacheCurrentAnimeForOffline() async {
+        if let details = animeDetails?.data.anime.info {
+            await OfflineManager.shared.cacheAnimeDetails(details, episodes: allEpisodes, thumbnails: [:])
+            return
+        }
+
+        if let offlineDetails = offlineAnimeDetails {
+            await OfflineManager.shared.cacheImage(from: offlineDetails.image)
         }
     }
 }

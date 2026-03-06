@@ -153,7 +153,7 @@ struct SettingsView: View {
 
                 Section("Community & Support") {
                     Button(action: {
-                        if let url = URL(string: "https://discord.gg/EE3xSCSqgC") {
+                        if let url = URL(string: "https://discord.gg/UkfKR7wNhF") {
                             UIApplication.shared.open(url)
                         }
                     }) {

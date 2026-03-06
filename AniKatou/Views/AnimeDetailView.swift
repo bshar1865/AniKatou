@@ -8,6 +8,7 @@ struct AnimeDetailView: View {
     @State private var isDescriptionExpanded = false
     @State private var isSelectingEpisodes = false
     @State private var selectedEpisodeIDs: Set<String> = []
+    @State private var pendingDownloadedEpisodeRemoval: HLSDownloadItem?
 
     private var resolvedDetails: AnimeDetails? {
         viewModel.animeDetails?.data.anime.info ?? viewModel.offlineAnimeDetails.map(offlineToDetails)
@@ -56,6 +57,22 @@ struct AnimeDetailView: View {
             Button("OK") { viewModel.downloadMessage = nil }
         } message: {
             Text(viewModel.downloadMessage ?? "")
+        }
+        .alert("Remove Downloaded Episode", isPresented: Binding(
+            get: { pendingDownloadedEpisodeRemoval != nil },
+            set: { if !$0 { pendingDownloadedEpisodeRemoval = nil } }
+        )) {
+            Button("Remove", role: .destructive) {
+                if let item = pendingDownloadedEpisodeRemoval {
+                    downloadManager.removeDownload(item)
+                }
+                pendingDownloadedEpisodeRemoval = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDownloadedEpisodeRemoval = nil
+            }
+        } message: {
+            Text("Remove this downloaded episode from your device?")
         }
     }
 
@@ -123,66 +140,73 @@ struct AnimeDetailView: View {
                 )
                 .padding(.horizontal)
 
-                LazyVStack(spacing: 12) {
-                    ForEach(viewModel.currentEpisodes) { episode in
-                        let downloadItem = downloadManager.downloads.first(where: { $0.episodeId == episode.id })
-                        let isDownloaded = downloadManager.isEpisodeDownloaded(episode.id)
-                        let anime = animeItem(from: details)
+                Group {
+                    if isSelectingEpisodes {
+                        LazyVStack(spacing: 12) {
+                            ForEach(viewModel.currentEpisodes) { episode in
+                                let downloadItem = downloadManager.downloads.first(where: { $0.episodeId == episode.id })
+                                let isDownloaded = downloadManager.isEpisodeDownloaded(episode.id)
+                                let isSelectableForDownload = isSelectable(isDownloaded: isDownloaded, item: downloadItem)
 
-                        let isSelectableForDownload = !isDownloaded && downloadItem?.state != .queued && downloadItem?.state != .downloading
-
-                        if isSelectingEpisodes {
-                            Button {
-                                guard isSelectableForDownload else { return }
-                                if selectedEpisodeIDs.contains(episode.id) {
-                                    selectedEpisodeIDs.remove(episode.id)
-                                } else {
-                                    selectedEpisodeIDs.insert(episode.id)
-                                }
-                            } label: {
                                 AnimeEpisodeSelectableRow(
                                     episode: episode,
                                     isSelected: selectedEpisodeIDs.contains(episode.id),
                                     isDownloaded: isDownloaded,
                                     downloadItem: downloadItem
                                 )
-                                .opacity(isSelectableForDownload ? 1 : 0.6)
+                                .opacity(isSelectableForDownload ? 1 : 0.55)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    guard isSelectableForDownload else { return }
+                                    toggleSelection(for: episode.id)
+                                }
                             }
-                            .buttonStyle(.plain)
-                            .disabled(!isSelectableForDownload)
-                        } else {
-                            ZStack(alignment: .topTrailing) {
-                                NavigationLink(destination: EpisodeView(
-                                    episodeId: episode.id,
-                                    animeId: animeId,
-                                    animeTitle: details.name,
-                                    episodeNumber: "\(episode.number)",
-                                    episodeTitle: episode.title,
-                                    thumbnailURL: nil
-                                )) {
-                                    AnimeEpisodeCard(
-                                        episode: episode,
-                                        isDownloaded: isDownloaded,
-                                        downloadItem: downloadItem,
-                                        reservesTrailingAccessorySpace: true
-                                    )
-                                }
-                                .buttonStyle(.plain)
+                        }
+                    } else {
+                        LazyVStack(spacing: 12) {
+                            ForEach(viewModel.currentEpisodes) { episode in
+                                let downloadItem = downloadManager.downloads.first(where: { $0.episodeId == episode.id })
+                                let isDownloaded = downloadManager.isEpisodeDownloaded(episode.id)
+                                let completedDownload = downloadManager.downloadedItem(for: episode.id)
+                                let anime = animeItem(from: details)
 
-                                Button {
-                                    Task {
-                                        await viewModel.downloadEpisode(anime: anime, episodesToCache: viewModel.currentEpisodes, episode: episode)
+                                ZStack(alignment: .topTrailing) {
+                                    NavigationLink(destination: EpisodeView(
+                                        episodeId: episode.id,
+                                        animeId: animeId,
+                                        animeTitle: details.name,
+                                        episodeNumber: "\(episode.number)",
+                                        episodeTitle: episode.title,
+                                        thumbnailURL: nil
+                                    )) {
+                                        AnimeEpisodeCard(
+                                            episode: episode,
+                                            isDownloaded: isDownloaded,
+                                            downloadItem: downloadItem,
+                                            reservesTrailingAccessorySpace: true
+                                        )
                                     }
-                                } label: {
-                                    AnimeEpisodeDownloadButton(
-                                        symbol: downloadButtonSymbol(isDownloaded: isDownloaded, item: downloadItem),
-                                        tint: downloadButtonColor(isDownloaded: isDownloaded, item: downloadItem)
-                                    )
+                                    .buttonStyle(.plain)
+
+                                    Button {
+                                        Task {
+                                            await viewModel.downloadEpisode(anime: anime, episodesToCache: viewModel.currentEpisodes, episode: episode)
+                                        }
+                                    } label: {
+                                        AnimeEpisodeDownloadButton(
+                                            symbol: downloadButtonSymbol(isDownloaded: isDownloaded, item: downloadItem),
+                                            tint: downloadButtonColor(isDownloaded: isDownloaded, item: downloadItem)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(isDownloadButtonDisabled(isDownloaded: isDownloaded, item: downloadItem))
+                                    .padding(.top, 16)
+                                    .padding(.trailing, 16)
                                 }
-                                .buttonStyle(.plain)
-                                .disabled(isDownloadButtonDisabled(isDownloaded: isDownloaded, item: downloadItem))
-                                .padding(.top, 16)
-                                .padding(.trailing, 16)
+                                .onLongPressGesture {
+                                    guard let completedDownload else { return }
+                                    pendingDownloadedEpisodeRemoval = completedDownload
+                                }
                             }
                         }
                     }
@@ -190,6 +214,18 @@ struct AnimeDetailView: View {
                 .padding(.horizontal)
             }
         }
+    }
+
+    private func toggleSelection(for episodeID: String) {
+        if selectedEpisodeIDs.contains(episodeID) {
+            selectedEpisodeIDs.remove(episodeID)
+        } else {
+            selectedEpisodeIDs.insert(episodeID)
+        }
+    }
+
+    private func isSelectable(isDownloaded: Bool, item: HLSDownloadItem?) -> Bool {
+        !isDownloaded && item?.state != .queued && item?.state != .downloading
     }
 
     private func offlineToDetails(_ offline: OfflineAnimeDetails) -> AnimeDetails {
@@ -267,4 +303,3 @@ struct AnimeDetailView: View {
         return .accentColor
     }
 }
-

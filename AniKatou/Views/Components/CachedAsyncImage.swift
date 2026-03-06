@@ -110,6 +110,14 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
             isLoading = false
             return
         }
+
+        if let diskImage = OfflineManager.shared.getCachedImage(for: url.absoluteString) {
+            image = diskImage
+            let cost = Int(diskImage.size.width * diskImage.size.height * diskImage.scale * diskImage.scale * 4)
+            ImageCache.shared.set(diskImage, for: url, cost: cost)
+            isLoading = false
+            return
+        }
         
         guard !isLoading else { return }
         isLoading = true
@@ -125,6 +133,13 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
                 ImageCache.shared.set(loadedImage, for: url, cost: cost)
                 return
             } catch {
+                if let diskImage = OfflineManager.shared.getCachedImage(for: url.absoluteString) {
+                    image = diskImage
+                    let cost = Int(diskImage.size.width * diskImage.size.height * diskImage.scale * diskImage.scale * 4)
+                    ImageCache.shared.set(diskImage, for: url, cost: cost)
+                    return
+                }
+
                 guard attempt < retryAttempts - 1 else { break }
                 try? await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 300_000_000))
             }
@@ -139,6 +154,8 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
                 throw URLError(.badServerResponse)
             }
             
+        OfflineManager.shared.cacheImageData(data, for: url.absoluteString)
+
         guard let image = downsampledImage(from: data) else {
                 throw URLError(.cannotDecodeContentData)
             }

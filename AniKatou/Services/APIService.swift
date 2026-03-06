@@ -110,6 +110,45 @@ class APIService {
         let result: AnimeSearchResult = try await fetch("popular", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
         return result.data.animes
     }
+    private func performWithRetryWindow<T>(_ operation: @escaping () async throws -> T) async throws -> T {
+        let deadline = Date().addingTimeInterval(5)
+        var lastError: Error?
+
+        while Date() < deadline {
+            do {
+                return try await operation()
+            } catch let error as APIError {
+                lastError = error
+                guard shouldRetry(error), Date() < deadline else {
+                    throw error
+                }
+            } catch {
+                lastError = error
+                guard Date() < deadline else {
+                    throw error
+                }
+            }
+
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+
+        if let apiError = lastError as? APIError {
+            throw apiError
+        }
+
+        throw lastError ?? APIError.networkError(URLError(.timedOut))
+    }
+
+    private func shouldRetry(_ error: APIError) -> Bool {
+        switch error {
+        case .networkError:
+            return true
+        case .serverError(let code, _):
+            return code >= 500
+        default:
+            return false
+        }
+    }
 
     private func validateResponse<T: Codable>(_ response: T) throws -> T {
         if let result = response as? HomePageResult, result.status != 200 {
@@ -131,38 +170,43 @@ class APIService {
     }
 
     private func fetch<T: Codable>(_ endpoint: String, queryItems: [URLQueryItem] = []) async throws -> T {
-        guard let url = APIConfig.buildEndpoint(endpoint, queryItems: queryItems) else {
-            throw APIError.notConfigured
-        }
-
-        var request = URLRequest(url: url)
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-
-        do {
-            let (data, response) = try await session.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw APIError.invalidResponse
+        try await performWithRetryWindow { [self] in
+            guard let url = APIConfig.buildEndpoint(endpoint, queryItems: queryItems) else {
+                throw APIError.notConfigured
             }
 
-            if httpResponse.statusCode == 404 {
-                throw APIError.serverError(404, UserMessage.apiResourceNotFound)
-            }
+            var request = URLRequest(url: url)
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.setValue(self.userAgent, forHTTPHeaderField: "User-Agent")
+            request.timeoutInterval = 5
 
-            if httpResponse.statusCode != 200 {
-                throw APIError.serverError(httpResponse.statusCode, UserMessage.apiRequestFailed)
-            }
+            do {
+                let (data, response) = try await self.session.data(for: request)
 
-            let decodedResponse = try decoder.decode(T.self, from: data)
-            return try validateResponse(decodedResponse)
-        } catch let error as DecodingError {
-            throw APIError.decodingError(error)
-        } catch let error as APIError {
-            throw error
-        } catch {
-            throw APIError.networkError(error)
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw APIError.invalidResponse
+                }
+
+                if httpResponse.statusCode == 404 {
+                    throw APIError.serverError(404, UserMessage.apiResourceNotFound)
+                }
+
+                if httpResponse.statusCode != 200 {
+                    throw APIError.serverError(httpResponse.statusCode, UserMessage.apiRequestFailed)
+                }
+
+                let decodedResponse = try self.decoder.decode(T.self, from: data)
+                return try self.validateResponse(decodedResponse)
+            } catch let error as DecodingError {
+                throw APIError.decodingError(error)
+            } catch let error as APIError {
+                throw error
+            } catch {
+                throw APIError.networkError(error)
+            }
         }
     }
 }
+
+

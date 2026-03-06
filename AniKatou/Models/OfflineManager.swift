@@ -64,6 +64,10 @@ class OfflineManager {
     private let monitorQueue = DispatchQueue(label: "AniKatou.NetworkMonitor")
     private var networkStatus: NWPath.Status = .requiresConnection
 
+    private var imageCacheDirectory: URL {
+        cacheDirectory.appendingPathComponent("images", isDirectory: true)
+    }
+
     private init() {
         let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
         cacheDirectory = documentsPath.appendingPathComponent("OfflineCache")
@@ -76,6 +80,9 @@ class OfflineManager {
         if !fileManager.fileExists(atPath: cacheDirectory.path) {
             try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
         }
+        if !fileManager.fileExists(atPath: imageCacheDirectory.path) {
+            try? fileManager.createDirectory(at: imageCacheDirectory, withIntermediateDirectories: true)
+        }
     }
 
     private func startNetworkMonitor() {
@@ -83,6 +90,18 @@ class OfflineManager {
             self?.networkStatus = path.status
         }
         networkMonitor.start(queue: monitorQueue)
+    }
+
+    private func cacheKey(for urlString: String) -> String {
+        Data(urlString.utf8)
+            .base64EncodedString()
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    private func imageFileURL(for urlString: String) -> URL {
+        imageCacheDirectory.appendingPathComponent(cacheKey(for: urlString)).appendingPathExtension("json")
     }
 
     // MARK: - Anime Details Caching
@@ -94,6 +113,7 @@ class OfflineManager {
             let fileURL = cacheDirectory.appendingPathComponent("anime_\(animeDetails.id).json")
             try data.write(to: fileURL)
 
+            await cacheImage(from: animeDetails.image)
             await cacheThumbnailImages(thumbnails, for: animeDetails.id)
         } catch {
             // Failed to cache anime details
@@ -124,6 +144,47 @@ class OfflineManager {
         try? fileManager.removeItem(at: thumbnailDirectory)
     }
 
+    // MARK: - Generic Image Caching
+    func cacheImage(from urlString: String) async {
+        guard let url = URL(string: urlString) else { return }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                return
+            }
+            cacheImageData(data, for: urlString)
+        } catch {
+            // Failed to cache image
+        }
+    }
+
+    func cacheImageData(_ data: Data, for urlString: String) {
+        guard UIImage(data: data) != nil else { return }
+
+        let offlineImage = OfflineImage(url: urlString, data: data, cachedDate: Date())
+        guard let imageData = try? JSONEncoder().encode(offlineImage) else { return }
+        try? imageData.write(to: imageFileURL(for: urlString), options: .atomic)
+    }
+
+    func getCachedImage(for urlString: String) -> UIImage? {
+        let fileURL = imageFileURL(for: urlString)
+
+        guard let data = try? Data(contentsOf: fileURL),
+              let offlineImage = try? JSONDecoder().decode(OfflineImage.self, from: data),
+              let image = UIImage(data: offlineImage.data) else {
+            return nil
+        }
+
+        if Date().timeIntervalSince(offlineImage.cachedDate) > maxCacheAge {
+            try? fileManager.removeItem(at: fileURL)
+            return nil
+        }
+
+        return image
+    }
+
     // MARK: - Thumbnail Image Caching
     private func cacheThumbnailImages(_ thumbnails: [Int: String], for animeId: String) async {
         let thumbnailDirectory = cacheDirectory.appendingPathComponent("thumbnails_\(animeId)")
@@ -142,6 +203,7 @@ class OfflineManager {
 
                 let imageFileURL = thumbnailDirectory.appendingPathComponent("episode_\(episodeNumber).json")
                 try imageData.write(to: imageFileURL)
+                cacheImageData(data, for: thumbnailURL)
             } catch {
                 // Failed to cache thumbnail
             }
@@ -212,6 +274,7 @@ class OfflineManager {
             for fileURL in contents {
                 try fileManager.removeItem(at: fileURL)
             }
+            createCacheDirectoryIfNeeded()
         } catch {
             // Failed to clear cache
         }
@@ -234,13 +297,8 @@ class OfflineManager {
         let animeFiles = try? fileManager.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: nil)
             .filter { $0.lastPathComponent.hasPrefix("anime_") && $0.pathExtension == "json" }
 
-        let imageFiles = try? fileManager.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: nil)
-            .filter { $0.lastPathComponent.hasPrefix("thumbnails_") }
-            .compactMap { thumbnailDir in
-                try? fileManager.contentsOfDirectory(at: thumbnailDir, includingPropertiesForKeys: nil)
-                    .filter { $0.pathExtension == "json" }
-            }
-            .flatMap { $0 }
+        let imageFiles = try? fileManager.contentsOfDirectory(at: imageCacheDirectory, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "json" }
 
         return (
             totalSize: totalSize,
