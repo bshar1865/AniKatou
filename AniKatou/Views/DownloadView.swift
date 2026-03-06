@@ -2,6 +2,8 @@ import SwiftUI
 
 struct DownloadView: View {
     @StateObject private var manager = HLSDownloadManager.shared
+    @State private var pendingGroupRemoval: AnimeDownloadGroup?
+    @State private var confirmedGroupRemoval: AnimeDownloadGroup?
 
     private var groups: [AnimeDownloadGroup] {
         let grouped = Dictionary(grouping: manager.downloads, by: { $0.animeId })
@@ -50,7 +52,9 @@ struct DownloadView: View {
                     }
 
                     ForEach(groups) { group in
-                        DownloadGroupCard(group: group, manager: manager)
+                        DownloadGroupCard(group: group, manager: manager) {
+                            pendingGroupRemoval = group
+                        }
                     }
                 }
             }
@@ -58,6 +62,40 @@ struct DownloadView: View {
             .padding(.vertical, 14)
         }
         .navigationTitle("Downloads")
+        .confirmationDialog(
+            "Remove downloads for \(pendingGroupRemoval?.animeTitle ?? "")?",
+            isPresented: Binding(
+                get: { pendingGroupRemoval != nil },
+                set: { if !$0 { pendingGroupRemoval = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Continue", role: .destructive) {
+                confirmedGroupRemoval = pendingGroupRemoval
+                pendingGroupRemoval = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingGroupRemoval = nil
+            }
+        } message: {
+            Text("This will remove every queued, failed, and saved episode for this anime.")
+        }
+        .alert("Remove All Downloads", isPresented: Binding(
+            get: { confirmedGroupRemoval != nil },
+            set: { if !$0 { confirmedGroupRemoval = nil } }
+        )) {
+            Button("Remove All", role: .destructive) {
+                if let group = confirmedGroupRemoval {
+                    manager.removeDownloads(for: group.animeId)
+                }
+                confirmedGroupRemoval = nil
+            }
+            Button("Cancel", role: .cancel) {
+                confirmedGroupRemoval = nil
+            }
+        } message: {
+            Text("This action cannot be undone.")
+        }
     }
 
     private var summaryCard: some View {
@@ -171,6 +209,7 @@ private struct AnimeDownloadGroup: Identifiable {
 private struct DownloadGroupCard: View {
     let group: AnimeDownloadGroup
     @ObservedObject var manager: HLSDownloadManager
+    let onRemove: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -192,7 +231,7 @@ private struct DownloadGroupCard: View {
                 Spacer()
 
                 Button("Remove", role: .destructive) {
-                    manager.removeDownloads(for: group.animeId)
+                    onRemove()
                 }
                 .font(.caption.weight(.semibold))
                 .buttonStyle(.borderless)
