@@ -2,6 +2,7 @@ import Foundation
 
 enum UserMessage {
     static let noInternet = "No internet connection. Please connect to the internet and try again."
+    static let networkRequestFailed = "Unable to reach the server right now. Please try again."
     static let homeOffline = "An internet connection is required to load Home."
     static let homeLoadFailed = "Unable to load Home at this time. Please try again."
     static let searchUnavailable = "Unable to complete the search right now. Please try again."

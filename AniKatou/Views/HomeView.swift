@@ -2,7 +2,10 @@ import SwiftUI
 
 struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
+    @StateObject private var downloadManager = HLSDownloadManager.shared
     @State private var watchHistory: [WatchProgress] = []
+    @State private var selectedProgressForDelete: WatchProgress?
+    @State private var showDeleteProgressAlert = false
 
     private var hasContent: Bool {
         !viewModel.trendingAnimes.isEmpty ||
@@ -13,10 +16,18 @@ struct HomeView: View {
         !viewModel.top10Today.isEmpty
     }
 
+    private var offlineLibraryItems: [AnimeItem] {
+        LibraryManager.shared.libraryItems.filter { downloadManager.downloadedEpisodeCount(for: $0.id) > 0 }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 continueWatchingSection
+
+                if OfflineManager.shared.isOfflineMode && !offlineLibraryItems.isEmpty {
+                    section(title: "Available Offline", animes: offlineLibraryItems)
+                }
 
                 if hasContent {
                     section(title: "Trending", animes: viewModel.trendingAnimes)
@@ -25,7 +36,7 @@ struct HomeView: View {
                     section(title: "Most Popular", animes: viewModel.mostPopularAnimes)
                     section(title: "Latest Completed", animes: viewModel.latestCompletedAnimes)
                     section(title: "Top 10 Today", animes: viewModel.top10Today)
-                } else if watchHistory.isEmpty && !viewModel.isLoading {
+                } else if watchHistory.isEmpty && offlineLibraryItems.isEmpty && !viewModel.isLoading {
                     homeEmptyState
                 }
             }
@@ -33,7 +44,7 @@ struct HomeView: View {
         }
         .navigationTitle("Home")
         .overlay {
-            if viewModel.isLoading && !hasContent && watchHistory.isEmpty {
+            if viewModel.isLoading && !hasContent && watchHistory.isEmpty && offlineLibraryItems.isEmpty {
                 ProgressView("Loading...")
             }
         }
@@ -44,6 +55,18 @@ struct HomeView: View {
         .task {
             reloadWatchHistory()
             await viewModel.loadHomeData()
+        }
+        .alert("Remove from Continue Watching?", isPresented: $showDeleteProgressAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Remove", role: .destructive) {
+                if let progress = selectedProgressForDelete {
+                    WatchProgressManager.shared.removeProgress(for: progress.animeID, episodeID: progress.episodeID)
+                    reloadWatchHistory()
+                }
+                selectedProgressForDelete = nil
+            }
+        } message: {
+            Text("This episode entry will be removed.")
         }
     }
 
@@ -67,6 +90,12 @@ struct HomeView: View {
                                 HomeContinueWatchingCard(progress: progress, coverURL: coverURL(for: progress))
                             }
                             .buttonStyle(.plain)
+                            .contextMenu {
+                                Button("Remove from Continue Watching", role: .destructive) {
+                                    selectedProgressForDelete = progress
+                                    showDeleteProgressAlert = true
+                                }
+                            }
                         }
                     }
                     .padding(.horizontal)

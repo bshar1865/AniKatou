@@ -96,6 +96,20 @@ struct SettingsView: View {
                 }
 
                 Section("Downloads") {
+                    NavigationLink(destination: DownloadView()) {
+                        HStack {
+                            Image(systemName: "arrow.down.circle")
+                                .foregroundColor(.blue)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Download Queue")
+                                    .font(.headline)
+                                Text("View active and completed downloads")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+
                     Stepper(value: $viewModel.concurrentDownloadsLimit, in: 1...3) {
                         HStack {
                             Text("Simultaneous Downloads")
@@ -183,3 +197,4 @@ struct SettingsView: View {
 #Preview {
     SettingsView()
 }
+
