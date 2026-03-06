@@ -55,44 +55,9 @@ struct EpisodeCount: Codable {
     let dub: Int?
 }
 
-enum SearchSortOption: String, CaseIterable, Identifiable {
-    case relevance = "default"
-    case recentlyAdded = "recently-added"
-    case recentlyUpdated = "recently-updated"
-    case score = "score"
-    case nameAZ = "name-az"
-    case releasedDate = "released-date"
 
-    var id: String { rawValue }
 
-    var title: String {
-        switch self {
-        case .relevance: return "Relevance"
-        case .recentlyAdded: return "Recently Added"
-        case .recentlyUpdated: return "Recently Updated"
-        case .score: return "Score"
-        case .nameAZ: return "A-Z"
-        case .releasedDate: return "Release Date"
-        }
-    }
-}
 
-struct SearchSuggestionResult: Codable {
-    let status: Int
-    let data: SearchSuggestionData
-}
-
-struct SearchSuggestionData: Codable {
-    let suggestions: [SearchSuggestionItem]
-}
-
-struct SearchSuggestionItem: Codable, Identifiable {
-    let id: String
-    let name: String
-    let poster: String?
-    let jname: String?
-    let moreInfo: [String]?
-}
 
 // Anime Details
 struct AnimeDetailsResult: Codable {

@@ -228,9 +228,6 @@ class APIService {
         if let result = response as? AnimeQtipResult, result.status != 200 {
             throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
         }
-        if let result = response as? SearchSuggestionResult, result.status != 200 {
-            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
-        }
         if let result = response as? NextEpisodeScheduleResult, result.status != 200 {
             throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
         }
