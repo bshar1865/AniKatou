@@ -54,9 +54,14 @@ class SearchViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let results = try await APIService.shared.searchAnime(query: trimmed)
+            let results = try await APIService.shared.searchAnime(query: trimmed, excludeRatings: ["r+", "rx"])
             guard !Task.isCancelled else { return }
-            searchResults = filterNSFWContent(results)
+
+            let preliminarilyFiltered = filterNSFWContent(results)
+            let validatedResults = await validateSearchResultsForSafety(preliminarilyFiltered)
+            guard !Task.isCancelled else { return }
+
+            searchResults = validatedResults
 
             if !searchResults.isEmpty {
                 addToSearchHistory(trimmed)
@@ -83,6 +88,37 @@ class SearchViewModel: ObservableObject {
 
         guard !Task.isCancelled else { return }
         isLoading = false
+    }
+
+    private func validateSearchResultsForSafety(_ results: [AnimeItem]) async -> [AnimeItem] {
+        guard !results.isEmpty else { return [] }
+
+        return await withTaskGroup(of: (Int, AnimeItem)?.self) { group in
+            for (index, anime) in results.enumerated() {
+                group.addTask {
+                    if anime.containsNSFWContent {
+                        return nil
+                    }
+
+                    guard let qtip = try? await APIService.shared.getAnimeQtipInfo(id: anime.id) else {
+                        return (index, anime)
+                    }
+
+                    return qtip.data.anime.containsNSFWContent ? nil : (index, anime)
+                }
+            }
+
+            var safeResults: [(Int, AnimeItem)] = []
+            for await result in group {
+                if let result {
+                    safeResults.append(result)
+                }
+            }
+
+            return safeResults
+                .sorted { $0.0 < $1.0 }
+                .map(\.1)
+        }
     }
 
     private func loadSearchHistory() {

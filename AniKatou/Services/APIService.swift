@@ -62,36 +62,38 @@ class APIService {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
     }
 
-    func searchAnime(query: String) async throws -> [AnimeItem] {
+    func searchAnime(query: String, page: Int = 1, excludeRatings: [String] = []) async throws -> [AnimeItem] {
         guard query.count >= 3 else {
             throw APIError.searchQueryTooShort
         }
 
         let queryItems = [
             URLQueryItem(name: "q", value: query),
-            URLQueryItem(name: "page", value: "1"),
-            URLQueryItem(name: "nsfw", value: "false")
+            URLQueryItem(name: "page", value: "\(page)")
         ]
 
         let result: AnimeSearchResult = try await fetch("search", queryItems: queryItems)
-        return result.data.animes
+        if excludeRatings.isEmpty {
+            return result.data.animes
+        }
+        return result.data.animes.filter { !ContentSafety.shouldExcludeRating($0.rating, excludeRatings: excludeRatings) }
     }
 
     func getAnimeDetails(id: String) async throws -> AnimeDetailsResult {
-        try await fetch("anime/\(id)", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
+        try await fetch("anime/\(id)")
     }
 
     func getAnimeQtipInfo(id: String) async throws -> AnimeQtipResult {
-        try await fetch("qtip/\(id)", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
+        try await fetch("qtip/\(id)")
     }
 
     func getAnimeEpisodes(id: String) async throws -> [EpisodeInfo] {
-        let result: EpisodesResponse = try await fetch("anime/\(id)/episodes", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
+        let result: EpisodesResponse = try await fetch("anime/\(id)/episodes")
         return result.data.episodes
     }
 
     func getNextEpisodeSchedule(id: String) async throws -> NextEpisodeSchedule {
-        let result: NextEpisodeScheduleResult = try await fetch("anime/\(id)/next-episode-schedule", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
+        let result: NextEpisodeScheduleResult = try await fetch("anime/\(id)/next-episode-schedule")
         return result.data
     }
 
@@ -99,8 +101,7 @@ class APIService {
         let result: EpisodeServersResult = try await fetch(
             "episode/servers",
             queryItems: [
-                URLQueryItem(name: "animeEpisodeId", value: episodeId),
-                URLQueryItem(name: "nsfw", value: "false")
+                URLQueryItem(name: "animeEpisodeId", value: episodeId)
             ]
         )
         return result.data
@@ -152,8 +153,7 @@ class APIService {
         let queryItems = [
             URLQueryItem(name: "animeEpisodeId", value: episodeId),
             URLQueryItem(name: "server", value: server),
-            URLQueryItem(name: "category", value: category),
-            URLQueryItem(name: "nsfw", value: "false")
+            URLQueryItem(name: "category", value: category)
         ]
 
         let result: StreamingResult = try await fetch("episode/sources", queryItems: queryItems)
@@ -161,13 +161,13 @@ class APIService {
     }
 
     func getHomePage() async throws -> HomePageData {
-        let result: HomePageResult = try await fetch("home", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
+        let result: HomePageResult = try await fetch("home")
         return result.data
     }
 
     func getPopularAnime() async throws -> [AnimeItem] {
-        let result: AnimeSearchResult = try await fetch("popular", queryItems: [URLQueryItem(name: "nsfw", value: "false")])
-        return result.data.animes
+        let home = try await getHomePage()
+        return home.mostPopularAnimes
     }
 
     private func performWithRetryWindow<T>(_ operation: @escaping () async throws -> T) async throws -> T {
@@ -210,30 +210,18 @@ class APIService {
         }
     }
 
+    private func validateEnvelope(_ response: APIResultEnvelope) throws {
+        if let success = response.success, success == false {
+            throw APIError.serverError(response.status ?? 500, UserMessage.apiRequestFailed)
+        }
+        if let status = response.status, status != 200 {
+            throw APIError.serverError(status, UserMessage.unexpectedStatus(status))
+        }
+    }
+
     private func validateResponse<T: Codable>(_ response: T) throws -> T {
-        if let result = response as? HomePageResult, result.status != 200 {
-            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
-        }
-        if let result = response as? AnimeSearchResult, result.status != 200 {
-            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
-        }
-        if let result = response as? AnimeDetailsResult, result.status != 200 {
-            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
-        }
-        if let result = response as? AnimeQtipResult, result.status != 200 {
-            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
-        }
-        if let result = response as? NextEpisodeScheduleResult, result.status != 200 {
-            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
-        }
-        if let result = response as? EpisodeServersResult, result.status != 200 {
-            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
-        }
-        if let result = response as? EpisodesResponse, result.status != 200 {
-            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
-        }
-        if let result = response as? StreamingResult, result.status != 200 {
-            throw APIError.serverError(result.status, UserMessage.unexpectedStatus(result.status))
+        if let envelope = response as? APIResultEnvelope {
+            try validateEnvelope(envelope)
         }
         return response
     }

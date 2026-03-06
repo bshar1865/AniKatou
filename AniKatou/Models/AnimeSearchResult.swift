@@ -1,7 +1,8 @@
 import Foundation
 
-struct AnimeSearchResult: Codable {
-    let status: Int
+struct AnimeSearchResult: Codable, APIResultEnvelope {
+    let status: Int?
+    let success: Bool?
     let data: AnimeSearchData
 }
 
@@ -40,8 +41,9 @@ struct EpisodeCount: Codable {
     let dub: Int?
 }
 
-struct AnimeDetailsResult: Codable {
-    let status: Int
+struct AnimeDetailsResult: Codable, APIResultEnvelope {
+    let status: Int?
+    let success: Bool?
     let data: AnimeDetailsData
 }
 
@@ -100,8 +102,9 @@ struct AnimeMoreInfo: Codable {
     let producers: [String]?
 }
 
-struct AnimeQtipResult: Codable {
-    let status: Int
+struct AnimeQtipResult: Codable, APIResultEnvelope {
+    let status: Int?
+    let success: Bool?
     let data: AnimeQtipData
 }
 
@@ -133,8 +136,9 @@ struct AnimeQtipInfo: Codable {
     }
 }
 
-struct NextEpisodeScheduleResult: Codable {
-    let status: Int
+struct NextEpisodeScheduleResult: Codable, APIResultEnvelope {
+    let status: Int?
+    let success: Bool?
     let data: NextEpisodeSchedule
 }
 
@@ -144,8 +148,9 @@ struct NextEpisodeSchedule: Codable {
     let secondsUntilAiring: Int?
 }
 
-struct EpisodeServersResult: Codable {
-    let status: Int
+struct EpisodeServersResult: Codable, APIResultEnvelope {
+    let status: Int?
+    let success: Bool?
     let data: EpisodeServersData
 }
 
@@ -170,8 +175,9 @@ struct ResolvedStreamingSource {
     let didFallback: Bool
 }
 
-struct EpisodesResponse: Codable {
-    let status: Int
+struct EpisodesResponse: Codable, APIResultEnvelope {
+    let status: Int?
+    let success: Bool?
     let data: EpisodesData
 }
 
@@ -189,8 +195,9 @@ struct EpisodeInfo: Codable, Identifiable {
     var id: String { episodeId }
 }
 
-struct StreamingResult: Codable, Equatable {
-    let status: Int
+struct StreamingResult: Codable, Equatable, APIResultEnvelope {
+    let status: Int?
+    let success: Bool?
     let data: StreamingData
 }
 

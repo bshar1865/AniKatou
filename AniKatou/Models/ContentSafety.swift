@@ -31,15 +31,18 @@ enum ContentSafety {
         return blockedKeywords.contains { haystack.contains($0) }
     }
 
+    static func shouldExcludeRating(_ rating: String?, excludeRatings: [String]) -> Bool {
+        guard let rating else { return false }
+        let normalized = rating.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        return excludeRatings.map { $0.lowercased() }.contains { normalized.hasPrefix($0) }
+    }
+
     private static func matchesBlockedGenre(_ genre: String) -> Bool {
         let lowered = genre.lowercased()
         return blockedGenres.contains { lowered.contains($0) }
     }
 
     private static func matchesBlockedRating(_ rating: String) -> Bool {
-        let normalized = rating
-            .lowercased()
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return blockedRatingPrefixes.contains { normalized.hasPrefix($0) }
+        shouldExcludeRating(rating, excludeRatings: blockedRatingPrefixes)
     }
 }
