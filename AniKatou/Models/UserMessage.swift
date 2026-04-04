@@ -31,7 +31,7 @@ enum UserMessage {
     static let apiHostConnectionFailed = "Unable to connect to the API host."
     static let apiValidationTimeout = "The connection timed out. Please try again."
     static let apiNetworkValidationFailed = "A network error occurred while validating the API server."
-    static let apiUnexpectedResponse = "The server is reachable, but it did not return a valid AniWatch API response."
+    static let apiUnexpectedResponse = "The server is reachable, but it did not return a valid API response."
 
     static func serverError(_ code: Int) -> String {
         "The server returned an error (code \(code))."

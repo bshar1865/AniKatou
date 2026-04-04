@@ -44,7 +44,7 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Server Settings")
                                     .font(.headline)
-                                Text("Configure your AniWatch API endpoint")
+                                Text("Configure your API endpoint")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -197,4 +197,5 @@ struct SettingsView: View {
 #Preview {
     SettingsView()
 }
+
 

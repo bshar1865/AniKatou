@@ -72,7 +72,7 @@ class APIService {
             URLQueryItem(name: "page", value: "\(page)")
         ]
 
-        let result: AnimeSearchResult = try await fetch("search", queryItems: queryItems)
+        let result: AnimeSearchResult = try await fetch(.search, queryItems: queryItems)
         if excludeRatings.isEmpty {
             return result.data.animes
         }
@@ -80,26 +80,26 @@ class APIService {
     }
 
     func getAnimeDetails(id: String) async throws -> AnimeDetailsResult {
-        try await fetch("anime/\(id)")
+        try await fetch(.animeDetails(id: id))
     }
 
     func getAnimeQtipInfo(id: String) async throws -> AnimeQtipResult {
-        try await fetch("qtip/\(id)")
+        try await fetch(.qtip(id: id))
     }
 
     func getAnimeEpisodes(id: String) async throws -> [EpisodeInfo] {
-        let result: EpisodesResponse = try await fetch("anime/\(id)/episodes")
+        let result: EpisodesResponse = try await fetch(.animeEpisodes(id: id))
         return result.data.episodes
     }
 
     func getNextEpisodeSchedule(id: String) async throws -> NextEpisodeSchedule {
-        let result: NextEpisodeScheduleResult = try await fetch("anime/\(id)/next-episode-schedule")
+        let result: NextEpisodeScheduleResult = try await fetch(.nextEpisodeSchedule(id: id))
         return result.data
     }
 
     func getEpisodeServers(episodeId: String) async throws -> EpisodeServersData {
         let result: EpisodeServersResult = try await fetch(
-            "episode/servers",
+            .episodeServers,
             queryItems: [
                 URLQueryItem(name: "animeEpisodeId", value: episodeId)
             ]
@@ -156,12 +156,12 @@ class APIService {
             URLQueryItem(name: "category", value: category)
         ]
 
-        let result: StreamingResult = try await fetch("episode/sources", queryItems: queryItems)
+        let result: StreamingResult = try await fetch(.streamingSources, queryItems: queryItems)
         return result
     }
 
     func getHomePage() async throws -> HomePageData {
-        let result: HomePageResult = try await fetch("home")
+        let result: HomePageResult = try await fetch(.home)
         return result.data
     }
 
@@ -226,7 +226,7 @@ class APIService {
         return response
     }
 
-    private func fetch<T: Codable>(_ endpoint: String, queryItems: [URLQueryItem] = []) async throws -> T {
+    private func fetch<T: Codable>(_ endpoint: APIEndpoint, queryItems: [URLQueryItem] = []) async throws -> T {
         try await performWithRetryWindow { [self] in
             guard let url = APIConfig.buildEndpoint(endpoint, queryItems: queryItems) else {
                 throw APIError.notConfigured

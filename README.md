@@ -19,7 +19,7 @@ It does not include built-in content sources.
 ## Setup
 
 1. Build or sideload the app.
-2. Run an AniWatch-compatible API backend.
+2. Run your API backend.
 3. Open `Settings -> Server Settings` and set your API base URL.
 
 ## Notes
@@ -27,10 +27,6 @@ It does not include built-in content sources.
 - AniKatou is a client only.
 - No media is hosted or bundled by this app.
 - You are responsible for the backend and how it is used.
-
-## API backend reference
-
-- https://github.com/ghoshRitesh12/aniwatch-api
 
 ## License
 

@@ -39,7 +39,7 @@ class APIConfigViewModel: ObservableObject {
             return false
         }
         let existingPath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let homePath = "api/\(APIConfig.defaultAPIVersion)/hianime/home"
+        let homePath = APIEndpointConfig.endpointPath(for: .home)
         components.path = existingPath.isEmpty ? "/\(homePath)" : "/\(existingPath)/\(homePath)"
         components.queryItems = [URLQueryItem(name: "nsfw", value: "false")]
         guard let homeURL = components.url else {
