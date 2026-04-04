@@ -9,7 +9,7 @@ class APIConfigViewModel: ObservableObject {
     @Published var isConfigured: Bool
 
     init() {
-        apiURL = APIConfig.baseURL ?? ""
+        apiURL = APIConfig.baseURL ?? APIEndpointConfig.defaultBaseURL
         isConfigured = APIConfig.isConfigured
     }
 

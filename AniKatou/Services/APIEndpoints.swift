@@ -15,27 +15,33 @@ enum APIEndpoint {
         case .search:
             return "search"
         case .animeDetails(let id):
-            return "anime/\(id)"
+            return "details/\(id)"
         case .animeEpisodes(let id):
-            return "anime/\(id)/episodes"
+            return "episodes/\(id)"
         case .home:
             return "home"
         case .qtip(let id):
-            return "qtip/\(id)"
-        case .nextEpisodeSchedule(let id):
-            return "anime/\(id)/next-episode-schedule"
+            return "details/\(id)"
+        case .nextEpisodeSchedule:
+            return "updates"
         case .episodeServers:
-            return "episode/servers"
+            return "stream"
         case .streamingSources:
-            return "episode/sources"
+            return "stream"
         }
     }
 }
 
 struct APIEndpointConfig {
     // Update these values whenever you switch to a new API provider.
-    static var apiVersion = "v2"
-    static var serviceRoot = "hianime"
+    static var defaultBaseURL = "https://animeapi.50n50.deno.net"
+    static var apiVersion = ""
+    static var serviceRoot = ""
+
+    static let searchQueryKey = "keyword"
+    static let searchPageKey = "page"
+    static let streamTokenKey = "token"
+    static let streamTypeKey = "type"
 
     static var basePath: String {
         let parts = ["api", apiVersion, serviceRoot].filter { !$0.isEmpty }
@@ -51,5 +57,19 @@ struct APIEndpointConfig {
 
     static func endpointPath(for endpoint: APIEndpoint) -> String {
         endpointPath(endpoint.path)
+    }
+
+    static func searchQueryItems(query: String, page: Int) -> [URLQueryItem] {
+        [
+            URLQueryItem(name: searchQueryKey, value: query),
+            URLQueryItem(name: searchPageKey, value: "\(page)")
+        ]
+    }
+
+    static func streamQueryItems(token: String, type: String) -> [URLQueryItem] {
+        [
+            URLQueryItem(name: streamTokenKey, value: token),
+            URLQueryItem(name: streamTypeKey, value: type)
+        ]
     }
 }

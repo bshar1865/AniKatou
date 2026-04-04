@@ -1,6 +1,6 @@
 # AniKatou (iOS)
 
-AniKatou is a SwiftUI iOS app for browsing anime metadata and playing streams from your own API.
+AniKatou is a SwiftUI iOS app for browsing anime metadata and playing streams using the Anime API (50n50).
 
 It does not include built-in content sources.
 
@@ -21,6 +21,12 @@ It does not include built-in content sources.
 1. Build or sideload the app.
 2. Run your API backend.
 3. Open `Settings -> Server Settings` and set your API base URL.
+
+## API backend reference
+
+- https://github.com/50n50/animeapi
+
+Thanks to Paul for providing the Anime API. This backend is required for the app to load and stream anime.
 
 ## Notes
 
