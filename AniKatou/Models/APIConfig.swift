@@ -30,7 +30,11 @@ struct APIConfig {
         guard var components = URLComponents(string: urlString) else { return nil }
         let existingPath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let endpointPath = APIEndpointConfig.endpointPath(path)
+
         if existingPath.isEmpty {
+            components.path = "/\(endpointPath)"
+        } else if existingPath.lowercased() == "api" && endpointPath.lowercased().hasPrefix("api/") {
+            // Avoid double /api when the user includes /api in the base URL.
             components.path = "/\(endpointPath)"
         } else {
             components.path = "/\(existingPath)/\(endpointPath)"

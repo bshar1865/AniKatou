@@ -48,11 +48,7 @@ class APIConfigViewModel: ObservableObject {
         }
 
         do {
-            let homeResult = try await validateHomeEndpoint(url: homeURL)
-            guard homeResult.status == 200 else {
-                errorMessage = UserMessage.apiUnexpectedResponse
-                return false
-            }
+            try await validateHomeEndpoint(url: homeURL)
 
             APIConfig.baseURL = modifiedURL
             isConfigured = true
@@ -84,7 +80,7 @@ class APIConfigViewModel: ObservableObject {
         errorMessage = nil
     }
 
-    private func validateHomeEndpoint(url: URL) async throws -> HomePageResult {
+    private func validateHomeEndpoint(url: URL) async throws {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 5
         config.timeoutIntervalForResource = 5
@@ -107,10 +103,14 @@ class APIConfigViewModel: ObservableObject {
                 guard httpResponse.statusCode == 200 else {
                     throw APIError.serverError(httpResponse.statusCode, UserMessage.serverError(httpResponse.statusCode))
                 }
-                guard let homeResult = try? JSONDecoder().decode(HomePageResult.self, from: data) else {
+
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let success = json["success"] as? Bool,
+                   success == false {
                     throw APIError.invalidResponse
                 }
-                return homeResult
+
+                return
             } catch {
                 lastError = error
                 try? await Task.sleep(nanoseconds: 500_000_000)
