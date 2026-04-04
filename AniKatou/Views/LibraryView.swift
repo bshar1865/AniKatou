@@ -1,116 +1,65 @@
 import SwiftUI
 
+fileprivate enum LibraryTab {
+    case recents
+    case downloads
+}
+
 struct LibraryView: View {
-    @StateObject private var downloadManager = HLSDownloadManager.shared
-    @State private var recentCount = 0
+    @State private var selectedTab: LibraryTab = .recents
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Library")
-                        .font(.title2.weight(.bold))
-                    Text("Quick access to your recent episodes and offline downloads.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal)
+        VStack(spacing: 0) {
+            LibrarySegmentedControl(selectedTab: $selectedTab)
+            Divider()
 
-                VStack(spacing: 12) {
-                    NavigationLink(destination: RecentsView()) {
-                        LibraryHubCard(
-                            title: "Recents",
-                            subtitle: recentSubtitle,
-                            systemImage: "clock.arrow.circlepath"
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    NavigationLink(destination: DownloadView()) {
-                        LibraryHubCard(
-                            title: "Downloads",
-                            subtitle: downloadsSubtitle,
-                            systemImage: "arrow.down.circle"
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal)
-
-                if recentCount == 0 && downloadManager.downloads.isEmpty {
-                    ContentUnavailableView(
-                        "Nothing Here Yet",
-                        systemImage: "tray",
-                        description: Text("Watch an episode or start a download to see it here.")
-                    )
-                    .frame(maxWidth: .infinity, minHeight: 260)
-                    .padding(.horizontal)
+            Group {
+                switch selectedTab {
+                case .recents:
+                    RecentsListView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .downloads:
+                    DownloadsListView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .padding(.vertical, 14)
         }
         .navigationTitle("Library")
-        .onAppear {
-            refreshRecents()
-        }
-    }
-
-    private var recentSubtitle: String {
-        recentCount == 0 ? "No recent episodes" : "\(recentCount) recent episode\(recentCount == 1 ? "" : "s")"
-    }
-
-    private var downloadsSubtitle: String {
-        let count = downloadManager.downloads.count
-        return count == 0 ? "No downloads" : "\(count) download\(count == 1 ? "" : "s")"
-    }
-
-    private func refreshRecents() {
-        WatchProgressManager.shared.cleanupFinishedEpisodes()
-        recentCount = WatchProgressManager.shared.getWatchHistory().count
     }
 }
 
-private struct LibraryHubCard: View {
-    let title: String
-    let subtitle: String
-    let systemImage: String
+private struct LibrarySegmentedControl: View {
+    @Binding var selectedTab: LibraryTab
 
     var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.blue.opacity(0.12))
-                    .frame(width: 44, height: 44)
-
-                Image(systemName: systemImage)
-                    .font(.title3)
-                    .foregroundColor(.blue)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundColor(.secondary)
+        HStack(spacing: 24) {
+            segmentButton(title: "Recents", tab: .recents)
+            segmentButton(title: "Downloads", tab: .downloads)
         }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-        )
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .background(Color(.systemBackground))
+    }
+
+    private func segmentButton(title: String, tab: LibraryTab) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedTab = tab
+            }
+        } label: {
+            VStack(spacing: 6) {
+                Text(title)
+                    .font(.subheadline.weight(selectedTab == tab ? .semibold : .regular))
+                    .foregroundColor(selectedTab == tab ? .primary : .secondary)
+
+                Capsule()
+                    .fill(selectedTab == tab ? Color.blue : Color.clear)
+                    .frame(height: 3)
+                    .frame(maxWidth: 40)
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 

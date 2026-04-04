@@ -1,6 +1,14 @@
 import SwiftUI
 
 struct RecentsView: View {
+    var body: some View {
+        RecentsListView()
+            .navigationTitle("Recents")
+            .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct RecentsListView: View {
     @State private var watchHistory: [WatchProgress] = []
     @State private var selectedProgressForDelete: WatchProgress?
     @State private var showDeleteProgressAlert = false
@@ -39,8 +47,6 @@ struct RecentsView: View {
             }
         }
         .listStyle(.plain)
-        .navigationTitle("Recents")
-        .navigationBarTitleDisplayMode(.inline)
         .refreshable {
             reloadWatchHistory()
         }
@@ -103,7 +109,7 @@ private struct RecentEpisodeRow: View {
                     .font(.headline)
                     .lineLimit(1)
 
-                Text("Episode \(progress.episodeNumber)")
+                Text("Watch to EPISODE \(progress.episodeNumber)")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
 
@@ -132,3 +138,4 @@ private struct RecentEpisodeRow: View {
         RecentsView()
     }
 }
+
