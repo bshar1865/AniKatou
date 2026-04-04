@@ -76,7 +76,7 @@ struct AnimeDetailHeroSection: View {
 
             HStack(spacing: 12) {
                 Button(action: toggleLibrary) {
-                    Label(isInLibrary ? "In Library" : "Add to Library", systemImage: isInLibrary ? "books.vertical.fill" : "books.vertical")
+                    Label(isInLibrary ? "In Favourites" : "Add to Favourites", systemImage: isInLibrary ? "heart.fill" : "heart")
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
@@ -508,3 +508,4 @@ private struct AnimeEpisodeProgressBar: View {
         }
     }
 }
+

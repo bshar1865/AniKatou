@@ -12,18 +12,18 @@ struct ContentView: View {
             .tag(0)
 
             NavigationStack {
-                LibraryView()
+                FavoritesView()
             }
             .tabItem {
-                Label("Library", systemImage: "books.vertical")
+                Label("Favourites", systemImage: "heart")
             }
             .tag(1)
 
             NavigationStack {
-                SearchView()
+                LibraryView()
             }
             .tabItem {
-                Label("Search", systemImage: "magnifyingglass")
+                Label("Library", systemImage: "books.vertical")
             }
             .tag(2)
 

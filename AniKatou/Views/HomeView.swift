@@ -43,6 +43,14 @@ struct HomeView: View {
             .padding(.vertical)
         }
         .navigationTitle("Home")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink(destination: SearchView()) {
+                    Image(systemName: "magnifyingglass")
+                }
+                .accessibilityLabel("Search")
+            }
+        }
         .overlay {
             if viewModel.isLoading && !hasContent && watchHistory.isEmpty && offlineLibraryItems.isEmpty {
                 ProgressView("Loading...")
