@@ -188,14 +188,51 @@ struct AnimeAPINameUrl: Codable {
     let url: String?
 }
 
-struct AnimeAPIEpisode: Codable {
-    let num: StringOrInt
+struct AnimeAPIEpisode: Decodable {
+    let number: Int
     let token: String
     let title: String?
     let jpTitle: String?
     let isFiller: Bool?
+    let langs: Int?
     let sub: Bool?
     let dub: Bool?
+    let softsub: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case number
+        case num
+        case token
+        case title
+        case jpTitle
+        case isFiller
+        case langs
+        case sub
+        case dub
+        case softsub
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        token = try container.decode(String.self, forKey: .token)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        jpTitle = try container.decodeIfPresent(String.self, forKey: .jpTitle)
+        isFiller = try container.decodeIfPresent(Bool.self, forKey: .isFiller)
+        langs = try container.decodeIfPresent(Int.self, forKey: .langs)
+        sub = try container.decodeIfPresent(Bool.self, forKey: .sub)
+        dub = try container.decodeIfPresent(Bool.self, forKey: .dub)
+        softsub = try container.decodeIfPresent(Bool.self, forKey: .softsub)
+
+        if let numberValue = try container.decodeIfPresent(Int.self, forKey: .number) {
+            number = numberValue
+        } else if let numberString = try container.decodeIfPresent(String.self, forKey: .number) {
+            number = Int(numberString) ?? 0
+        } else if let numValue = try container.decodeIfPresent(StringOrInt.self, forKey: .num) {
+            number = numValue.intValue ?? Int(numValue.stringValue ?? "") ?? 0
+        } else {
+            number = 0
+        }
+    }
 }
 
 struct AnimeAPIStreamData: Codable {

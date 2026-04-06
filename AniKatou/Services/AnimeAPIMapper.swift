@@ -119,7 +119,7 @@ enum AnimeAPIMapper {
 
     static func mapEpisodes(_ items: [AnimeAPIEpisode]) -> [EpisodeInfo] {
         items.map { item in
-            let number = item.num.intValue ?? Int(item.num.stringValue ?? "") ?? 0
+            let number = item.number
             return EpisodeInfo(
                 title: item.title,
                 episodeId: item.token,

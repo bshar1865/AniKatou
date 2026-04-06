@@ -38,6 +38,13 @@ struct FavoritesView: View {
                                 AnimeCard(anime: anime)
                             }
                             .buttonStyle(.plain)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    viewModel.remove(anime)
+                                } label: {
+                                    Label("Remove from Favourites", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                     .padding(.horizontal)

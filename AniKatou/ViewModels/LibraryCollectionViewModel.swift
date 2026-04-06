@@ -34,4 +34,8 @@ class LibraryCollectionViewModel: ObservableObject {
             libraryItems = LibraryManager.shared.libraryItems
         }
     }
+
+    func remove(_ anime: AnimeItem) {
+        LibraryManager.shared.remove(anime)
+    }
 }
