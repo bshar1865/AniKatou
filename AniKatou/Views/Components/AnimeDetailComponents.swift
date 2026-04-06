@@ -184,7 +184,7 @@ struct AnimeMetadataCard: View {
                     ForEach(Array(metadataItems.enumerated()), id: \.offset) { _, item in
                         HStack(alignment: .top, spacing: 14) {
                             Text(item.0)
-                                .font(.caption.weight(.semibold))
+                                .font(.caption2.weight(.semibold))
                                 .foregroundColor(.secondary)
                                 .frame(width: 88, alignment: .leading)
 
@@ -215,9 +215,8 @@ struct AnimeEpisodeSectionHeader: View {
     let currentGroupTitle: String
     let showsGroupMenu: Bool
     let groups: [EpisodeGroup]
-    let isSelecting: Bool
     let onSelectGroup: (Int) -> Void
-    let onToggleSelection: () -> Void
+    let onDownloadAll: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -225,19 +224,24 @@ struct AnimeEpisodeSectionHeader: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.title3.weight(.bold))
-                    Text(isSelecting ? "Tap episodes to build your queue" : "Quick download or select multiple episodes")
+                    Text("Tap any episode to start watching")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
 
                 Spacer()
 
-                Button(isSelecting ? "Done" : "Select", action: onToggleSelection)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.accentColor)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial, in: Capsule())
+                if let onDownloadAll {
+                    Button(action: onDownloadAll) {
+                        Label("Download", systemImage: "arrow.down.circle")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.accentColor)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.ultraThinMaterial, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
             if showsGroupMenu {
@@ -389,74 +393,8 @@ struct AnimeEpisodeCard: View {
     }
 }
 
-struct AnimeEpisodeSelectableRow: View {
-    let episode: EpisodeInfo
-    let isSelected: Bool
-    let isDownloaded: Bool
-    let downloadItem: HLSDownloadItem?
 
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                .font(.title3)
-                .foregroundColor(isSelected ? .accentColor : .secondary)
 
-            AnimeEpisodeCard(
-                episode: episode,
-                isDownloaded: isDownloaded,
-                downloadItem: downloadItem,
-                reservesTrailingAccessorySpace: false
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(isSelected ? Color.accentColor.opacity(0.38) : Color.clear, lineWidth: 1.5)
-            )
-        }
-    }
-}
-
-struct AnimeEpisodeDownloadButton: View {
-    let symbol: String
-    let tint: Color
-
-    var body: some View {
-        Image(systemName: symbol)
-            .font(.caption2.weight(.bold))
-            .foregroundColor(tint)
-            .frame(width: 34, height: 34)
-            .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.white.opacity(0.16), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
-    }
-}
-
-struct AnimeEpisodeSelectionButton: View {
-    let count: Int
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: "arrow.down.circle.fill")
-                    .font(.headline)
-                Text("Queue \(count)")
-                    .font(.subheadline.weight(.semibold))
-            }
-            .foregroundColor(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 13)
-            .background(
-                Capsule()
-                    .fill(count == 0 ? Color.gray : Color.blue)
-            )
-            .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 6)
-        }
-        .disabled(count == 0)
-    }
-}
 
 private struct AnimeDetailPill: View {
     let text: String
@@ -464,7 +402,7 @@ private struct AnimeDetailPill: View {
 
     var body: some View {
         Label(text, systemImage: icon)
-            .font(.caption.weight(.semibold))
+            .font(.caption2.weight(.semibold))
             .foregroundColor(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 7)

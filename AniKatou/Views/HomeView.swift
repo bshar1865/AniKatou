@@ -39,7 +39,14 @@ struct HomeView: View {
         }
         .overlay {
             if viewModel.isLoading && !hasContent {
-                ProgressView("Loading...")
+                VStack(spacing: 10) {
+                    ProgressView()
+                    Text("Loading...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .refreshable {

@@ -55,15 +55,14 @@ class AnimeDetailViewModel: ObservableObject {
 
     private func loadOnlineAnimeDetails(animeId: String) async {
         do {
-            async let detailsTask = APIService.shared.getAnimeDetails(id: animeId)
-            async let episodesTask = APIService.shared.getAnimeEpisodes(id: animeId)
-            let qtipTask = Task { try? await APIService.shared.getAnimeQtipInfo(id: animeId) }
-            let scheduleTask = Task { try? await APIService.shared.getNextEpisodeSchedule(id: animeId) }
+            let result = try await retryFor(duration: 15) {
+                try await fetchOnlineAnimeDetails(animeId: animeId)
+            }
 
-            let detailsResult = try await detailsTask
-            let episodes = try await episodesTask
-            let qtipResult = await qtipTask.value
-            nextEpisodeSchedule = await scheduleTask.value
+            let detailsResult = result.details
+            let episodes = result.episodes
+            let qtipResult = result.qtip
+            nextEpisodeSchedule = result.schedule
 
             if detailsResult.data.anime.info.containsNSFWContent || qtipResult?.data.anime.containsNSFWContent == true {
                 errorMessage = "This app does not support hentai shows."
@@ -91,6 +90,42 @@ class AnimeDetailViewModel: ObservableObject {
             }
             errorMessage = UserMessage.animeDetailsUnavailable
         }
+    }
+
+    private func fetchOnlineAnimeDetails(animeId: String) async throws -> (
+        details: AnimeDetailsResult,
+        episodes: [EpisodeInfo],
+        qtip: AnimeQtipResult?,
+        schedule: NextEpisodeSchedule?
+    ) {
+        async let detailsTask = APIService.shared.getAnimeDetails(id: animeId)
+        async let episodesTask = APIService.shared.getAnimeEpisodes(id: animeId)
+        let qtipTask = Task { try? await APIService.shared.getAnimeQtipInfo(id: animeId) }
+        let scheduleTask = Task { try? await APIService.shared.getNextEpisodeSchedule(id: animeId) }
+
+        let detailsResult = try await detailsTask
+        let episodes = try await episodesTask
+        let qtipResult = await qtipTask.value
+        let scheduleResult = await scheduleTask.value
+
+        return (detailsResult, episodes, qtipResult, scheduleResult)
+    }
+
+    private func retryFor<T>(duration: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
+        let deadline = Date().addingTimeInterval(duration)
+        var lastError: Error?
+
+        while Date() < deadline {
+            do {
+                return try await operation()
+            } catch {
+                lastError = error
+            }
+
+            try? await Task.sleep(nanoseconds: 700_000_000)
+        }
+
+        throw lastError ?? APIError.invalidResponse
     }
 
     func libraryItem() -> AnimeItem? {
@@ -282,6 +317,8 @@ class AnimeDetailViewModel: ObservableObject {
 
 
 }
+
+
 
 
 
