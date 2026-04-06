@@ -56,7 +56,7 @@ class AnimeDetailViewModel: ObservableObject {
     private func loadOnlineAnimeDetails(animeId: String) async {
         do {
             let result = try await retryFor(duration: 15) {
-                try await fetchOnlineAnimeDetails(animeId: animeId)
+                try await self.fetchOnlineAnimeDetails(animeId: animeId)
             }
 
             let detailsResult = result.details
@@ -317,6 +317,7 @@ class AnimeDetailViewModel: ObservableObject {
 
 
 }
+
 
 
 
