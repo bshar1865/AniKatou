@@ -32,13 +32,9 @@ class EpisodeViewModel: ObservableObject {
         do {
             let resolved = try await APIService.shared.resolveStreamingSources(
                 episodeId: episodeId,
-                category: AppSettings.shared.preferredLanguage,
-                preferredServer: AppSettings.shared.preferredServer
+                category: AppSettings.shared.preferredLanguage
             )
             streamingData = resolved.result
-            if resolved.didFallback {
-                playbackNotice = UserMessage.switchedServer(displayName(for: resolved.server))
-            }
         } catch let error as APIError {
             if !loadDownloadedEpisodeIfAvailable(episodeId: episodeId, notice: UserMessage.playbackOpeningOffline) {
                 errorMessage = error.message.isEmpty ? UserMessage.playbackNeedsDownload : error.message
@@ -64,9 +60,5 @@ class EpisodeViewModel: ObservableObject {
         localOutro = introOutro.outro
         playbackNotice = notice
         return true
-    }
-
-    private func displayName(for server: String) -> String {
-        AppSettings.shared.availableServers.first(where: { $0.id == server })?.name ?? server
     }
 }

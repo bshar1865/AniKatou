@@ -1,7 +1,6 @@
 import Foundation
 
 struct APIConfig {
-    static let defaultAPIVersion = "v2"
     static let apiConfigKey = "api_base_url"
     
     static var baseURL: String? {
@@ -18,6 +17,10 @@ struct APIConfig {
         return url.scheme?.lowercased() == "https" || url.scheme?.lowercased() == "http"
     }
     
+    static func buildEndpoint(_ endpoint: APIEndpoint, queryItems: [URLQueryItem]? = nil) -> URL? {
+        buildEndpoint(endpoint.path, queryItems: queryItems)
+    }
+
     static func buildEndpoint(_ path: String, queryItems: [URLQueryItem]? = nil) -> URL? {
         guard var urlString = baseURL?.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "@", with: "") else { return nil }
         
@@ -26,8 +29,12 @@ struct APIConfig {
         
         guard var components = URLComponents(string: urlString) else { return nil }
         let existingPath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let endpointPath = "api/\(defaultAPIVersion)/hianime\(path.hasPrefix("/") ? path : "/\(path)")"
+        let endpointPath = APIEndpointConfig.endpointPath(path)
+
         if existingPath.isEmpty {
+            components.path = "/\(endpointPath)"
+        } else if existingPath.lowercased() == "api" && endpointPath.lowercased().hasPrefix("api/") {
+            // Avoid double /api when the user includes /api in the base URL.
             components.path = "/\(endpointPath)"
         } else {
             components.path = "/\(existingPath)/\(endpointPath)"
@@ -36,4 +43,4 @@ struct APIConfig {
         
         return components.url
     }
-} 
+}

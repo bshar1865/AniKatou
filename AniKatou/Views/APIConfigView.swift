@@ -62,15 +62,9 @@ struct APIConfigView: View {
                 }
                 
                 Section {
-                    Link(destination: URL(string: "https://github.com/ghoshRitesh12/aniwatch-api")!) {
-                        HStack {
-                            Text("Setup Guide")
-                            Spacer()
-                            Image(systemName: "arrow.up.right")
-                        }
-                    }
-                } footer: {
                     Text("You must provide a valid API URL to use this app.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
                 }
             }
             .navigationTitle(isInitialSetup ? "API Configuration Required" : "API Settings")
@@ -82,4 +76,4 @@ struct APIConfigView: View {
 
 #Preview {
     APIConfigView()
-} 
+}

@@ -15,7 +15,7 @@ struct CollectionsDetailView: View {
         ScrollView {
             VStack(spacing: 20) {
                 HStack {
-                    Text("Library")
+                    Text("Favourites")
                         .font(.title)
                         .fontWeight(.bold)
 
@@ -30,9 +30,9 @@ struct CollectionsDetailView: View {
 
                 if viewModel.libraryItems.isEmpty {
                     ContentUnavailableView(
-                        "Library Is Empty",
-                        systemImage: "books.vertical",
-                        description: Text("Anime you save will appear here")
+                        "Favourites Are Empty",
+                        systemImage: "heart",
+                        description: Text("Anime you favourite will appear here")
                     )
                 } else if isGridView {
                     LazyVGrid(columns: Self.gridColumns, spacing: 20) {
@@ -41,7 +41,7 @@ struct CollectionsDetailView: View {
                                 AnimeCard(anime: anime, width: 160)
                             }
                             .contextMenu {
-                                Button("Remove from Library", role: .destructive) {
+                                Button("Remove from Favourites", role: .destructive) {
                                     itemToRemove = anime
                                     showingRemoveAlert = true
                                 }
@@ -56,7 +56,7 @@ struct CollectionsDetailView: View {
                                 row(anime)
                             }
                             .contextMenu {
-                                Button("Remove from Library", role: .destructive) {
+                                Button("Remove from Favourites", role: .destructive) {
                                     itemToRemove = anime
                                     showingRemoveAlert = true
                                 }
@@ -68,8 +68,8 @@ struct CollectionsDetailView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("Library")
-        .alert("Remove From Library", isPresented: $showingRemoveAlert) {
+        .navigationTitle("Favourites")
+        .alert("Remove From Favourites", isPresented: $showingRemoveAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Remove", role: .destructive) {
                 if let anime = itemToRemove {
@@ -78,7 +78,7 @@ struct CollectionsDetailView: View {
                 itemToRemove = nil
             }
         } message: {
-            Text("This anime will be removed from your library.")
+            Text("This anime will be removed from your favourites.")
         }
     }
 
@@ -103,7 +103,7 @@ struct CollectionsDetailView: View {
                         .foregroundColor(.secondary)
                 }
 
-                Text("Saved to Library")
+                Text("Saved to Favourites")
                     .font(.caption)
                     .foregroundColor(.blue)
             }
@@ -114,3 +114,5 @@ struct CollectionsDetailView: View {
         .cornerRadius(12)
     }
 }
+
+

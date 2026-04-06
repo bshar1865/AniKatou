@@ -8,7 +8,6 @@ struct SettingsView: View {
     private var setupItems: [(String, String, Bool)] {
         [
             ("API server", APIConfig.isConfigured ? "Configured" : "Required", APIConfig.isConfigured),
-            ("Preferred server", viewModel.availableServers.first(where: { $0.id == viewModel.preferredServer })?.name ?? viewModel.preferredServer, true),
             ("Audio language", viewModel.availableLanguages.first(where: { $0.id == viewModel.preferredLanguage })?.name ?? viewModel.preferredLanguage, true),
             ("Subtitles", viewModel.subtitlesEnabled ? "Enabled" : "Disabled", viewModel.subtitlesEnabled)
         ]
@@ -44,7 +43,7 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Server Settings")
                                     .font(.headline)
-                                Text("Configure your AniWatch API endpoint")
+                                Text("Configure your API endpoint")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -53,12 +52,6 @@ struct SettingsView: View {
                 }
 
                 Section("Playback") {
-                    Picker("Preferred Server", selection: $viewModel.preferredServer) {
-                        ForEach(viewModel.availableServers, id: \.id) { server in
-                            Text(server.name).tag(server.id)
-                        }
-                    }
-
                     Picker("Audio Language", selection: $viewModel.preferredLanguage) {
                         ForEach(viewModel.availableLanguages, id: \.id) { language in
                             Text(language.name).tag(language.id)
@@ -197,4 +190,3 @@ struct SettingsView: View {
 #Preview {
     SettingsView()
 }
-

@@ -9,7 +9,7 @@ class APIConfigViewModel: ObservableObject {
     @Published var isConfigured: Bool
 
     init() {
-        apiURL = APIConfig.baseURL ?? ""
+        apiURL = APIConfig.baseURL ?? APIEndpointConfig.defaultBaseURL
         isConfigured = APIConfig.isConfigured
     }
 
@@ -39,20 +39,22 @@ class APIConfigViewModel: ObservableObject {
             return false
         }
         let existingPath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let homePath = "api/\(APIConfig.defaultAPIVersion)/hianime/home"
-        components.path = existingPath.isEmpty ? "/\(homePath)" : "/\(existingPath)/\(homePath)"
-        components.queryItems = [URLQueryItem(name: "nsfw", value: "false")]
+        let homePath = APIEndpointConfig.endpointPath(for: .home)
+        if existingPath.isEmpty {
+            components.path = "/\(homePath)"
+        } else if existingPath.lowercased() == "api" && homePath.lowercased().hasPrefix("api/") {
+            components.path = "/\(homePath)"
+        } else {
+            components.path = "/\(existingPath)/\(homePath)"
+        }
+        components.queryItems = nil
         guard let homeURL = components.url else {
             errorMessage = UserMessage.invalidURLFormat
             return false
         }
 
         do {
-            let homeResult = try await validateHomeEndpoint(url: homeURL)
-            guard homeResult.status == 200 else {
-                errorMessage = UserMessage.apiUnexpectedResponse
-                return false
-            }
+            try await validateHomeEndpoint(url: homeURL)
 
             APIConfig.baseURL = modifiedURL
             isConfigured = true
@@ -84,7 +86,7 @@ class APIConfigViewModel: ObservableObject {
         errorMessage = nil
     }
 
-    private func validateHomeEndpoint(url: URL) async throws -> HomePageResult {
+    private func validateHomeEndpoint(url: URL) async throws {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 5
         config.timeoutIntervalForResource = 5
@@ -107,10 +109,13 @@ class APIConfigViewModel: ObservableObject {
                 guard httpResponse.statusCode == 200 else {
                     throw APIError.serverError(httpResponse.statusCode, UserMessage.serverError(httpResponse.statusCode))
                 }
-                guard let homeResult = try? JSONDecoder().decode(HomePageResult.self, from: data) else {
+
+                if let decoded = try? JSONDecoder().decode(AnimeAPIResponse<AnimeAPIHomeData>.self, from: data),
+                   decoded.success == false {
                     throw APIError.invalidResponse
                 }
-                return homeResult
+
+                return
             } catch {
                 lastError = error
                 try? await Task.sleep(nanoseconds: 500_000_000)
@@ -120,3 +125,5 @@ class APIConfigViewModel: ObservableObject {
         throw lastError ?? URLError(.timedOut)
     }
 }
+
+

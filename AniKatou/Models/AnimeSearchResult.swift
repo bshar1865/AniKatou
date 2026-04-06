@@ -220,6 +220,23 @@ struct StreamingData: Codable, Equatable {
         case anilistID
         case malID
     }
+    init(
+        headers: [String: String]?,
+        sources: [StreamSource],
+        tracks: [SubtitleTrack]?,
+        intro: IntroOutro?,
+        outro: IntroOutro?,
+        anilistID: Int?,
+        malID: Int?
+    ) {
+        self.headers = headers
+        self.sources = sources
+        self.tracks = tracks
+        self.intro = intro
+        self.outro = outro
+        self.anilistID = anilistID
+        self.malID = malID
+    }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)

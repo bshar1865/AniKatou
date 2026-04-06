@@ -1,50 +1,70 @@
 import SwiftUI
 
-struct LibraryView: View {
-    @StateObject private var viewModel = LibraryCollectionViewModel()
+fileprivate enum LibraryTab {
+    case recents
+    case downloads
+}
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16)
-    ]
+struct LibraryView: View {
+    @State private var selectedTab: LibraryTab = .recents
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Text("My Library")
-                        .font(.title3.weight(.bold))
-                    Spacer()
-                    Text("\(viewModel.libraryItems.count)")
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(Color(.tertiarySystemBackground)))
-                }
-                .padding(.horizontal)
+        VStack(spacing: 0) {
+            LibrarySegmentedControl(selectedTab: $selectedTab)
+            Divider()
 
-                if viewModel.libraryItems.isEmpty {
-                    ContentUnavailableView(
-                        "Library Is Empty",
-                        systemImage: "books.vertical",
-                        description: Text("Open any anime and tap Add to Library")
-                    )
-                    .frame(maxWidth: .infinity, minHeight: 320)
-                } else {
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(viewModel.libraryItems) { anime in
-                            NavigationLink(destination: AnimeDetailView(animeId: anime.id)) {
-                                AnimeCard(anime: anime)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal)
+            Group {
+                switch selectedTab {
+                case .recents:
+                    RecentsListView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .downloads:
+                    DownloadsListView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .padding(.vertical, 14)
         }
         .navigationTitle("Library")
+    }
+}
+
+private struct LibrarySegmentedControl: View {
+    @Binding var selectedTab: LibraryTab
+
+    var body: some View {
+        HStack(spacing: 24) {
+            segmentButton(title: "Recents", tab: .recents)
+            segmentButton(title: "Downloads", tab: .downloads)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .background(Color(.systemBackground))
+    }
+
+    private func segmentButton(title: String, tab: LibraryTab) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedTab = tab
+            }
+        } label: {
+            VStack(spacing: 6) {
+                Text(title)
+                    .font(.subheadline.weight(selectedTab == tab ? .semibold : .regular))
+                    .foregroundColor(selectedTab == tab ? .primary : .secondary)
+
+                Capsule()
+                    .fill(selectedTab == tab ? Color.blue : Color.clear)
+                    .frame(height: 3)
+                    .frame(maxWidth: 40)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+#Preview {
+    NavigationStack {
+        LibraryView()
     }
 }

@@ -4,7 +4,6 @@ class AppSettings {
     static let shared = AppSettings()
 
     private let defaults = UserDefaults.standard
-    private let serverKey = "preferred_server"
     private let languageKey = "preferred_language"
     private let qualityKey = "video_quality"
     private let subtitlesKey = "subtitles_enabled"
@@ -13,18 +12,6 @@ class AppSettings {
     private let concurrentDownloadsKey = "concurrent_downloads_limit"
 
     private init() {}
-
-    var preferredServer: String {
-        get { defaults.string(forKey: serverKey) ?? "hd-1" }
-        set { defaults.set(newValue, forKey: serverKey) }
-    }
-
-    var availableServers: [(id: String, name: String)] {
-        [
-            ("hd-1", "HD Server 1"),
-            ("hd-2", "HD Server 2")
-        ]
-    }
 
     var preferredLanguage: String {
         get { defaults.string(forKey: languageKey) ?? "sub" }

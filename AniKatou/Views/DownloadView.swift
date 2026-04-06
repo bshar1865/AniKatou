@@ -1,6 +1,13 @@
 import SwiftUI
 
 struct DownloadView: View {
+    var body: some View {
+        DownloadsListView()
+            .navigationTitle("Downloads")
+    }
+}
+
+struct DownloadsListView: View {
     @StateObject private var manager = HLSDownloadManager.shared
     @State private var pendingGroupRemoval: AnimeDownloadGroup?
     @State private var confirmedGroupRemoval: AnimeDownloadGroup?
@@ -36,8 +43,6 @@ struct DownloadView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                summaryCard
-
                 if groups.isEmpty {
                     ContentUnavailableView(
                         "No Downloads",
@@ -61,7 +66,6 @@ struct DownloadView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
         }
-        .navigationTitle("Downloads")
         .confirmationDialog(
             "Remove downloads for \(pendingGroupRemoval?.animeTitle ?? "")?",
             isPresented: Binding(
@@ -98,48 +102,6 @@ struct DownloadView: View {
         }
     }
 
-    private var summaryCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.blue.opacity(0.12))
-                        .frame(width: 46, height: 46)
-
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.blue)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Download Queue")
-                        .font(.headline)
-                    Text("Queued episodes will start automatically as download slots open.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            HStack(spacing: 8) {
-                downloadStatChip(title: "Active", value: "\(activeCount)", tint: .blue)
-                downloadStatChip(title: "Completed", value: "\(completedCount)", tint: .green)
-                if failedCount > 0 {
-                    downloadStatChip(title: "Failed", value: "\(failedCount)", tint: .red)
-                }
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-        )
-    }
-
     private var failureOnlyState: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("Downloads Need Attention", systemImage: "exclamationmark.triangle.fill")
@@ -159,25 +121,6 @@ struct DownloadView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.red.opacity(0.18), lineWidth: 1)
-        )
-    }
-
-    private func downloadStatChip(title: String, value: String, tint: Color) -> some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(tint.opacity(0.92))
-                .frame(width: 7, height: 7)
-            Text(title)
-            Text(value)
-                .fontWeight(.semibold)
-        }
-        .font(.caption)
-        .foregroundColor(.secondary)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            Capsule()
-                .fill(Color(.tertiarySystemBackground))
         )
     }
 }
@@ -229,6 +172,13 @@ private struct DownloadGroupCard: View {
                 .buttonStyle(.plain)
 
                 Spacer()
+
+                NavigationLink(destination: AnimeDetailView(animeId: group.animeId)) {
+                    Image(systemName: "info.circle")
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.blue)
+                .buttonStyle(.borderless)
 
                 Button("Remove", role: .destructive) {
                     onRemove()
@@ -305,13 +255,18 @@ private struct DownloadAnimeDetailView: View {
                     .padding(.top, 24)
                 } else {
                     ForEach(items) { item in
-                        DownloadEpisodeRow(item: item, onAction: {
-                            if item.state == .queued || item.state == .downloading {
-                                manager.cancelDownload(item)
-                            } else {
-                                manager.removeDownload(item)
+                        DownloadEpisodeRow(
+                            item: item,
+                            animeId: animeId,
+                            animeTitle: animeTitle,
+                            onAction: {
+                                if item.state == .queued || item.state == .downloading {
+                                    manager.cancelDownload(item)
+                                } else {
+                                    manager.removeDownload(item)
+                                }
                             }
-                        })
+                        )
                     }
                 }
             }
@@ -320,11 +275,20 @@ private struct DownloadAnimeDetailView: View {
         }
         .navigationTitle(animeTitle)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink(destination: AnimeDetailView(animeId: animeId)) {
+                    Text("Details")
+                }
+            }
+        }
     }
 }
 
 private struct DownloadEpisodeRow: View {
     let item: HLSDownloadItem
+    let animeId: String
+    let animeTitle: String
     let onAction: () -> Void
 
     private var isActive: Bool {
@@ -343,6 +307,10 @@ private struct DownloadEpisodeRow: View {
         item.state == .failed ? .red : .blue
     }
 
+    private var canPlay: Bool {
+        item.state == .completed
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -358,20 +326,43 @@ private struct DownloadEpisodeRow: View {
                 .tint(tintColor)
 
             HStack(alignment: .top) {
-                Text(statusText)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Watch to EPISODE \(item.episodeNumber)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    if item.state == .completed, let sizeText = downloadSizeText() {
+                        Text("Used \(sizeText)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
 
                 Spacer(minLength: 10)
 
-                Button(actionLabel, role: actionRole) {
-                    onAction()
+                if canPlay {
+                    NavigationLink(destination: EpisodeView(
+                        episodeId: item.episodeId,
+                        animeId: animeId,
+                        animeTitle: animeTitle,
+                        episodeNumber: item.episodeNumber,
+                        episodeTitle: nil,
+                        thumbnailURL: nil
+                    )) {
+                        Text("Play")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.borderedProminent)
+                    .tint(.blue)
+                    .controlSize(.small)
+                } else {
+                    Button(actionLabel, role: actionRole) {
+                        onAction()
+                    }
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.borderedProminent)
+                    .tint(isActive ? .orange : .red)
+                    .controlSize(.small)
                 }
-                .font(.caption.weight(.semibold))
-                .buttonStyle(.borderedProminent)
-                .tint(isActive ? .orange : .red)
-                .controlSize(.small)
             }
         }
         .padding(12)
@@ -384,6 +375,46 @@ private struct DownloadEpisodeRow: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
+    }
+
+    private func downloadSizeText() -> String? {
+        let bytes = downloadSizeBytes()
+        guard bytes > 0 else { return nil }
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useMB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
+
+    private func downloadSizeBytes() -> Int64 {
+        guard let path = item.localPath else { return 0 }
+        let url = URL(fileURLWithPath: path)
+        return fileSize(at: url)
+    }
+
+    private func fileSize(at url: URL) -> Int64 {
+        let fileManager = FileManager.default
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) else { return 0 }
+
+        if !isDirectory.boolValue {
+            if let fileSize = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+                return Int64(fileSize)
+            }
+            return 0
+        }
+
+        guard let enumerator = fileManager.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey]) else {
+            return 0
+        }
+
+        var total: Int64 = 0
+        for case let fileURL as URL in enumerator {
+            if let fileSize = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+                total += Int64(fileSize)
+            }
+        }
+        return total
     }
 
     private var statusTitle: String {
@@ -403,21 +434,6 @@ private struct DownloadEpisodeRow: View {
         case .completed: return .green
         case .failed: return .red
         case .cancelled: return .orange
-        }
-    }
-
-    private var statusText: String {
-        switch item.state {
-        case .queued:
-            return "Preparing this episode for offline playback"
-        case .downloading:
-            return "Downloading \(Int(item.progress * 100))%"
-        case .completed:
-            return "Saved offline and ready without internet"
-        case .failed:
-            return item.errorMessage ?? "Needs internet to continue"
-        case .cancelled:
-            return "Stopped before completion"
         }
     }
 }
@@ -444,3 +460,5 @@ private struct StateBadge: View {
         DownloadView()
     }
 }
+
+
