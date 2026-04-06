@@ -45,19 +45,44 @@ struct AnimeAPIHomeData: Decodable {
     let latestDub: [AnimeAPIListItem]
     let latestChina: [AnimeAPIListItem]
 
+    enum CodingKeys: String, CodingKey {
+        case featured
+        case trending
+        case latestSub
+        case latestDub
+        case latestChina
+        case latestSubAlt = "latest_sub"
+        case latestDubAlt = "latest_dub"
+        case latestChinaAlt = "latest_china"
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         featured = try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .featured) ?? []
         trending = try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .trending) ?? []
-        latestSub = try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestSub) ?? []
-        latestDub = try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestDub) ?? []
-        latestChina = try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestChina) ?? []
+        latestSub =
+            try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestSub)
+            ?? container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestSubAlt)
+            ?? []
+        latestDub =
+            try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestDub)
+            ?? container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestDubAlt)
+            ?? []
+        latestChina =
+            try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestChina)
+            ?? container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestChinaAlt)
+            ?? []
     }
 }
 
 struct AnimeAPISearchData: Decodable {
     let results: [AnimeAPIListItem]
     let pagination: AnimeAPIPagination?
+
+    enum CodingKeys: String, CodingKey {
+        case results
+        case pagination
+    }
 
     init(from decoder: Decoder) throws {
         if var arrayContainer = try? decoder.unkeyedContainer() {
@@ -204,3 +229,4 @@ final class AnimeArtworkCache {
 }
 
 private struct EmptyDecodable: Decodable {}
+
