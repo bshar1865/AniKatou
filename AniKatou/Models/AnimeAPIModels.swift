@@ -38,40 +38,38 @@ struct StringOrInt: Codable {
     }
 }
 
+struct AnimeAPITrendingSection: Decodable {
+    let now: [AnimeAPIListItem]?
+    let day: [AnimeAPIListItem]?
+    let week: [AnimeAPIListItem]?
+    let month: [AnimeAPIListItem]?
+}
+
 struct AnimeAPIHomeData: Decodable {
     let featured: [AnimeAPIListItem]
-    let trending: [AnimeAPIListItem]
-    let latestSub: [AnimeAPIListItem]
-    let latestDub: [AnimeAPIListItem]
-    let latestChina: [AnimeAPIListItem]
+    let trending: AnimeAPITrendingSection?
+    let latestUpdates: [AnimeAPIListItem]
+    let newReleases: [AnimeAPIListItem]
+    let upcoming: [AnimeAPIListItem]
+    let completed: [AnimeAPIListItem]
 
     enum CodingKeys: String, CodingKey {
         case featured
         case trending
-        case latestSub
-        case latestDub
-        case latestChina
-        case latestSubAlt = "latest_sub"
-        case latestDubAlt = "latest_dub"
-        case latestChinaAlt = "latest_china"
+        case latestUpdates
+        case newReleases
+        case upcoming
+        case completed
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         featured = try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .featured) ?? []
-        trending = try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .trending) ?? []
-        latestSub =
-            try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestSub)
-            ?? container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestSubAlt)
-            ?? []
-        latestDub =
-            try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestDub)
-            ?? container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestDubAlt)
-            ?? []
-        latestChina =
-            try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestChina)
-            ?? container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestChinaAlt)
-            ?? []
+        trending = try container.decodeIfPresent(AnimeAPITrendingSection.self, forKey: .trending)
+        latestUpdates = try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .latestUpdates) ?? []
+        newReleases = try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .newReleases) ?? []
+        upcoming = try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .upcoming) ?? []
+        completed = try container.decodeIfPresent([AnimeAPIListItem].self, forKey: .completed) ?? []
     }
 }
 
@@ -117,6 +115,7 @@ struct AnimeAPIListItem: Codable {
     let jpTitle: String?
     let link: String?
     let image: String?
+    let poster: String?
     let tooltipId: String?
     let sub: StringOrInt?
     let dub: StringOrInt?
@@ -161,6 +160,7 @@ struct AnimeAPIDetailsInfo: Codable {
     let duration: String?
     let status: String?
     let malScore: String?
+    let mal: String?
     let genres: [AnimeAPINameUrl]?
     let studios: [AnimeAPINameUrl]?
     let producers: [AnimeAPINameUrl]?
@@ -175,6 +175,7 @@ struct AnimeAPIDetailsInfo: Codable {
         case duration
         case status
         case malScore = "mal_score"
+        case mal
         case genres
         case studios
         case producers
@@ -229,4 +230,11 @@ final class AnimeArtworkCache {
 }
 
 private struct EmptyDecodable: Decodable {}
+
+
+
+
+
+
+
 

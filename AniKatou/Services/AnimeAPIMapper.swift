@@ -3,24 +3,35 @@ import Foundation
 enum AnimeAPIMapper {
     static func mapHome(_ data: AnimeAPIHomeData) -> HomePageData {
         let featured = mapList(data.featured)
-        let trending = mapList(data.trending)
-        let latestSub = mapList(data.latestSub)
-        let latestDub = mapList(data.latestDub)
-        let latestChina = mapList(data.latestChina)
+        let trendingNow = mapList(data.trending?.now ?? [])
+        let trendingDay = mapList(data.trending?.day ?? [])
+        let trendingWeek = mapList(data.trending?.week ?? [])
+        let trendingMonth = mapList(data.trending?.month ?? [])
 
-        let combinedLatest = latestSub + latestDub + latestChina
-        let top10 = Array((trending.isEmpty ? featured : trending).prefix(10))
+        let latestUpdates = mapList(data.latestUpdates)
+        let newReleases = mapList(data.newReleases)
+        let upcoming = mapList(data.upcoming)
+        let completed = mapList(data.completed)
+
+        let trendingFallback = !trendingNow.isEmpty ? trendingNow : (!trendingDay.isEmpty ? trendingDay : (!trendingWeek.isEmpty ? trendingWeek : featured))
+        let topToday = !trendingDay.isEmpty ? trendingDay : trendingFallback
+        let topWeek = !trendingWeek.isEmpty ? trendingWeek : trendingFallback
+        let topMonth = !trendingMonth.isEmpty ? trendingMonth : trendingFallback
 
         return HomePageData(
             spotlightAnimes: featured,
-            trendingAnimes: trending,
-            latestEpisodeAnimes: combinedLatest,
-            topUpcomingAnimes: [],
-            topAiringAnimes: latestSub,
-            mostPopularAnimes: featured.isEmpty ? trending : featured,
-            latestCompletedAnimes: latestDub,
+            trendingAnimes: trendingFallback,
+            latestEpisodeAnimes: latestUpdates.isEmpty ? newReleases : latestUpdates,
+            topUpcomingAnimes: upcoming,
+            topAiringAnimes: newReleases,
+            mostPopularAnimes: !trendingMonth.isEmpty ? trendingMonth : trendingFallback,
+            latestCompletedAnimes: completed,
             genres: [],
-            top10Animes: Top10Animes(today: top10, week: [], month: [])
+            top10Animes: Top10Animes(
+                today: Array(topToday.prefix(10)),
+                week: Array(topWeek.prefix(10)),
+                month: Array(topMonth.prefix(10))
+            )
         )
     }
 
@@ -56,7 +67,7 @@ enum AnimeAPIMapper {
             premiered: detailsInfo?.premiered,
             duration: detailsInfo?.duration,
             status: detailsInfo?.status,
-            malscore: detailsInfo?.malScore ?? data.rating,
+            malscore: detailsInfo?.malScore ?? detailsInfo?.mal ?? data.rating,
             genres: genres,
             studios: studios,
             producers: producers
@@ -87,7 +98,7 @@ enum AnimeAPIMapper {
         let info = AnimeQtipInfo(
             id: data.id ?? slugify(title),
             name: title,
-            malscore: data.details?.malScore,
+            malscore: data.details?.malScore ?? data.details?.mal,
             quality: nil,
             episodes: EpisodeCount(sub: data.sub?.intValue, dub: data.dub?.intValue),
             type: data.type,
@@ -146,7 +157,7 @@ enum AnimeAPIMapper {
     static func mapListItem(_ item: AnimeAPIListItem) -> AnimeItem? {
         guard let title = item.title, !title.isEmpty else { return nil }
         let id = item.id ?? item.link.map(extractId) ?? slugify(title)
-        if let image = item.image {
+        if let image = item.image ?? item.poster {
             AnimeArtworkCache.shared.store(id: id, image: image)
         }
         let genres = item.genres?.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
@@ -156,7 +167,7 @@ enum AnimeAPIMapper {
             id: id,
             name: title,
             jname: item.jpTitle,
-            poster: item.image ?? "",
+            poster: item.image ?? item.poster ?? "",
             duration: nil,
             type: item.type,
             rating: item.rating,
@@ -197,3 +208,6 @@ enum AnimeAPIMapper {
             .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
     }
 }
+
+
+

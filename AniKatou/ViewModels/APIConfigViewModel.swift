@@ -40,7 +40,13 @@ class APIConfigViewModel: ObservableObject {
         }
         let existingPath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let homePath = APIEndpointConfig.endpointPath(for: .home)
-        components.path = existingPath.isEmpty ? "/\(homePath)" : "/\(existingPath)/\(homePath)"
+        if existingPath.isEmpty {
+            components.path = "/\(homePath)"
+        } else if existingPath.lowercased() == "api" && homePath.lowercased().hasPrefix("api/") {
+            components.path = "/\(homePath)"
+        } else {
+            components.path = "/\(existingPath)/\(homePath)"
+        }
         components.queryItems = nil
         guard let homeURL = components.url else {
             errorMessage = UserMessage.invalidURLFormat
@@ -119,3 +125,5 @@ class APIConfigViewModel: ObservableObject {
         throw lastError ?? URLError(.timedOut)
     }
 }
+
+
