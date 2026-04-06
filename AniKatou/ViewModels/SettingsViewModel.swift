@@ -3,10 +3,6 @@ import SwiftUI
 
 @MainActor
 class SettingsViewModel: ObservableObject {
-    @Published var preferredServer: String {
-        didSet { AppSettings.shared.preferredServer = preferredServer }
-    }
-
     @Published var preferredLanguage: String {
         didSet { AppSettings.shared.preferredLanguage = preferredLanguage }
     }
@@ -64,7 +60,6 @@ class SettingsViewModel: ObservableObject {
 
     @Published var cacheStatistics: (totalSize: Int64, animeCount: Int, imageCount: Int)?
 
-    var availableServers: [(id: String, name: String)] { AppSettings.shared.availableServers }
     var availableLanguages: [(id: String, name: String)] { AppSettings.shared.availableLanguages }
     var availableQualities: [(id: String, name: String)] { AppSettings.shared.availableQualities }
 
@@ -73,7 +68,6 @@ class SettingsViewModel: ObservableObject {
     }
 
     init() {
-        preferredServer = AppSettings.shared.preferredServer
         preferredLanguage = AppSettings.shared.preferredLanguage
         preferredQuality = AppSettings.shared.preferredQuality
         concurrentDownloadsLimit = AppSettings.shared.concurrentDownloadsLimit

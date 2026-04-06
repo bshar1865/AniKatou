@@ -68,30 +68,32 @@ class APIService {
         }
 
         let queryItems = APIEndpointConfig.searchQueryItems(query: query, page: page)
+        let data: AnimeAPISearchData = try await fetch(.search, queryItems: queryItems)
+        let items = AnimeAPIMapper.mapSearch(data)
 
-        let result: AnimeSearchResult = try await fetch(.search, queryItems: queryItems)
         if excludeRatings.isEmpty {
-            return result.data.animes
+            return items
         }
-        return result.data.animes.filter { !ContentSafety.shouldExcludeRating($0.rating, excludeRatings: excludeRatings) }
+        return items.filter { !ContentSafety.shouldExcludeRating($0.rating, excludeRatings: excludeRatings) }
     }
 
     func getAnimeDetails(id: String) async throws -> AnimeDetailsResult {
-        try await fetch(.animeDetails(id: id))
+        let data: AnimeAPIDetails = try await fetch(.animeDetails(id: id))
+        return try AnimeAPIMapper.mapDetails(data)
     }
 
     func getAnimeQtipInfo(id: String) async throws -> AnimeQtipResult {
-        try await fetch(.qtip(id: id))
+        let data: AnimeAPIDetails = try await fetch(.qtip(id: id))
+        return try AnimeAPIMapper.mapQtip(data)
     }
 
     func getAnimeEpisodes(id: String) async throws -> [EpisodeInfo] {
-        let result: EpisodesResponse = try await fetch(.animeEpisodes(id: id))
-        return result.data.episodes
+        let data: [AnimeAPIEpisode] = try await fetch(.animeEpisodes(id: id))
+        return AnimeAPIMapper.mapEpisodes(data)
     }
 
     func getNextEpisodeSchedule(id: String) async throws -> NextEpisodeSchedule {
-        let result: NextEpisodeScheduleResult = try await fetch(.nextEpisodeSchedule(id: id))
-        return result.data
+        throw APIError.invalidEndpoint
     }
 
     func resolveStreamingSources(episodeId: String, category: String = "sub", preferredServer: String = "hd-1") async throws -> ResolvedStreamingSource {
@@ -108,19 +110,72 @@ class APIService {
         }
 
         let queryItems = APIEndpointConfig.streamQueryItems(token: episodeId, type: category)
-
-        let result: StreamingResult = try await fetch(.streamingSources, queryItems: queryItems)
-        return result
+        let data: AnimeAPIStreamData = try await fetch(.streamingSources, queryItems: queryItems)
+        return AnimeAPIMapper.mapStream(data)
     }
 
     func getHomePage() async throws -> HomePageData {
-        let result: HomePageResult = try await fetch(.home)
-        return result.data
+        let data: AnimeAPIHomeData = try await fetch(.home)
+        return AnimeAPIMapper.mapHome(data)
     }
 
     func getPopularAnime() async throws -> [AnimeItem] {
         let home = try await getHomePage()
         return home.mostPopularAnimes
+    }
+
+    private func fetch<T: Decodable>(_ endpoint: APIEndpoint, queryItems: [URLQueryItem] = []) async throws -> T {
+        let data = try await fetchData(endpoint, queryItems: queryItems)
+        do {
+            let response = try decoder.decode(AnimeAPIResponse<T>.self, from: data)
+            if response.success == false {
+                throw APIError.serverError(502, response.error ?? UserMessage.apiRequestFailed)
+            }
+            guard let payload = response.data else {
+                throw APIError.invalidResponse
+            }
+            return payload
+        } catch let error as APIError {
+            throw error
+        } catch {
+            throw APIError.decodingError(error)
+        }
+    }
+
+    private func fetchData(_ endpoint: APIEndpoint, queryItems: [URLQueryItem] = []) async throws -> Data {
+        try await performWithRetryWindow { [self] in
+            guard let url = APIConfig.buildEndpoint(endpoint, queryItems: queryItems) else {
+                throw APIError.notConfigured
+            }
+
+            var request = URLRequest(url: url)
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.setValue(self.userAgent, forHTTPHeaderField: "User-Agent")
+            request.timeoutInterval = 5
+
+            do {
+                let (data, response) = try await self.session.data(for: request)
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw APIError.invalidResponse
+                }
+
+                if httpResponse.statusCode == 404 {
+                    throw APIError.serverError(404, UserMessage.apiResourceNotFound)
+                }
+
+                if httpResponse.statusCode != 200 {
+                    throw APIError.serverError(httpResponse.statusCode, UserMessage.apiRequestFailed)
+                }
+
+                return data
+            } catch let error as APIError {
+                throw error
+            } catch {
+                throw APIError.networkError(error)
+            }
+        }
     }
 
     private func performWithRetryWindow<T>(_ operation: @escaping () async throws -> T) async throws -> T {
@@ -160,61 +215,6 @@ class APIService {
             return code >= 500
         default:
             return false
-        }
-    }
-
-    private func validateEnvelope(_ response: APIResultEnvelope) throws {
-        if let success = response.success, success == false {
-            throw APIError.serverError(response.status ?? 500, UserMessage.apiRequestFailed)
-        }
-        if let status = response.status, status != 200 {
-            throw APIError.serverError(status, UserMessage.unexpectedStatus(status))
-        }
-    }
-
-    private func validateResponse<T: Codable>(_ response: T) throws -> T {
-        if let envelope = response as? APIResultEnvelope {
-            try validateEnvelope(envelope)
-        }
-        return response
-    }
-
-    private func fetch<T: Codable>(_ endpoint: APIEndpoint, queryItems: [URLQueryItem] = []) async throws -> T {
-        try await performWithRetryWindow { [self] in
-            guard let url = APIConfig.buildEndpoint(endpoint, queryItems: queryItems) else {
-                throw APIError.notConfigured
-            }
-
-            var request = URLRequest(url: url)
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.setValue("application/json", forHTTPHeaderField: "Accept")
-            request.setValue(self.userAgent, forHTTPHeaderField: "User-Agent")
-            request.timeoutInterval = 5
-
-            do {
-                let (data, response) = try await self.session.data(for: request)
-
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    throw APIError.invalidResponse
-                }
-
-                if httpResponse.statusCode == 404 {
-                    throw APIError.serverError(404, UserMessage.apiResourceNotFound)
-                }
-
-                if httpResponse.statusCode != 200 {
-                    throw APIError.serverError(httpResponse.statusCode, UserMessage.apiRequestFailed)
-                }
-
-                let decodedResponse = try self.decoder.decode(T.self, from: data)
-                return try self.validateResponse(decodedResponse)
-            } catch let error as DecodingError {
-                throw APIError.decodingError(error)
-            } catch let error as APIError {
-                throw error
-            } catch {
-                throw APIError.networkError(error)
-            }
         }
     }
 }

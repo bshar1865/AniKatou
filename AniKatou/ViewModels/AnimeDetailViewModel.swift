@@ -222,8 +222,7 @@ class AnimeDetailViewModel: ObservableObject {
 
         let resolved = try await APIService.shared.resolveStreamingSources(
             episodeId: episode.id,
-            category: AppSettings.shared.preferredLanguage,
-            preferredServer: AppSettings.shared.preferredServer
+            category: AppSettings.shared.preferredLanguage
         )
 
         guard let source = resolved.result.data.sources.first(where: { ($0.isM3U8 ?? false) || $0.url.contains(".m3u8") }),
@@ -245,7 +244,7 @@ class AnimeDetailViewModel: ObservableObject {
         )
 
         guard started else { return (false, nil) }
-        return (true, resolved.didFallback ? displayName(for: resolved.server) : nil)
+        return (true, nil)
     }
 
     private func queueEpisodeDownloadWithRetry(anime: AnimeItem, episodesToCache: [EpisodeInfo], episode: EpisodeInfo) async -> (queued: Bool, serverName: String?) {
@@ -281,7 +280,13 @@ class AnimeDetailViewModel: ObservableObject {
         }
     }
 
-    private func displayName(for server: String) -> String {
-        AppSettings.shared.availableServers.first(where: { $0.id == server })?.name ?? server
-    }
+
 }
+
+
+
+
+
+
+
+

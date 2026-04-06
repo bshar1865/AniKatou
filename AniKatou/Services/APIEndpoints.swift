@@ -7,7 +7,6 @@ enum APIEndpoint {
     case home
     case qtip(id: String)
     case nextEpisodeSchedule(id: String)
-    case episodeServers
     case streamingSources
 
     var path: String {
@@ -24,8 +23,6 @@ enum APIEndpoint {
             return "details/\(id)"
         case .nextEpisodeSchedule:
             return "updates"
-        case .episodeServers:
-            return "stream"
         case .streamingSources:
             return "stream"
         }

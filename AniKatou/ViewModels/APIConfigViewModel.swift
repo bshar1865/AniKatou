@@ -41,7 +41,7 @@ class APIConfigViewModel: ObservableObject {
         let existingPath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let homePath = APIEndpointConfig.endpointPath(for: .home)
         components.path = existingPath.isEmpty ? "/\(homePath)" : "/\(existingPath)/\(homePath)"
-        components.queryItems = [URLQueryItem(name: "nsfw", value: "false")]
+        components.queryItems = nil
         guard let homeURL = components.url else {
             errorMessage = UserMessage.invalidURLFormat
             return false
@@ -104,9 +104,8 @@ class APIConfigViewModel: ObservableObject {
                     throw APIError.serverError(httpResponse.statusCode, UserMessage.serverError(httpResponse.statusCode))
                 }
 
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let success = json["success"] as? Bool,
-                   success == false {
+                if let decoded = try? JSONDecoder().decode(AnimeAPIResponse<AnimeAPIHomeData>.self, from: data),
+                   decoded.success == false {
                     throw APIError.invalidResponse
                 }
 
